@@ -5,9 +5,19 @@ import {
   UnauthorizedException,
   HttpCode,
   HttpStatus,
+  Get,
+  UseGuards,
+  Request as NestRequest,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { SignupDto, LoginDto } from './dto/auth.dto';
+import { JwtAuthGuard } from '../common/guard/jwt.guard';
+import { User } from '@prisma/client';
+
+// 定义一个包含 user 的 Request 类型，或者使用全局声明
+interface RequestWithUser extends Request {
+  user: Omit<User, 'password'>;
+}
 
 @Controller('auth')
 export class AuthController {
@@ -15,7 +25,6 @@ export class AuthController {
 
   @Post('signup')
   async signUp(@Body() signupDto: SignupDto) {
-    // 替换 any -> SignupDto
     return this.authService.register(
       signupDto.email,
       signupDto.password,
@@ -26,7 +35,6 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(@Body() loginDto: LoginDto) {
-    // 替换 any -> LoginDto
     const user = await this.authService.validateUser(
       loginDto.email,
       loginDto.password,
@@ -35,5 +43,12 @@ export class AuthController {
       throw new UnauthorizedException('邮箱或密码错误');
     }
     return this.authService.login(user);
+  }
+
+  @Get('profile')
+  @UseGuards(JwtAuthGuard)
+  getProfile(@NestRequest() req: RequestWithUser) {
+    // 因为已经有了 Guard 和 Strategy，这里的 req.user 已经是数据库里的最新对象
+    return req.user;
   }
 }

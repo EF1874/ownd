@@ -11,13 +11,15 @@ export class UsersService {
     // 关键：绝对不能在数据库存明文密码！使用 bcrypt 加密。
     const hashedPassword = await bcrypt.hash(pass, 10);
 
-    return this.prisma.user.create({
+    const { password: _, ...user } = await this.prisma.user.create({
       data: {
         email,
         password: hashedPassword,
         name,
       },
     });
+
+    return user;
   }
 
   // 查找：根据邮箱找到用户（登录验证用）
