@@ -1,0 +1,53 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+}
+
+// 1. 用户模型
+model User {
+    id        String   @id @default(uuid())
+    email     String   @unique
+    password  String
+    name      String?
+    items     Item[] // 一个用户可以拥有多个物品
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+// 2. 物品模型 (对应前端的 Device)
+model Item {
+    id           String   @id @default(uuid())
+    name         String
+    price        Float    @default(0.0)
+    purchaseDate DateTime @default(now())
+
+    // 核心业务字段
+    imagePath String?
+    notes     String?
+    tags      String[] // PostgreSQL 原生支持字符串数组，非常方便
+
+    // 关联
+    userId     String
+    user       User      @relation(fields: [userId], references: [id])
+    categoryId String?
+    category   Category? @relation(fields: [categoryId], references: [id])
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+// 3. 分类模型
+model Category {
+    id       String @id @default(uuid())
+    name     String @unique
+    iconPath String
+    items    Item[]
+}
