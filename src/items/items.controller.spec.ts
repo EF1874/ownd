@@ -1,0 +1,126 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { ItemsController } from './items.controller';
+import { ItemsService } from './items.service';
+import { MinioService } from '../minio/minio.service';
+import { JwtAuthGuard } from '../common/guard/jwt.guard';
+import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
+import { CreateItemDto } from './dto/create-item.dto';
+import { UpdateItemDto } from './dto/update-item.dto';
+import { User } from '@prisma/client';
+
+describe('ItemsController', () => {
+  let controller: ItemsController;
+  let service: DeepMockProxy<ItemsService>;
+  let minioService: DeepMockProxy<MinioService>;
+
+  const mockUser: User = {
+    id: 'user-1',
+    email: 'test@test.com',
+    name: 'Test User',
+    password: 'hashedpassword',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  // 严格定义 MockRequest 类型，不再使用 any
+  const mockRequest = { user: mockUser } as any;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [ItemsController],
+      providers: [
+        {
+          provide: ItemsService,
+          useValue: mockDeep<ItemsService>(),
+        },
+        {
+          provide: MinioService,
+          useValue: mockDeep<MinioService>(),
+        },
+      ],
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
+
+    controller = module.get<ItemsController>(ItemsController);
+    service = module.get(ItemsService);
+    minioService = module.get(MinioService);
+  });
+
+  it('should be defined', () => {
+    expect(controller).toBeDefined();
+  });
+
+  describe('create', () => {
+    it('应该调用 service.create 并传入正确的 userId', async () => {
+      const dto: CreateItemDto = { name: '物品', price: 10 };
+      await controller.create(dto, mockRequest);
+
+      expect(service.create).toHaveBeenCalledWith(mockUser.id, dto);
+    });
+  });
+
+  describe('findAll', () => {
+    it('应该调用 service.findAll 并传入正确的 userId', async () => {
+      await controller.findAll(mockRequest);
+
+      expect(service.findAll).toHaveBeenCalledWith(mockUser.id);
+    });
+  });
+
+  describe('findOne', () => {
+    it('应该传入正确的 itemId 和 userId', async () => {
+      const itemId = 'item-123';
+      await controller.findOne(itemId, mockRequest);
+
+      expect(service.findOne).toHaveBeenCalledWith(itemId, mockUser.id);
+    });
+  });
+
+  describe('update', () => {
+    it('应该传入正确的参数进行更新', async () => {
+      const itemId = 'item-123';
+      const dto: UpdateItemDto = { name: '新名字' };
+      await controller.update(itemId, dto, mockRequest);
+
+      expect(service.update).toHaveBeenCalledWith(itemId, mockUser.id, dto);
+    });
+  });
+
+  describe('remove', () => {
+    it('应该调用 service.remove 并传入正确的 ID', async () => {
+      const itemId = 'item-123';
+      await controller.remove(itemId, mockRequest);
+
+      expect(service.remove).toHaveBeenCalledWith(itemId, mockUser.id);
+    });
+  });
+
+  describe('uploadImage', () => {
+    it('应该经过 权限校验 -> MinIO 上传 -> 数据库更新 的完整流程', async () => {
+      const itemId = 'item-123';
+      const mockFile = {
+        originalname: 'test.png',
+        buffer: Buffer.from('test'),
+      } as Express.Multer.File;
+      const mockSavedPath = '/ownd-items/test.png';
+
+      service.findOne.mockResolvedValue({
+        id: itemId,
+        userId: mockUser.id,
+      } as any);
+      minioService.uploadFile.mockResolvedValue(mockSavedPath);
+
+      await controller.uploadImage(itemId, mockFile, mockRequest);
+
+      expect(service.findOne).toHaveBeenCalledWith(itemId, mockUser.id);
+      expect(minioService.uploadFile).toHaveBeenCalledWith(mockFile);
+      expect(service.updateImagePath).toHaveBeenCalledWith(
+        itemId,
+        mockUser.id,
+        mockSavedPath,
+      );
+    });
+  });
+});
