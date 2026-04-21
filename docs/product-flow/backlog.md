@@ -7,14 +7,14 @@
 - [x] **TSK-1.4**: Auth 模块实现 (JWT 登录与校验) [DONE]
 - [x] **TSK-1.5**: 全局拦截器与异常过滤器 [DONE]
 - [x] **TSK-1.7**: Items CRUD 与归属权隔离 [DONE]
-- [ ] **TSK-1.6**: Swagger API 文档集成 [TODO]
+- [/] **TSK-1.6**: Swagger API 文档集成 [In Progress]
 
 ## [Epic] V2.0 业务能力
 - [ ] **TSK-2.1**: Category CRUD
 - [x] **TSK-1.7**: Item CRUD (已提前在 V1.0 完成)
 
 ## [Epic] V3.0 高级特性
-- [/] **TSK-3.1**: 文件上传 (MinIO) [Partially Done - Need Verification]
+- [x] **TSK-3.1**: 文件上传 (MinIO) [DONE]
 - [ ] **TSK-3.2**: 异步 Timeline (EventEmitter)
 
 ## Milestones
