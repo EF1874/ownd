@@ -20,6 +20,8 @@ model User {
     items     Item[] // 一个用户可以拥有多个物品
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
+
+    categories Category[]
 }
 
 // 2. 物品模型 (对应前端的 Device)
@@ -38,16 +40,33 @@ model Item {
     userId     String
     user       User      @relation(fields: [userId], references: [id])
     categoryId String?
-    category   Category? @relation(fields: [categoryId], references: [id])
+    category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
+
+    @@index([categoryId])
 }
 
 // 3. 分类模型
 model Category {
-    id       String @id @default(uuid())
-    name     String @unique
-    iconPath String
-    items    Item[]
+    id   String  @id @default(uuid())
+    name String
+    icon String?
+
+    userId String
+    user   User   @relation(fields: [userId], references: [id])
+
+    @@unique([name, userId])
+
+    parentId String?
+    parent   Category?  @relation("CategoryToCategory", fields: [parentId], references: [id], onDelete: Cascade)
+    children Category[] @relation("CategoryToCategory")
+
+    items Item[]
+
+    createAt DateTime @default(now())
+    updateAt DateTime @updatedAt
+
+    @@index([parentId])
 }

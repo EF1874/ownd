@@ -20,8 +20,14 @@ export class SignupDto {
   @MinLength(6, { message: '密码至少需要 6 位' })
   password: string;
 
+  @ApiProperty({
+    description: '用户名',
+    example: '张三',
+    required: true,
+  })
   @IsString()
-  name?: string;
+  @IsNotEmpty()
+  name: string;
 }
 
 export class LoginDto {

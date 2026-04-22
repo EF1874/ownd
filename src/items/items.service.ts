@@ -8,9 +8,10 @@ export class ItemsService {
   constructor(private prisma: PrismaService) {}
 
   async create(userId: string, createItemDto: CreateItemDto) {
+    const { file: _, ...data } = createItemDto;
     return this.prisma.item.create({
       data: {
-        ...createItemDto,
+        ...data,
         userId: userId,
       },
     });
@@ -21,6 +22,9 @@ export class ItemsService {
       where: {
         userId: userId,
       },
+      include: {
+        category: true,
+      },
     });
   }
 
@@ -29,6 +33,9 @@ export class ItemsService {
       where: {
         id,
         userId, // 关键：只能查询属于自己的物品
+      },
+      include: {
+        category: true,
       },
     });
 
@@ -44,7 +51,7 @@ export class ItemsService {
     // 如果不加上 userId，任何登录用户都能修改其他人的物品吗？请尝试修复它。
     return this.prisma.item.update({
       where: { id, userId },
-      data: updateItemDto,
+      data: { ...updateItemDto },
     });
   }
 

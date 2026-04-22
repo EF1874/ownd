@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as Minio from 'minio';
+import path from 'path';
 
 @Injectable()
 export class MinioService {
@@ -42,7 +43,8 @@ export class MinioService {
 
   async uploadFile(file: Express.Multer.File) {
     // 生成随机文件名，防止冲突
-    const fileName = `${Date.now()}-${file.originalname}`;
+    const ext = path.extname(file.originalname); // 获取扩展名如 .png
+    const fileName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
 
     await this.client.putObject(
       this.bucketName,
