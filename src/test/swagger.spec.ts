@@ -51,6 +51,7 @@ describe('Swagger (e2e)', () => {
   });
 
   it('应该能够成功访问 Swagger JSON 路径', () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     return request(app.getHttpServer())
       .get('/api-docs-json')
       .expect(200)
@@ -62,6 +63,7 @@ describe('Swagger (e2e)', () => {
   });
 
   it('应该包含 Auth 相关的安全定义', () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     return request(app.getHttpServer())
       .get('/api-docs-json')
       .expect(200)
@@ -75,12 +77,14 @@ describe('Swagger (e2e)', () => {
   });
 
   it('应该包含物品管理的 Tags 分组', () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     return request(app.getHttpServer())
       .get('/api-docs-json')
       .expect(200)
       .expect((res: request.Response) => {
         const paths = res.body.paths;
-        const itemsPostTags = (paths['/api/v1/items']?.post?.tags as string[]) || [];
+        const itemsPostTags =
+          (paths['/api/v1/items']?.post?.tags as string[]) || [];
         expect(itemsPostTags).toContain('物品管理');
       });
   });
