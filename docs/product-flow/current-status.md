@@ -4,15 +4,15 @@
 > **AI 协作协议**：本项目强制遵守 [AI 导师协作协议](../ai-workflow-sop.md)。
 
 - 项目：Ownd Backend (物记后端)
-- 当前阶段：Implementation (核心实施阶段)
-- 当前目标：实现 Swagger API 文档集成 (TSK-1.6)，为前后端联调打桩。
-- 下一动作：配置 Swagger 并装饰 DTO。
+- 当前阶段：Implementation (业务实施阶段)
+- 当前目标：实现 Category CRUD (TSK-2.1)，完善业务闭环。
+- 下一动作：定义 Category Schema 并创建模块。
 - 阻塞项：无
-- 最近完成：全量实现 MinIO 对象存储集成与 100% 绿通的单元测试 (TSK-1.8/3.1)。
+- 最近完成：全量实现 Swagger API 文档集成与自动化 E2E 验证 (TSK-1.6)。
 - 活跃文档：
   - `docs/product-flow/implementation-plan.md`
   - `docs/product-flow/backlog.md`
-- 最后更新：2026-04-20
+- 最后更新：2026-04-22
 
 ## Notes
 

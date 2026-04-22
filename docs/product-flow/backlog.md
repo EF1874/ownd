@@ -7,7 +7,7 @@
 - [x] **TSK-1.4**: Auth 模块实现 (JWT 登录与校验) [DONE]
 - [x] **TSK-1.5**: 全局拦截器与异常过滤器 [DONE]
 - [x] **TSK-1.7**: Items CRUD 与归属权隔离 [DONE]
-- [/] **TSK-1.6**: Swagger API 文档集成 [In Progress]
+- [x] **TSK-1.6**: Swagger API 文档集成 [DONE]
 
 ## [Epic] V2.0 业务能力
 - [ ] **TSK-2.1**: Category CRUD
