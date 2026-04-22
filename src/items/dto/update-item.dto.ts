@@ -1,4 +1,4 @@
-import { PartialType } from '@nestjs/mapped-types';
+import { PartialType } from '@nestjs/swagger';
 import { CreateItemDto } from './create-item.dto';
 
 // PartialType 会自动将 CreateItemDto 中的所有字段变为可选 (@IsOptional)

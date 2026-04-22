@@ -1,21 +1,24 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsNotEmpty, IsOptional, IsNumber } from 'class-validator';
 
 export class CreateItemDto {
+  @ApiProperty({ description: '物品名称', example: '手机', required: true })
   @IsString()
   @IsNotEmpty()
   name: string;
 
-  // 【地雷区】：我故意用了 IsString，但实际上 prisma 里的 price 是 Float
-  // 如果你直接传数字，校验会失败；如果你传字符串，存数据库会报错。请尝试修复它。
+  @ApiProperty({ description: '物品价格', example: '1000', required: true })
   @IsNumber()
   @IsNotEmpty()
   price: number;
 
+  @ApiProperty({ description: '物品备注', example: '这是一个很好的手机' })
   @IsString()
   @IsOptional()
   notes?: string;
 
   // 标签数组
+  @ApiProperty({ description: '物品标签', example: ['电子产品', '手机'] })
   @IsString({ each: true })
   @IsOptional()
   tags?: string[];

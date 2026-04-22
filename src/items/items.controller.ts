@@ -21,11 +21,14 @@ import { JwtAuthGuard } from '../common/guard/jwt.guard';
 import { User } from '@prisma/client';
 import { UpdateItemDto } from './dto/update-item.dto';
 import { MinioService } from '../minio/minio.service';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 interface RequestWithUser extends Request {
   user: User;
 }
 
+@ApiTags('物品管理')
+@ApiBearerAuth()
 @Controller('items')
 export class ItemsController {
   constructor(
