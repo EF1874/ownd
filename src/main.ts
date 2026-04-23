@@ -3,6 +3,8 @@ import { AppModule } from './app.module';
 import { ClassSerializerInterceptor, ValidationPipe } from '@nestjs/common';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { PrismaClientExceptionFilter } from './common/filters/prisma-exception.filter';
+import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
@@ -36,7 +38,11 @@ async function bootstrap() {
   );
 
   // 3. 全局异常过滤器
-  app.useGlobalFilters(new HttpExceptionFilter());
+  const configService = app.get(ConfigService);
+  app.useGlobalFilters(
+    new HttpExceptionFilter(),
+    new PrismaClientExceptionFilter(configService),
+  );
 
   await app.listen(process.env.PORT ?? 3000);
 }

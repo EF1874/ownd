@@ -47,16 +47,14 @@ export class ItemsService {
   }
 
   async update(id: string, userId: string, updateItemDto: UpdateItemDto) {
-    // 【地雷区】：我在这里故意只用了 id 来查询。
-    // 如果不加上 userId，任何登录用户都能修改其他人的物品吗？请尝试修复它。
+    const { file: _file, ...data } = updateItemDto;
     return this.prisma.item.update({
       where: { id, userId },
-      data: { ...updateItemDto },
+      data: data,
     });
   }
 
   async remove(id: string, userId: string) {
-    // 【地雷区】：同上，这里也漏掉了归属权校验。
     return this.prisma.item.delete({
       where: { id, userId },
     });
