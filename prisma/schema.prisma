@@ -22,6 +22,57 @@ model User {
     updatedAt DateTime @updatedAt
 
     categories Category[]
+    platforms  Platform[]
+}
+
+enum ItemRecordType {
+    RENEWAL
+    MAINTENANCE
+    UPGRADE
+    OTHER
+}
+
+enum ItemCycleType {
+    DAY
+    WEEK
+    MONTH
+    QUARTER
+    YEAR
+}
+
+model ItemHistory {
+    id    String         @id @default(uuid())
+    type  ItemRecordType
+    price Float          @default(0.0)
+
+    itemId     String
+    item       Item      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+    recordDate DateTime? @default(now())
+
+    startDate DateTime?
+    endDate   DateTime?
+    cycleType ItemCycleType?
+    cycle     Int?
+
+    note String?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+model Platform {
+    id        String   @id @default(uuid())
+    name      String
+    icon      String
+    color     String
+
+    user      User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    userId    String?
+
+    items Item[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
 }
 
 // 2. 物品模型 (对应前端的 Device)
@@ -42,8 +93,27 @@ model Item {
     categoryId String?
     category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+    createdAt     DateTime      @default(now())
+    updatedAt     DateTime      @updatedAt
+    itemHistories ItemHistory[]
+
+    currentCycleType ItemCycleType?
+    currentCycle     Int?
+    nextBillingDate  DateTime?
+    isAutoRenew      Boolean?       @default(false)
+
+    isBackup    Boolean? @default(false)
+    backupDate  DateTime?
+
+    isScrapped   Boolean?  @default(false)
+    scrappedDate DateTime?
+
+    warrantyEndDate DateTime?
+
+    isVirtual Boolean @default(false)
+
+    platformId String?
+    platform   Platform? @relation(fields: [platformId], references: [id], onDelete: SetNull)
 
     @@index([categoryId])
 }
@@ -54,10 +124,8 @@ model Category {
     name String
     icon String?
 
-    userId String
-    user   User   @relation(fields: [userId], references: [id])
-
-    @@unique([name, userId])
+    userId String?
+    user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     parentId String?
     parent   Category?  @relation("CategoryToCategory", fields: [parentId], references: [id], onDelete: Cascade)
@@ -65,8 +133,11 @@ model Category {
 
     items Item[]
 
-    createAt DateTime @default(now())
-    updateAt DateTime @updatedAt
+    isVirtual Boolean @default(false)
 
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([name, userId])
     @@index([parentId])
 }

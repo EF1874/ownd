@@ -1,6 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Item } from '@prisma/client';
-import { CategoryEntity } from 'src/categories/entities/category.entity';
+import { Item, ItemCycleType } from '@prisma/client';
+import { CategoryEntity } from '../../categories/entities/category.entity';
+import { PlatformEntity } from '../../platform/entities/platform.entity';
+import { ItemHistoryEntity } from './item-history.entity';
+import { Type } from 'class-transformer';
 
 export class ItemEntity implements Item {
   @ApiProperty({ description: '物品ID', example: 'uuid' })
@@ -50,4 +53,63 @@ export class ItemEntity implements Item {
 
   @ApiProperty({ description: '更新时间' })
   updatedAt: Date;
+
+  @ApiProperty({
+    description: '平台ID',
+    example: 'platform-uuid',
+    nullable: true,
+  })
+  platformId: string | null;
+
+  @ApiProperty({
+    description: '平台详情',
+    type: () => PlatformEntity,
+    nullable: true,
+  })
+  platform?: PlatformEntity;
+
+  @ApiProperty({ description: '周期类型', enum: ItemCycleType, nullable: true })
+  currentCycleType: ItemCycleType | null;
+
+  @ApiProperty({ description: '当前周期', nullable: true })
+  currentCycle: number | null;
+
+  @ApiProperty({ description: '下一个账单日期', nullable: true })
+  nextBillingDate: Date | null;
+
+  @ApiProperty({ description: '是否自动续订', default: false, nullable: true })
+  isAutoRenew: boolean | null;
+
+  @ApiProperty({
+    description: '是否为闲置或备用',
+    default: false,
+    nullable: true,
+  })
+  isBackup: boolean | null;
+
+  @ApiProperty({ description: '闲置日期', nullable: true })
+  backupDate: Date | null;
+
+  @ApiProperty({
+    description: '是否已停用或处理',
+    default: false,
+    nullable: true,
+  })
+  isScrapped: boolean | null;
+
+  @ApiProperty({ description: '报废日期', nullable: true })
+  scrappedDate: Date | null;
+
+  @ApiProperty({ description: '过保日期', nullable: true })
+  warrantyEndDate: Date | null;
+
+  @ApiProperty({ description: '是否为虚拟物品/订阅', default: false })
+  isVirtual: boolean;
+
+  @ApiProperty({
+    description: '物品历史记录',
+    type: () => [ItemHistoryEntity],
+  })
+  @Type(() => ItemHistoryEntity)
+  itemHistories: ItemHistoryEntity[];
 }

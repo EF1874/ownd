@@ -85,7 +85,7 @@ export class ItemsController {
   @ApiOperation({ summary: '获取物品详情' })
   @ApiResponse({ status: 200, type: ItemEntity })
   findOne(@Param('id') id: string, @Request() req: RequestWithUser) {
-    return this.itemsService.findOne(id, req.user.id);
+    return this.itemsService.findOne(req.user.id, id);
   }
 
   @Patch(':id')
@@ -113,7 +113,7 @@ export class ItemsController {
       imagePath = await this.minioService.uploadFile(file);
     }
 
-    return this.itemsService.update(id, req.user.id, {
+    return this.itemsService.update(req.user.id, id, {
       ...updateItemDto,
       imagePath,
     });
@@ -123,7 +123,7 @@ export class ItemsController {
   @ApiOperation({ summary: '删除物品' })
   @ApiResponse({ status: 200, description: '删除成功' })
   remove(@Param('id') id: string, @Request() req: RequestWithUser) {
-    return this.itemsService.remove(id, req.user.id);
+    return this.itemsService.remove(req.user.id, id);
   }
 
   // 保留单独上传图片的接口，用于纯图片更新场景
@@ -147,6 +147,6 @@ export class ItemsController {
   ) {
     await this.itemsService.findOne(id, req.user.id);
     const savedPath = await this.minioService.uploadFile(file);
-    return this.itemsService.updateImagePath(id, req.user.id, savedPath);
+    return this.itemsService.updateImagePath(req.user.id, id, savedPath);
   }
 }

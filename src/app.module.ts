@@ -8,6 +8,7 @@ import { ItemsModule } from './items/items.module';
 import { MinioModule } from './minio/minio.module';
 import { CategoriesModule } from './categories/categories.module';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
+import { StatisticsModule } from './statistics/statistics.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { LoggerMiddleware } from './common/middleware/logger.middleware';
     ItemsModule,
     MinioModule,
     CategoriesModule,
+    StatisticsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

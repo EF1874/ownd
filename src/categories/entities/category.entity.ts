@@ -15,8 +15,8 @@ export class CategoryEntity implements Category {
   })
   icon: string | null;
 
-  @ApiProperty({ description: '用户ID', example: 'user-uuid' })
-  userId: string;
+  @ApiProperty({ description: '用户ID', example: 'user-uuid', nullable: true })
+  userId: string | null;
 
   @ApiProperty({
     description: '父级分类ID',
@@ -26,10 +26,13 @@ export class CategoryEntity implements Category {
   parentId: string | null;
 
   @ApiProperty({ description: '创建时间' })
-  createAt: Date;
+  createdAt: Date;
 
   @ApiProperty({ description: '更新时间' })
-  updateAt: Date;
+  updatedAt: Date;
+
+  @ApiProperty({ description: '是否为虚拟分类', default: false })
+  isVirtual: boolean;
 
   @ApiProperty({
     description: '子分类列表',
