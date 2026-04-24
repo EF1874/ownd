@@ -22,10 +22,24 @@ export class UsersService {
     return user;
   }
 
-  // 查找：根据邮箱找到用户（登录验证用）
+  /**
+   * 用于登录验证
+   * @param email 用户邮箱
+   * @returns 用户对象
+   */
   async findByEmail(email: string) {
     return this.prisma.user.findUnique({
       where: { email },
+    });
+  }
+
+  /**
+   * @param userId 用户ID
+   * @returns 用户对象
+   */
+  async findById(userId: string) {
+    return this.prisma.user.findUnique({
+      where: { id: userId },
     });
   }
 }

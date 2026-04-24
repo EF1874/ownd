@@ -25,7 +25,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   // payload 是登录时加密进去的数据：{ email, sub }
   async validate(payload: { sub: string; email: string }) {
-    const user = await this.usersService.findByEmail(payload.email);
+    const user = await this.usersService.findById(payload.sub);
 
     if (!user) {
       throw new UnauthorizedException('用户不存在或已失效');
