@@ -9,23 +9,31 @@ export class MinioService {
   private readonly bucketName: string;
   private readonly logger = new Logger(MinioService.name);
 
-  constructor(private configService: ConfigService) {
-    const endPoint = this.configService.get<string>('MINIO_ENDPOINT');
-
-    if (!endPoint) {
-      this.logger.error(
-        'MINIO_ENDPOINT is not defined in environment variables!',
-      );
+  private getRequiredConfig(
+    key: 'MINIO_ENDPOINT' | 'MINIO_ROOT_USER' | 'MINIO_ROOT_PASSWORD',
+  ): string {
+    const value = this.configService.get<string>(key);
+    if (value) {
+      return value;
     }
 
-    this.client = new Minio.Client({
-      endPoint: endPoint || '',
-      port: 9000,
-      useSSL: false,
-      accessKey: this.configService.get<string>('MINIO_ROOT_USER'),
-      secretKey: this.configService.get<string>('MINIO_ROOT_PASSWORD'),
-    });
+    const message = `Missing MinIO config: ${key}`;
+    this.logger.error(`${message}. Please check environment variables.`);
+    throw new Error(message);
+  }
 
+  constructor(private configService: ConfigService) {
+    const endPoint = this.getRequiredConfig('MINIO_ENDPOINT');
+    const accessKey = this.getRequiredConfig('MINIO_ROOT_USER');
+    const secretKey = this.getRequiredConfig('MINIO_ROOT_PASSWORD');
+
+    this.client = new Minio.Client({
+      port: 9000,
+      endPoint,
+      accessKey,
+      secretKey,
+      useSSL: false,
+    });
     this.bucketName = 'ownd-items';
   }
 
@@ -38,6 +46,7 @@ export class MinioService {
       }
     } catch (error) {
       this.logger.error('Failed to initialize MinIO bucket', error);
+      throw error;
     }
   }
 
@@ -56,5 +65,15 @@ export class MinioService {
 
     // 返回文件存储的路径（之后会存入数据库）
     return `/${this.bucketName}/${fileName}`;
+  }
+
+  async checkHealth() {
+    try {
+      await this.client.bucketExists(this.bucketName);
+      return true;
+    } catch (error) {
+      this.logger.error('Failed to check MinIO health', error);
+      throw error;
+    }
   }
 }
