@@ -11,7 +11,7 @@ import { Response as ExpressResponse } from 'express';
 export interface Response<T> {
   code: number;
   data: T;
-  message: string;
+  msg: string;
 }
 
 @Injectable()
@@ -30,7 +30,7 @@ export class TransformInterceptor<T> implements NestInterceptor<
       map((data: T) => ({
         code: statusCode,
         data,
-        message: 'success',
+        msg: 'success',
       })),
     );
   }

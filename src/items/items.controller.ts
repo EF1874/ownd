@@ -145,7 +145,7 @@ export class ItemsController {
     file: Express.Multer.File,
     @Request() req: RequestWithUser,
   ) {
-    await this.itemsService.findOne(id, req.user.id);
+    await this.itemsService.findOne(req.user.id, id);
     const savedPath = await this.minioService.uploadFile(file);
     return this.itemsService.updateImagePath(req.user.id, id, savedPath);
   }

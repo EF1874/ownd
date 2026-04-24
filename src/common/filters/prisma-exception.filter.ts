@@ -66,7 +66,7 @@ export class PrismaClientExceptionFilter implements ExceptionFilter {
     response.status(status).json({
       code: status,
       // 开发环境下透传详细的 rawMessage
-      message: isDev ? rawMessage : customMessage,
+      msg: isDev ? rawMessage : customMessage,
       path: request.url,
       timestamp: new Date().toISOString(),
     });

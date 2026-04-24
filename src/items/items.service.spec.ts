@@ -38,6 +38,17 @@ describe('ItemsService', () => {
     notes: null,
     tags: [],
     categoryId: null,
+    platformId: null,
+    currentCycleType: null,
+    currentCycle: null,
+    nextBillingDate: null,
+    isAutoRenew: false,
+    isBackup: false,
+    backupDate: null,
+    isScrapped: false,
+    scrappedDate: null,
+    warrantyEndDate: null,
+    isVirtual: false,
     purchaseDate: new Date(),
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -59,7 +70,20 @@ describe('ItemsService', () => {
       const result = await service.create(userId, dto);
 
       expect(prisma.item.create).toHaveBeenCalledWith({
-        data: { ...dto, userId },
+        data: {
+          ...dto,
+          imagePath: undefined,
+          nextBillingDate: null,
+          user: { connect: { id: userId } },
+          category: undefined,
+          platform: undefined,
+          itemHistories: undefined,
+        },
+        include: {
+          category: true,
+          platform: true,
+          itemHistories: true,
+        },
       });
       expect(result).toEqual(mockResult);
     });
@@ -76,6 +100,14 @@ describe('ItemsService', () => {
 
       expect(prisma.item.findMany).toHaveBeenCalledWith({
         where: { userId },
+        include: {
+          category: true,
+          platform: true,
+          itemHistories: {
+            orderBy: { startDate: 'desc' },
+            take: 1,
+          },
+        },
       });
       expect(result).toEqual(mockItems);
     });
@@ -89,10 +121,17 @@ describe('ItemsService', () => {
 
       prisma.item.findFirst.mockResolvedValue(mockItem);
 
-      const result = await service.findOne(itemId, userId);
+      const result = await service.findOne(userId, itemId);
 
       expect(prisma.item.findFirst).toHaveBeenCalledWith({
         where: { id: itemId, userId },
+        include: {
+          category: true,
+          platform: true,
+          itemHistories: {
+            orderBy: { createdAt: 'desc' },
+          },
+        },
       });
       expect(result).toEqual(mockItem);
     });
@@ -100,7 +139,7 @@ describe('ItemsService', () => {
     it('当物品不存在或不属于该用户时应该抛出 NotFoundException', async () => {
       prisma.item.findFirst.mockResolvedValue(null);
 
-      await expect(service.findOne('wrong-id', 'user-1')).rejects.toThrow(
+      await expect(service.findOne('user-1', 'wrong-id')).rejects.toThrow(
         NotFoundException,
       );
     });
@@ -116,11 +155,24 @@ describe('ItemsService', () => {
         createMockItem({ id: itemId, userId, ...dto }),
       );
 
-      const result = await service.update(itemId, userId, dto);
+      prisma.item.findFirst.mockResolvedValue(
+        createMockItem({ id: itemId, userId }),
+      );
+
+      const result = await service.update(userId, itemId, dto);
 
       expect(prisma.item.update).toHaveBeenCalledWith({
-        where: { id: itemId, userId },
-        data: dto,
+        where: { id: itemId },
+        data: {
+          ...dto,
+          imagePath: undefined,
+          category: undefined,
+          platform: undefined,
+        },
+        include: {
+          category: true,
+          platform: true,
+        },
       });
       expect(result.name).toBe(dto.name);
     });
@@ -135,10 +187,14 @@ describe('ItemsService', () => {
         createMockItem({ id: itemId, userId }),
       );
 
-      await service.remove(itemId, userId);
+      prisma.item.findFirst.mockResolvedValue(
+        createMockItem({ id: itemId, userId }),
+      );
+
+      await service.remove(userId, itemId);
 
       expect(prisma.item.delete).toHaveBeenCalledWith({
-        where: { id: itemId, userId },
+        where: { id: itemId },
       });
     });
   });
@@ -153,10 +209,14 @@ describe('ItemsService', () => {
         createMockItem({ id: itemId, userId, imagePath }),
       );
 
-      const result = await service.updateImagePath(itemId, userId, imagePath);
+      prisma.item.findFirst.mockResolvedValue(
+        createMockItem({ id: itemId, userId }),
+      );
+
+      const result = await service.updateImagePath(userId, itemId, imagePath);
 
       expect(prisma.item.update).toHaveBeenCalledWith({
-        where: { id: itemId, userId },
+        where: { id: itemId },
         data: { imagePath },
       });
       expect(result.imagePath).toBe(imagePath);
