@@ -20,14 +20,17 @@
   - 字段名必须为 `file`。
 
 ## 4. 异常处理映射
-后端返回的错误格式如下，请在前端层进行统一解析并展示 `message`：
+后端目标错误协议如下，请在前端层统一解析并展示 `msg`：
 ```json
 {
-  "statusCode": 400,
-  "message": ["price must be a number"],
+  "code": 400,
+  "data": null,
+  "msg": "price must be a number",
   "timestamp": "..."
 }
 ```
+
+> 兼容说明：历史版本可能返回 `message`，在 R1 完成前建议前端兼容读取 `msg ?? message`。
 
 ## 5. 开发建议 (Next Steps for Frontend AI)
 1. 实现 `AuthInterceptor` 自动注入 Token。

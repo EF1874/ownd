@@ -5,14 +5,20 @@
 
 - 项目：Ownd Backend (物记后端)
 - 当前阶段：Implementation (业务实施阶段)
-- 当前目标：实现 Category CRUD (TSK-2.1)，完善业务闭环。
-- 下一动作：定义 Category Schema 并创建模块。
-- 阻塞项：无
-- 最近完成：全量实现 Swagger API 文档集成与自动化 E2E 验证 (TSK-1.6)。
+- 当前目标：完成 V4 进入实施前的质量收敛与迁移安全基线（TSK-4.1-R）。
+- 下一动作：按“讲解 -> 引导 -> 理解验证 -> AI 测试”流程，从 R1（响应协议对齐）开始执行。
+- 阻塞项：
+  - 无硬阻塞
+  - 软阻塞：`npm run lint` 在 `test/app.e2e-spec.ts` 处失败，需先修复工程质量门
+- 最近完成：
+  - 已完成文档同步：`current-status` / `backlog` / `implementation-plan` / `decisions` / `tech-stack` / `architecture` / `acceptance`
+  - 已完成服务审计：识别到 1 个高优先级缺陷（`items.controller` 参数顺序）与若干中优先级技术风险
 - 活跃文档：
   - `docs/product-flow/implementation-plan.md`
   - `docs/product-flow/backlog.md`
-- 最后更新：2026-04-22
+  - `docs/product-flow/decisions.md`
+  - `docs/product-flow/acceptance.md`
+- 最后更新：2026-04-23
 
 ## Notes
 

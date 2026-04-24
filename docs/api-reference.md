@@ -2,6 +2,11 @@
 
 本文档记录了当前系统中已实现的接口契约，供前端或其他工具参考。所有接口的基础路径为 `/api/v1`。
 
+## 响应协议说明（重要）
+
+- **目标协议（PRD 基线）**: `{"code": number, "data": any, "msg": string}`
+- **当前状态**: 历史实现中存在 `message` 字段返回，已列入 `R1` 修复任务，修复后本文件以 `msg` 为唯一标准。
+
 ## 1. 认证模块 (Auth)
 
 ### 注册 (Signup)
@@ -70,11 +75,22 @@
 
 ## 全局规范
 - **成功响应**: `200/201`
+- **成功示例（目标）**:
+  ```json
+  {
+    "code": 200,
+    "data": {
+      "id": "xxx"
+    },
+    "msg": "success"
+  }
+  ```
 - **错误响应**:
   ```json
   {
-    "statusCode": 401,
-    "message": "Unauthorized",
+    "code": 401,
+    "data": null,
+    "msg": "Unauthorized",
     "timestamp": "2026-04-20T..."
   }
   ```
