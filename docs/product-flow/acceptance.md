@@ -9,21 +9,21 @@
 
 ## Verification Checklist
 
-- [ ] R1：API 响应协议已统一为 `code/data/msg`，并同步文档
-- [ ] R2：图片上传路径参数顺序问题已修复并补测试
-- [ ] R3：`npm run lint` 无错误
-- [ ] R4：JWT 校验主路径为 `sub(id)` 查询
-- [ ] R5：MinIO 缺失关键配置时 fail-fast
+- [x] R1：API 响应协议已统一为 `code/data/msg`，并同步文档
+- [x] R2：图片上传路径参数顺序问题已修复并补测试
+- [x] R3：`npm run lint` 无错误
+- [x] R4：JWT 校验主路径为 `sub(id)` 查询
+- [x] R5：MinIO 缺失关键配置时 fail-fast
 - [ ] R6：周期字段输入校验增强并通过测试
 - [ ] `npm run build` / `npm run test` / `npx prisma validate` 全部通过
 
 ## Findings
 
-- `build` 通过，`prisma validate` 通过。
-- `lint` 当前失败（`test/app.e2e-spec.ts` 未纳入 ts 项目服务），已纳入 P0 任务。
+- `lint` 通过，`build` 通过，关键模块单测通过（`items.service`、`users/auth`、`minio.service`）。
+- R1-R5 均已完成并完成阶段性验收，剩余 R6（周期字段校验）与 R7（迁移安全补强）。
 - 已识别并记录关键技术风险，见 `architecture.md` 与 `decisions.md`。
 
 ## Release Recommendation
 
 - 当前不建议进入 V4 功能扩展开发（TSK-4.2+）。
-- 建议先完成 R1-R6 并更新本文件勾选结果，再批准进入下一实施批次。
+- 建议先完成 R6 与 R7 并更新本文件勾选结果，再批准进入下一实施批次。
