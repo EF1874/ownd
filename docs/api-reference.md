@@ -71,6 +71,33 @@
 - **Content-Type**: `multipart/form-data`
 - **Body**: `file` (Binary, < 1MB, image/jpeg|png)
 
+### 历史记录管理 (History)
+- **获取历史**: `GET /items/:id/histories`
+- **添加记录**: `POST /items/:id/histories` (支持 RENEWAL, MAINTENANCE, UPGRADE, OTHER)
+- **删除记录**: `DELETE /items/:id/histories/:historyId`
+
+---
+
+## 3. 平台管理 (Platform)
+- **获取平台**: `GET /platform` (系统预设 + 个人自定义)
+- **创建平台**: `POST /platform`
+- **修改平台**: `PATCH /platform/:id`
+- **删除平台**: `DELETE /platform/:id`
+
+---
+
+## 4. 分类管理 (Categories)
+- **获取分类树**: `GET /categories` (返回树状结构)
+- **创建分类**: `POST /categories`
+- **修改分类**: `PATCH /categories/:id`
+- **删除分类**: `DELETE /categories/:id` (级联删除)
+
+---
+
+## 5. 统计引擎 (Statistics)
+- **资产概览**: `GET /statistics/summary` (返回总资产 TCO)
+- **单项统计**: `GET /statistics/items/:id` (返回该物品的日均成本等)
+
 ---
 
 ## 全局规范
