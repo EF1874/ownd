@@ -77,7 +77,7 @@ describe('ItemsController', () => {
       const itemId = 'item-123';
       await controller.findOne(itemId, mockRequest);
 
-      expect(service.findOne).toHaveBeenCalledWith(itemId, mockUser.id);
+      expect(service.findOne).toHaveBeenCalledWith(mockUser.id, itemId);
     });
   });
 
@@ -87,7 +87,7 @@ describe('ItemsController', () => {
       const dto: UpdateItemDto = { name: '新名字' };
       await controller.update(itemId, dto, mockRequest);
 
-      expect(service.update).toHaveBeenCalledWith(itemId, mockUser.id, dto);
+      expect(service.update).toHaveBeenCalledWith(mockUser.id, itemId, dto);
     });
   });
 
@@ -96,7 +96,7 @@ describe('ItemsController', () => {
       const itemId = 'item-123';
       await controller.remove(itemId, mockRequest);
 
-      expect(service.remove).toHaveBeenCalledWith(itemId, mockUser.id);
+      expect(service.remove).toHaveBeenCalledWith(mockUser.id, itemId);
     });
   });
 
@@ -117,11 +117,11 @@ describe('ItemsController', () => {
 
       await controller.uploadImage(itemId, mockFile, mockRequest);
 
-      expect(service.findOne).toHaveBeenCalledWith(itemId, mockUser.id);
+      expect(service.findOne).toHaveBeenCalledWith(mockUser.id, itemId);
       expect(minioService.uploadFile).toHaveBeenCalledWith(mockFile);
       expect(service.updateImagePath).toHaveBeenCalledWith(
-        itemId,
         mockUser.id,
+        itemId,
         mockSavedPath,
       );
     });

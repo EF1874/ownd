@@ -4,11 +4,14 @@ import {
   ArgumentsHost,
   HttpException,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(HttpExceptionFilter.name);
+
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
@@ -49,6 +52,18 @@ export class HttpExceptionFilter implements ExceptionFilter {
       path: request.url,
       timestamp: new Date().toISOString(),
     };
+
+    // 记录日志
+    const logMsg = `${request.method} ${request.url} - Status: ${status} - Message: ${message}`;
+    const internalServerErrorStatus: number = HttpStatus.INTERNAL_SERVER_ERROR;
+    if (status >= internalServerErrorStatus) {
+      this.logger.error(
+        logMsg,
+        exception instanceof Error ? exception.stack : undefined,
+      );
+    } else {
+      this.logger.warn(logMsg);
+    }
 
     response.status(status).json(errorResponse);
   }

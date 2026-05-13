@@ -6,23 +6,28 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { PrismaClientExceptionFilter } from './common/filters/prisma-exception.filter';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { WinstonModule } from 'nest-winston';
+import { winstonConfig } from './common/logger/logger.config';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // 使用 Winston 替换默认日志器
+  const app = await NestFactory.create(AppModule, {
+    logger: WinstonModule.createLogger(winstonConfig),
+  });
 
   app.setGlobalPrefix('api/v1');
 
+  // Swagger 配置
   const config = new DocumentBuilder()
     .setTitle('Ownd API')
-    .setDescription('Ownd API')
+    .setDescription('Ownd 后端接口文档')
     .setVersion('1.0')
     .addBearerAuth()
     .build();
-
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api-docs', app, document);
 
-  // 1. 全局验证管道
+  // 全局校验管道
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -31,22 +36,19 @@ async function bootstrap() {
     }),
   );
 
-  // 2. 全局响应拦截器
+  // 全局拦截器
   app.useGlobalInterceptors(
     new TransformInterceptor(),
     new ClassSerializerInterceptor(app.get(Reflector)),
   );
 
-  // 3. 全局异常过滤器
+  // 全局错误过滤器
   const configService = app.get(ConfigService);
   app.useGlobalFilters(
     new HttpExceptionFilter(),
     new PrismaClientExceptionFilter(configService),
   );
 
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(3000);
 }
-bootstrap().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+void bootstrap();

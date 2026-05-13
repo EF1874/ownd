@@ -77,15 +77,14 @@ export class ItemEntity implements Item {
   @ApiProperty({ description: '下一个账单日期', nullable: true })
   nextBillingDate: Date | null;
 
-  @ApiProperty({ description: '是否自动续订', default: false, nullable: true })
-  isAutoRenew: boolean | null;
+  @ApiProperty({ description: '是否自动续订', default: false })
+  isAutoRenew: boolean;
 
   @ApiProperty({
     description: '是否为闲置或备用',
     default: false,
-    nullable: true,
   })
-  isBackup: boolean | null;
+  isBackup: boolean;
 
   @ApiProperty({ description: '闲置日期', nullable: true })
   backupDate: Date | null;
@@ -93,9 +92,8 @@ export class ItemEntity implements Item {
   @ApiProperty({
     description: '是否已停用或处理',
     default: false,
-    nullable: true,
   })
-  isScrapped: boolean | null;
+  isScrapped: boolean;
 
   @ApiProperty({ description: '报废日期', nullable: true })
   scrappedDate: Date | null;

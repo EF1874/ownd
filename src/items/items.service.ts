@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateItemDto } from './dto/create-item.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
+import { CreateItemHistoryDto } from './dto/create-item-history.dto';
 import { ItemCycleType, ItemRecordType, Prisma } from '@prisma/client';
 import dayjs from 'dayjs';
 
@@ -68,7 +69,7 @@ export class ItemsService {
   /**
    * 计算周期的结束日期
    */
-  private calculateNextDate(
+  public calculateNextDate(
     start: Date,
     type: ItemCycleType,
     value: number,
@@ -161,6 +162,62 @@ export class ItemsService {
 
     return this.prisma.item.delete({
       where: { id },
+    });
+  }
+
+  // --- 历史记录管理 (ItemHistory) ---
+
+  async addHistory(userId: string, itemId: string, dto: CreateItemHistoryDto) {
+    // 1. 鉴权：确保物品属于该用户
+    await this.findOne(userId, itemId);
+
+    // 2. 事务处理：创建历史记录 + (如果是续费) 更新物品账单日
+    return this.prisma.$transaction(async (tx) => {
+      const history = await tx.itemHistory.create({
+        data: {
+          ...dto,
+          itemId,
+        },
+      });
+
+      // 如果是续费记录，且提供了结束日期，则更新物品的下期账单日
+      if (dto.type === ItemRecordType.RENEWAL && dto.endDate) {
+        const nextDate = dayjs(dto.endDate).add(1, 'day').toDate();
+        await tx.item.update({
+          where: { id: itemId },
+          data: { nextBillingDate: nextDate },
+        });
+      }
+
+      return history;
+    });
+  }
+
+  async findHistories(userId: string, itemId: string) {
+    // 鉴权
+    await this.findOne(userId, itemId);
+
+    return this.prisma.itemHistory.findMany({
+      where: { itemId },
+      orderBy: { recordDate: 'desc' },
+    });
+  }
+
+  async removeHistory(userId: string, itemId: string, historyId: string) {
+    // 鉴权：先确保物品属于用户
+    await this.findOne(userId, itemId);
+
+    // 再确保历史记录属于该物品
+    const history = await this.prisma.itemHistory.findUnique({
+      where: { id: historyId },
+    });
+
+    if (!history || history.itemId !== itemId) {
+      throw new NotFoundException('历史记录不存在或不属于该物品');
+    }
+
+    return this.prisma.itemHistory.delete({
+      where: { id: historyId },
     });
   }
 }

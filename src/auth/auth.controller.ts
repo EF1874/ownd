@@ -15,6 +15,7 @@ import { JwtAuthGuard } from '../common/guard/jwt.guard';
 import { User } from '@prisma/client';
 import { ApiBearerAuth, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { LoginResultEntity, UserEntity } from './entities/auth.entity';
+import { Audit } from '../common/decorators/audit.decorator';
 
 // 定义一个包含 user 的 Request 类型，或者使用全局声明
 interface RequestWithUser extends Request {
@@ -27,6 +28,7 @@ export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('signup')
+  @Audit('用户注册')
   @ApiResponse({ status: 201, description: '注册成功' })
   async signUp(@Body() signupDto: SignupDto) {
     return this.authService.register(
@@ -37,6 +39,7 @@ export class AuthController {
   }
 
   @Post('login')
+  @Audit('用户登录')
   @HttpCode(HttpStatus.OK)
   @ApiResponse({
     status: 200,

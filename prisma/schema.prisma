@@ -100,12 +100,12 @@ model Item {
     currentCycleType ItemCycleType?
     currentCycle     Int?
     nextBillingDate  DateTime?
-    isAutoRenew      Boolean?       @default(false)
+    isAutoRenew      Boolean        @default(false)
 
-    isBackup    Boolean? @default(false)
+    isBackup    Boolean @default(false)
     backupDate  DateTime?
 
-    isScrapped   Boolean?  @default(false)
+    isScrapped   Boolean  @default(false)
     scrappedDate DateTime?
 
     warrantyEndDate DateTime?
@@ -140,4 +140,18 @@ model Category {
 
     @@unique([name, userId])
     @@index([parentId])
+}
+
+// 4. 审计日志模型
+model AuditLog {
+    id        String   @id @default(uuid())
+    userId    String? // 操作者 ID (未登录请求可能为空)
+    action    String // 操作描述 (如: 删除物品)
+    method    String // HTTP 方法
+    path      String // 请求路径
+    payload   Json? // 请求内容 (脱敏后)
+    ip        String? // 访问者 IP
+    createdAt DateTime @default(now())
+
+    @@index([userId])
 }

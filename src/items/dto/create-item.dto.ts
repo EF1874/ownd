@@ -9,6 +9,7 @@ import {
   IsBoolean,
   IsArray,
   IsEnum,
+  Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ItemCycleType } from '@prisma/client';
@@ -81,7 +82,9 @@ export class CreateItemDto {
 
   @ApiProperty({ description: '当前周期数值', example: 1, required: false })
   @IsNumber()
+  @Type(() => Number)
   @IsOptional()
+  @Min(1, { message: '当前周期数值必须大于0' })
   currentCycle?: number;
 
   @ApiProperty({ description: '是否自动续订', default: false })

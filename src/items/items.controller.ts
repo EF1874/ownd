@@ -16,7 +16,9 @@ import {
 } from '@nestjs/common';
 import { ItemsService } from './items.service';
 import { CreateItemDto } from './dto/create-item.dto';
+import { CreateItemHistoryDto } from './dto/create-item-history.dto';
 import { JwtAuthGuard } from '../common/guard/jwt.guard';
+import { Audit } from '../common/decorators/audit.decorator';
 import { User } from '@prisma/client';
 import { UpdateItemDto } from './dto/update-item.dto';
 import { MinioService } from '../minio/minio.service';
@@ -120,6 +122,7 @@ export class ItemsController {
   }
 
   @Delete(':id')
+  @Audit('删除物品')
   @ApiOperation({ summary: '删除物品' })
   @ApiResponse({ status: 200, description: '删除成功' })
   remove(@Param('id') id: string, @Request() req: RequestWithUser) {
@@ -128,6 +131,7 @@ export class ItemsController {
 
   // 保留单独上传图片的接口，用于纯图片更新场景
   @Post(':id/image')
+  @Audit('更新物品图片')
   @ApiOperation({ summary: '仅更新物品图片' })
   @ApiConsumes('multipart/form-data')
   @ApiResponse({ status: 201, description: '图片上传成功' })
@@ -148,5 +152,38 @@ export class ItemsController {
     await this.itemsService.findOne(req.user.id, id);
     const savedPath = await this.minioService.uploadFile(file);
     return this.itemsService.updateImagePath(req.user.id, id, savedPath);
+  }
+
+  // --- 历史记录 (ItemHistory) 端点 ---
+
+  @Post(':id/histories')
+  @Audit('添加物品历史记录')
+  @ApiOperation({ summary: '为物品添加历史记录 (续费/维修/升级)' })
+  @ApiResponse({ status: 201, description: '添加成功' })
+  addHistory(
+    @Param('id') id: string,
+    @Body() createItemHistoryDto: CreateItemHistoryDto,
+    @Request() req: RequestWithUser,
+  ) {
+    return this.itemsService.addHistory(req.user.id, id, createItemHistoryDto);
+  }
+
+  @Get(':id/histories')
+  @ApiOperation({ summary: '获取物品的所有历史记录' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  findAllHistories(@Param('id') id: string, @Request() req: RequestWithUser) {
+    return this.itemsService.findHistories(req.user.id, id);
+  }
+
+  @Delete(':id/histories/:historyId')
+  @Audit('删除物品历史记录')
+  @ApiOperation({ summary: '删除物品的某条历史记录' })
+  @ApiResponse({ status: 200, description: '删除成功' })
+  removeHistory(
+    @Param('id') id: string,
+    @Param('historyId') historyId: string,
+    @Request() req: RequestWithUser,
+  ) {
+    return this.itemsService.removeHistory(req.user.id, id, historyId);
   }
 }

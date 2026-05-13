@@ -19,6 +19,7 @@ import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { JwtAuthGuard } from '../common/guard/jwt.guard';
+import { Audit } from '../common/decorators/audit.decorator';
 import { User } from '@prisma/client';
 import { CategoryEntity } from './entities/category.entity';
 
@@ -34,6 +35,7 @@ export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
 
   @Post()
+  @Audit('创建分类')
   @ApiOperation({ summary: '创建分类' })
   @ApiResponse({ status: 201, type: CategoryEntity })
   create(
@@ -58,6 +60,7 @@ export class CategoriesController {
   }
 
   @Patch(':id')
+  @Audit('更新分类')
   @ApiOperation({ summary: '更新分类信息' })
   @ApiResponse({ status: 200, type: CategoryEntity })
   update(
@@ -69,6 +72,7 @@ export class CategoriesController {
   }
 
   @Delete(':id')
+  @Audit('删除分类')
   @ApiOperation({ summary: '删除分类（级联删除子类）' })
   @ApiResponse({ status: 200, description: '删除成功' })
   remove(@Param('id') id: string, @Request() req: RequestWithUser) {
