@@ -59,6 +59,14 @@
    flutter run
    ```
 
+   Android 模拟器默认使用 `config/dev.json` 中的本地接口地址：
+
+   使用跨平台快捷命令构建开发包：
+
+   ```bash
+   pnpm run android:dev
+   ```
+
 ## 📦 打包发布(目前仅有 Android 版本)
 
 ### Android
@@ -66,13 +74,33 @@
 构建 Release 版本 APK：
 
 ```bash
-flutter build apk --release
+pnpm run android:prod
+```
+
+如果本机安装了 `make`，也可以使用：
+
+```bash
+make android-prod
 ```
 
 构建 App Bundle (Google Play):
 
 ```bash
-flutter build appbundle --release
+pnpm run android:aab
+```
+
+### 多平台构建命令
+
+构建脚本会读取 `config/dev.json` 或 `config/prod.json`，再统一传入 Flutter。常用命令：
+
+```bash
+pnpm run android:dev
+pnpm run android:prod
+pnpm run android:aab
+pnpm run ios:prod
+pnpm run windows:prod
+pnpm run macos:prod
+pnpm run linux:prod
 ```
 
 ### iOS

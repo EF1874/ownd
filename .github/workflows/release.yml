@@ -8,6 +8,8 @@ on:
             - 'main'
         paths:
             - 'pubspec.yaml'
+            - 'config/prod.json'
+            - '.github/workflows/release.yml'
     workflow_dispatch:
 
 permissions:
@@ -79,7 +81,10 @@ jobs:
 
             - name: Build APK
               if: steps.check_tag.outputs.SHOULD_BUILD == 'true'
-              run: flutter build apk --split-per-abi --release --build-number=${{ github.run_number }}
+              shell: bash
+              run: |
+                  API_BASE_URL=$(python -c "import json; print(json.load(open('config/prod.json'))['OWND_API_BASE_URL'])")
+                  flutter build apk --split-per-abi --release --build-number=${{ github.run_number }} --dart-define=OWND_API_BASE_URL="$API_BASE_URL"
 
             - name: Rename APK
               if: steps.check_tag.outputs.SHOULD_BUILD == 'true'

@@ -2,14 +2,12 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../config/app_config.dart';
 import 'api_exception.dart';
 import 'token_storage.dart';
 
 final apiBaseUrlProvider = Provider<String>((ref) {
-  return const String.fromEnvironment(
-    'OWND_API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:3000/api/v1',
-  );
+  return AppConfig.apiBaseUrl;
 });
 
 final dioProvider = Provider<Dio>((ref) {
