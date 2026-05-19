@@ -4,154 +4,156 @@
 // Get a free hosted Postgres database in seconds: `npx create-db`
 
 generator client {
-    provider = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-    provider = "postgresql"
+  provider = "postgresql"
 }
 
 // 1. 用户模型
 model User {
-    id        String   @id @default(uuid())
-    email     String   @unique
-    password  String
-    name      String?
-    items     Item[] // 一个用户可以拥有多个物品
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  id                          String   @id @default(uuid())
+  email                       String   @unique
+  password                    String
+  name                        String?
+  items                       Item[] // 一个用户可以拥有多个物品
+  categoryDefaultsInitialized Boolean  @default(false)
+  platformDefaultsInitialized Boolean  @default(false)
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
 
-    categories Category[]
-    platforms  Platform[]
+  categories Category[]
+  platforms  Platform[]
 }
 
 enum ItemRecordType {
-    RENEWAL
-    MAINTENANCE
-    UPGRADE
-    OTHER
+  RENEWAL
+  MAINTENANCE
+  UPGRADE
+  OTHER
 }
 
 enum ItemCycleType {
-    DAY
-    WEEK
-    MONTH
-    QUARTER
-    YEAR
+  DAY
+  WEEK
+  MONTH
+  QUARTER
+  YEAR
 }
 
 model ItemHistory {
-    id    String         @id @default(uuid())
-    type  ItemRecordType
-    price Float          @default(0.0)
+  id    String         @id @default(uuid())
+  type  ItemRecordType
+  price Float          @default(0.0)
 
-    itemId     String
-    item       Item      @relation(fields: [itemId], references: [id], onDelete: Cascade)
-    recordDate DateTime? @default(now())
+  itemId     String
+  item       Item      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  recordDate DateTime? @default(now())
 
-    startDate DateTime?
-    endDate   DateTime?
-    cycleType ItemCycleType?
-    cycle     Int?
+  startDate DateTime?
+  endDate   DateTime?
+  cycleType ItemCycleType?
+  cycle     Int?
 
-    note String?
+  note String?
 
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Platform {
-    id        String   @id @default(uuid())
-    name      String
-    icon      String
-    color     String
+  id    String @id @default(uuid())
+  name  String
+  icon  String
+  color String
 
-    user      User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
-    userId    String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String?
 
-    items Item[]
+  items Item[]
 
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // 2. 物品模型 (对应前端的 Device)
 model Item {
-    id           String   @id @default(uuid())
-    name         String
-    price        Float    @default(0.0)
-    purchaseDate DateTime @default(now())
+  id           String   @id @default(uuid())
+  name         String
+  price        Float    @default(0.0)
+  purchaseDate DateTime @default(now())
 
-    // 核心业务字段
-    imagePath String?
-    notes     String?
-    tags      String[] // PostgreSQL 原生支持字符串数组，非常方便
+  // 核心业务字段
+  imagePath String?
+  notes     String?
+  tags      String[] // PostgreSQL 原生支持字符串数组，非常方便
 
-    // 关联
-    userId     String
-    user       User      @relation(fields: [userId], references: [id])
-    categoryId String?
-    category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  // 关联
+  userId     String
+  user       User      @relation(fields: [userId], references: [id])
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
-    createdAt     DateTime      @default(now())
-    updatedAt     DateTime      @updatedAt
-    itemHistories ItemHistory[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  itemHistories ItemHistory[]
 
-    currentCycleType ItemCycleType?
-    currentCycle     Int?
-    nextBillingDate  DateTime?
-    isAutoRenew      Boolean        @default(false)
+  currentCycleType ItemCycleType?
+  currentCycle     Int?
+  nextBillingDate  DateTime?
+  isAutoRenew      Boolean        @default(false)
 
-    isBackup    Boolean @default(false)
-    backupDate  DateTime?
+  isBackup   Boolean   @default(false)
+  backupDate DateTime?
 
-    isScrapped   Boolean  @default(false)
-    scrappedDate DateTime?
+  isScrapped   Boolean   @default(false)
+  scrappedDate DateTime?
 
-    warrantyEndDate DateTime?
+  warrantyEndDate DateTime?
 
-    isVirtual Boolean @default(false)
+  isVirtual Boolean @default(false)
 
-    platformId String?
-    platform   Platform? @relation(fields: [platformId], references: [id], onDelete: SetNull)
+  platformId String?
+  platform   Platform? @relation(fields: [platformId], references: [id], onDelete: SetNull)
 
-    @@index([categoryId])
+  @@index([categoryId])
 }
 
 // 3. 分类模型
 model Category {
-    id   String  @id @default(uuid())
-    name String
-    icon String?
+  id   String  @id @default(uuid())
+  name String
+  icon String?
 
-    userId String?
-    user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-    parentId String?
-    parent   Category?  @relation("CategoryToCategory", fields: [parentId], references: [id], onDelete: Cascade)
-    children Category[] @relation("CategoryToCategory")
+  parentId String?
+  parent   Category?  @relation("CategoryToCategory", fields: [parentId], references: [id], onDelete: Cascade)
+  children Category[] @relation("CategoryToCategory")
 
-    items Item[]
+  items Item[]
 
-    isVirtual Boolean @default(false)
+  isVirtual Boolean @default(false)
 
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-    @@unique([name, userId])
-    @@index([parentId])
+  @@index([name, userId])
+  @@index([parentId])
 }
 
 // 4. 审计日志模型
 model AuditLog {
-    id        String   @id @default(uuid())
-    userId    String? // 操作者 ID (未登录请求可能为空)
-    action    String // 操作描述 (如: 删除物品)
-    method    String // HTTP 方法
-    path      String // 请求路径
-    payload   Json? // 请求内容 (脱敏后)
-    ip        String? // 访问者 IP
-    createdAt DateTime @default(now())
+  id        String   @id @default(uuid())
+  userId    String? // 操作者 ID (未登录请求可能为空)
+  action    String // 操作描述 (如: 删除物品)
+  method    String // HTTP 方法
+  path      String // 请求路径
+  payload   Json? // 请求内容 (脱敏后)
+  ip        String? // 访问者 IP
+  createdAt DateTime @default(now())
 
-    @@index([userId])
+  @@index([userId])
 }

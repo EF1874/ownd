@@ -21,9 +21,11 @@ export class PlatformService {
   }
 
   async findAll(userId: string) {
+    await this.ensureUserDefaultPlatforms(userId);
+
     return this.prisma.platform.findMany({
       where: {
-        OR: [{ userId: null }, { userId: userId }],
+        userId,
       },
       orderBy: {
         createdAt: 'asc',
@@ -40,8 +42,7 @@ export class PlatformService {
       throw new NotFoundException('平台不存在');
     }
 
-    // 鉴权：只能查看系统的或自己的
-    if (platform.userId !== null && platform.userId !== userId) {
+    if (platform.userId !== userId) {
       throw new ForbiddenException('你没有权限查看此平台');
     }
 
@@ -61,12 +62,6 @@ export class PlatformService {
       throw new NotFoundException('平台不存在');
     }
 
-    // 关键逻辑：系统预设平台禁止修改
-    if (platform.userId === null) {
-      throw new ForbiddenException('系统预设平台禁止修改');
-    }
-
-    // 关键逻辑：不能修改他人的私有平台
     if (platform.userId !== userId) {
       throw new ForbiddenException('你没有权限修改此平台');
     }
@@ -86,11 +81,6 @@ export class PlatformService {
       throw new NotFoundException('平台不存在');
     }
 
-    // 关键逻辑：系统预设平台禁止删除
-    if (platform.userId === null) {
-      throw new ForbiddenException('系统预设平台禁止删除');
-    }
-
     if (platform.userId !== userId) {
       throw new ForbiddenException('你没有权限删除此平台');
     }
@@ -98,5 +88,50 @@ export class PlatformService {
     return this.prisma.platform.delete({
       where: { id },
     });
+  }
+
+  private async ensureUserDefaultPlatforms(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { platformDefaultsInitialized: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('用户不存在');
+    }
+    if (user.platformDefaultsInitialized) {
+      return;
+    }
+
+    const existingUserPlatforms = await this.prisma.platform.count({
+      where: { userId },
+    });
+
+    if (existingUserPlatforms === 0) {
+      await this.copySystemPlatformTemplates(userId);
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { platformDefaultsInitialized: true },
+    });
+  }
+
+  private async copySystemPlatformTemplates(userId: string) {
+    const templates = await this.prisma.platform.findMany({
+      where: { userId: null },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    for (const template of templates) {
+      await this.prisma.platform.create({
+        data: {
+          name: template.name,
+          icon: template.icon,
+          color: template.color,
+          userId,
+        },
+      });
+    }
   }
 }

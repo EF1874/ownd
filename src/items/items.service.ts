@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateItemDto } from './dto/create-item.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
@@ -10,8 +14,17 @@ import dayjs from 'dayjs';
 export class ItemsService {
   constructor(private prisma: PrismaService) {}
 
+  private readonly itemInclude = {
+    category: { include: { parent: true } },
+    platform: true,
+    itemHistories: true,
+  } satisfies Prisma.ItemInclude;
+
   async create(userId: string, createItemDto: CreateItemDto) {
     const { platformId, categoryId, imagePath, ...data } = createItemDto;
+
+    await this.ensureCategoryAccess(userId, categoryId);
+    await this.ensurePlatformAccess(userId, platformId);
 
     // 1. 初始化变量
     let nextBillingDate: Date | null = null;
@@ -58,11 +71,7 @@ export class ItemsService {
             ? { create: itemHistoriesCreate }
             : undefined,
       },
-      include: {
-        category: true,
-        platform: true,
-        itemHistories: true,
-      },
+      include: this.itemInclude,
     });
   }
 
@@ -98,7 +107,7 @@ export class ItemsService {
     return this.prisma.item.findMany({
       where: { userId },
       include: {
-        category: true,
+        category: { include: { parent: true } },
         platform: true,
         itemHistories: {
           orderBy: { startDate: 'desc' },
@@ -112,7 +121,7 @@ export class ItemsService {
     const item = await this.prisma.item.findFirst({
       where: { id, userId },
       include: {
-        category: true,
+        category: { include: { parent: true } },
         platform: true,
         itemHistories: {
           orderBy: { createdAt: 'desc' },
@@ -133,6 +142,9 @@ export class ItemsService {
 
     const { platformId, categoryId, imagePath, ...data } = updateItemDto;
 
+    await this.ensureCategoryAccess(userId, categoryId);
+    await this.ensurePlatformAccess(userId, platformId);
+
     return this.prisma.item.update({
       where: { id },
       data: {
@@ -142,10 +154,40 @@ export class ItemsService {
         platform: platformId ? { connect: { id: platformId } } : undefined,
       },
       include: {
-        category: true,
+        category: { include: { parent: true } },
         platform: true,
       },
     });
+  }
+
+  private async ensureCategoryAccess(userId: string, categoryId?: string) {
+    if (!categoryId) return;
+
+    const category = await this.prisma.category.findFirst({
+      where: {
+        id: categoryId,
+        userId,
+      },
+    });
+
+    if (!category) {
+      throw new ForbiddenException('分类不存在或无权访问');
+    }
+  }
+
+  private async ensurePlatformAccess(userId: string, platformId?: string) {
+    if (!platformId) return;
+
+    const platform = await this.prisma.platform.findFirst({
+      where: {
+        id: platformId,
+        userId,
+      },
+    });
+
+    if (!platform) {
+      throw new ForbiddenException('平台不存在或无权访问');
+    }
   }
 
   async updateImagePath(userId: string, id: string, imagePath: string) {

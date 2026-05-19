@@ -80,7 +80,7 @@ describe('ItemsService', () => {
           itemHistories: undefined,
         },
         include: {
-          category: true,
+          category: { include: { parent: true } },
           platform: true,
           itemHistories: true,
         },
@@ -101,7 +101,7 @@ describe('ItemsService', () => {
       expect(prisma.item.findMany).toHaveBeenCalledWith({
         where: { userId },
         include: {
-          category: true,
+          category: { include: { parent: true } },
           platform: true,
           itemHistories: {
             orderBy: { startDate: 'desc' },
@@ -126,7 +126,7 @@ describe('ItemsService', () => {
       expect(prisma.item.findFirst).toHaveBeenCalledWith({
         where: { id: itemId, userId },
         include: {
-          category: true,
+          category: { include: { parent: true } },
           platform: true,
           itemHistories: {
             orderBy: { createdAt: 'desc' },
@@ -170,7 +170,7 @@ describe('ItemsService', () => {
           platform: undefined,
         },
         include: {
-          category: true,
+          category: { include: { parent: true } },
           platform: true,
         },
       });

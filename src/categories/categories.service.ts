@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
@@ -13,10 +13,7 @@ export class CategoriesService {
   async create(userId: string, createCategoryDto: CreateCategoryDto) {
     // 如果有 parentId，需要验证父级分类是否存在
     if (createCategoryDto.parentId) {
-      const parent = await this.findOne(createCategoryDto.parentId, userId);
-      if (!parent) {
-        throw new ForbiddenException('父级分类不存在或无权访问');
-      }
+      await this.findOne(createCategoryDto.parentId, userId);
     }
 
     return this.prisma.category.create({
@@ -28,9 +25,14 @@ export class CategoriesService {
   }
 
   async findAll(userId: string) {
+    await this.ensureUserDefaultCategories(userId);
+
     const categories = await this.prisma.category.findMany({
       where: {
-        userId: userId,
+        userId,
+      },
+      orderBy: {
+        createdAt: 'asc',
       },
     });
 
@@ -59,12 +61,18 @@ export class CategoriesService {
   }
 
   async findOne(id: string, userId: string) {
-    return this.prisma.category.findFirst({
+    const category = await this.prisma.category.findFirst({
       where: {
         id,
         userId,
       },
     });
+
+    if (!category) {
+      throw new NotFoundException('分类不存在');
+    }
+
+    return category;
   }
 
   async update(
@@ -72,15 +80,87 @@ export class CategoriesService {
     userId: string,
     updateCategoryDto: UpdateCategoryDto,
   ) {
+    const category = await this.findOne(id, userId);
+    if (updateCategoryDto.parentId) {
+      await this.findOne(updateCategoryDto.parentId, userId);
+    }
+
     return this.prisma.category.update({
-      where: { id, userId },
+      where: { id },
       data: updateCategoryDto,
     });
   }
 
   async remove(id: string, userId: string) {
+    await this.findOne(id, userId);
+
     return this.prisma.category.delete({
-      where: { id, userId },
+      where: { id },
     });
+  }
+
+  private async ensureUserDefaultCategories(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { categoryDefaultsInitialized: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('用户不存在');
+    }
+    if (user.categoryDefaultsInitialized) {
+      return;
+    }
+
+    const existingUserCategories = await this.prisma.category.count({
+      where: { userId },
+    });
+
+    if (existingUserCategories === 0) {
+      await this.copySystemCategoryTemplates(userId);
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { categoryDefaultsInitialized: true },
+    });
+  }
+
+  private async copySystemCategoryTemplates(userId: string) {
+    const templates = await this.prisma.category.findMany({
+      where: { userId: null },
+      orderBy: { createdAt: 'asc' },
+    });
+    const idMap = new Map<string, string>();
+
+    for (const template of templates.filter((category) => !category.parentId)) {
+      const created = await this.prisma.category.create({
+        data: {
+          name: template.name,
+          icon: template.icon,
+          isVirtual: template.isVirtual,
+          userId,
+        },
+      });
+      idMap.set(template.id, created.id);
+    }
+
+    for (const template of templates.filter((category) => category.parentId)) {
+      const parentId = template.parentId
+        ? idMap.get(template.parentId)
+        : undefined;
+      if (!parentId) continue;
+
+      const created = await this.prisma.category.create({
+        data: {
+          name: template.name,
+          icon: template.icon,
+          isVirtual: template.isVirtual,
+          parentId,
+          userId,
+        },
+      });
+      idMap.set(template.id, created.id);
+    }
   }
 }
