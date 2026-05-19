@@ -5,24 +5,19 @@ import 'package:archive/archive_io.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' hide Category;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:isar/isar.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:uuid/uuid.dart';
 
-import '../models/category.dart';
-import '../models/device.dart';
-import 'database_service.dart';
+import '../../core/network/api_client.dart';
 
 final dataTransferServiceProvider = Provider<DataTransferService>((ref) {
-  final dbService = ref.watch(databaseServiceProvider);
-  return DataTransferService(dbService.isar);
+  return DataTransferService(ref.watch(apiClientProvider));
 });
 
 class DataTransferService {
-  final Isar _isar;
+  final ApiClient _apiClient;
 
-  DataTransferService(this._isar);
+  DataTransferService(this._apiClient);
 
   Future<void> exportData() async {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -30,19 +25,8 @@ class DataTransferService {
   }
 
   Future<File> createBackup({required String fileName}) async {
-    // 1. Ensure all data has UUIDs (Migration)
-    await _isar.writeTxn(() async {
-      final categories = await _isar.categorys.where().findAll();
-      for (final category in categories) {
-        if (category.uuid == null) {
-          category.uuid = const Uuid().v4();
-          await _isar.categorys.put(category);
-        }
-      }
-    });
-
-    final devices = await _isar.devices.where().findAll();
-    final categories = await _isar.categorys.where().findAll();
+    final categories = await _apiClient.get<List<dynamic>>('/categories');
+    final devices = await _apiClient.get<List<dynamic>>('/items');
 
     // Prepare Temp Directory for Staging
     final tempDir = await getTemporaryDirectory();
@@ -54,74 +38,18 @@ class DataTransferService {
     }
     await stagingDir.create();
 
-    final imagesDir = Directory('${stagingDir.path}/images');
-    await imagesDir.create();
-
-    // Process Devices and Copy Images
     final devicesData = await Future.wait(
-      devices.map((e) async {
-        String? relativeIconPath;
-        if (e.customIconPath != null) {
-          final originalFile = File(e.customIconPath!);
-          if (await originalFile.exists()) {
-            final fileName = p.basename(e.customIconPath!);
-            // Copy to staging images folder
-            // Use UUID in filename to avoid collisions if multiple devices use "image.jpg"
-            final newFileName = '${e.uuid}_$fileName';
-            await originalFile.copy('${imagesDir.path}/$newFileName');
-            relativeIconPath = 'images/$newFileName';
-          }
-        }
-
-        return {
-          'uuid': e.uuid,
-          'name': e.name,
-          'categoryName': e.category.value?.name,
-          'price': e.price,
-          'purchaseDate': e.purchaseDate.toIso8601String(),
-          'platform': e.platform,
-          'warrantyEndDate': e.warrantyEndDate?.toIso8601String(),
-          'scrapDate': e.scrapDate?.toIso8601String(),
-          'backupDate': e.backupDate?.toIso8601String(),
-          'customIconPath': relativeIconPath, // Store relative path in ZIP
-          // Subscription Fields
-          'cycleType': e.cycleType?.name,
-          'isAutoRenew': e.isAutoRenew,
-          'nextBillingDate': e.nextBillingDate?.toIso8601String(),
-          'reminderDays': e.reminderDays,
-          'hasReminder': e.hasReminder,
-          'firstPeriodPrice': e.firstPeriodPrice,
-          'periodPrice': e.periodPrice,
-          'totalAccumulatedPrice': e.totalAccumulatedPrice,
-          'history': e.history
-              .map(
-                (h) => {
-                  'startDate': h.startDate?.toIso8601String(),
-                  'endDate': h.endDate?.toIso8601String(),
-                  'price': h.price,
-                  'cycleType': h.cycleType.name,
-                  'isAutoRenew': h.isAutoRenew,
-                  'recordDate': h.recordDate?.toIso8601String(),
-                  'note': h.note,
-                },
-              )
-              .toList(),
-        };
-      }).toList(),
+      devices.whereType<Map<String, dynamic>>().map(_exportItem).toList(),
     );
 
     final data = {
-      'version': 2, // Bump version to 2 for ZIP format
+      'version': 3,
+      'source': 'ownd-api',
       'timestamp': DateTime.now().toIso8601String(),
       'categories': categories
-          .map(
-            (e) => {
-              'uuid': e.uuid,
-              'name': e.name,
-              'iconPath': e.iconPath,
-              'isDefault': e.isDefault,
-            },
-          )
+          .whereType<Map<String, dynamic>>()
+          .expand(_flattenCategory)
+          .map(_exportCategory)
           .toList(),
       'devices': devicesData,
     };
@@ -225,185 +153,7 @@ class DataTransferService {
           data = jsonDecode(jsonString);
         }
 
-        await _isar.writeTxn(() async {
-          // 1. Restore Categories
-          final categoryMap = <String, Category>{};
-          if (data['categories'] != null) {
-            final categoriesList = data['categories'] as List;
-            for (final catData in categoriesList) {
-              final uuid = catData['uuid'];
-              final name = catData['name'];
-
-              Category? category;
-              if (uuid != null) {
-                category = await _isar.categorys
-                    .filter()
-                    .uuidEqualTo(uuid)
-                    .findFirst();
-              }
-              category ??= await _isar.categorys
-                  .filter()
-                  .nameEqualTo(name)
-                  .findFirst();
-
-              if (category == null) {
-                category = Category()
-                  ..uuid = uuid ?? const Uuid().v4()
-                  ..name = name
-                  ..iconPath = catData['iconPath']
-                  ..isDefault = catData['isDefault'] ?? false;
-                await _isar.categorys.put(category);
-              } else {
-                if (category.uuid == null && uuid != null) {
-                  category.uuid = uuid;
-                  await _isar.categorys.put(category);
-                }
-              }
-              categoryMap[name] = category;
-              if (uuid != null) categoryMap[uuid] = category;
-            }
-          }
-
-          // 2. Restore Devices
-          if (data['devices'] != null) {
-            final devicesList = data['devices'] as List;
-            for (final devData in devicesList) {
-              final uuid = devData['uuid'];
-
-              if (uuid != null) {
-                // Check if device exists. If so, update it or skip?
-                // Usually restore implies overwriting or adding missing.
-                // Let's skip existing to prevent duplicates, OR update if it's the same device.
-                // For simplicity, skip if UUID exists.
-                final existing = await _isar.devices
-                    .filter()
-                    .uuidEqualTo(uuid)
-                    .findFirst();
-                if (existing != null) {
-                  continue;
-                }
-              }
-
-              final device = Device()
-                ..uuid = uuid ?? const Uuid().v4()
-                ..name = devData['name']
-                ..price = (devData['price'] as num).toDouble()
-                ..purchaseDate = DateTime.parse(devData['purchaseDate'])
-                ..platform = devData['platform']
-                ..warrantyEndDate = devData['warrantyEndDate'] != null
-                    ? DateTime.parse(devData['warrantyEndDate'])
-                    : null
-                ..scrapDate = devData['scrapDate'] != null
-                    ? DateTime.parse(devData['scrapDate'])
-                    : null
-                ..backupDate = devData['backupDate'] != null
-                    ? DateTime.parse(devData['backupDate'])
-                    : null
-                // Subscription Fields
-                ..cycleType = devData['cycleType'] != null
-                    ? CycleType.values.firstWhere(
-                        (e) => e.name == devData['cycleType'],
-                        orElse: () => CycleType.monthly,
-                      )
-                    : null
-                ..isAutoRenew = devData['isAutoRenew'] ?? false
-                ..nextBillingDate = devData['nextBillingDate'] != null
-                    ? DateTime.parse(devData['nextBillingDate'])
-                    : null
-                ..reminderDays = devData['reminderDays'] ?? 1
-                ..hasReminder = devData['hasReminder'] ?? false
-                ..firstPeriodPrice = devData['firstPeriodPrice'] != null
-                    ? (devData['firstPeriodPrice'] as num).toDouble()
-                    : null
-                ..periodPrice = devData['periodPrice'] != null
-                    ? (devData['periodPrice'] as num).toDouble()
-                    : null
-                ..totalAccumulatedPrice =
-                    (devData['totalAccumulatedPrice'] ?? 0.0).toDouble();
-
-              // Restore Custom Icon (ZIP or Legacy)
-              if (devData['customIconPath'] != null) {
-                String path = devData['customIconPath'];
-                if (stagingPath != null && path.startsWith('images/')) {
-                  // It's a relative path from ZIP
-                  // Note: The zip might have extracted to "staging/backup_staging_xxx/images/..."
-                  // or "staging/images/..." depending on zip structure.
-                  // We need to find the file in staging dir.
-
-                  // Construct potential full path in staging
-                  // Assuming flat unzip or preserving structure.
-                  // Let's search for the image file by name in the staging dir if strict path fails.
-                  final fileName = p.basename(path);
-
-                  File? sourceFile;
-                  final stagingDirectory = Directory(stagingPath);
-                  await for (final entity in stagingDirectory.list(
-                    recursive: true,
-                  )) {
-                    if (entity is File && p.basename(entity.path) == fileName) {
-                      sourceFile = entity;
-                      break;
-                    }
-                  }
-
-                  if (sourceFile != null) {
-                    final appDir = await getApplicationDocumentsDirectory();
-                    final appDocsImagesDir = Directory(
-                      '${appDir.path}/imported_icons',
-                    ); // Separate folder or root?
-                    if (!await appDocsImagesDir.exists()) {
-                      await appDocsImagesDir.create();
-                    }
-                    final newPath = '${appDocsImagesDir.path}/$fileName';
-                    await sourceFile.copy(newPath);
-                    device.customIconPath = newPath;
-                  }
-                } else {
-                  // Legacy: absolute path or Base64 (if we kept it, but we removed it).
-                  // Base64 field check (backward compat for the version we just wrote but didn't release? No, user won't have it).
-                  // If it's an old absolute path, check if it exists (local restore).
-                  if (await File(path).exists()) {
-                    device.customIconPath = path;
-                  }
-                }
-              }
-
-              // History
-              if (devData['history'] != null) {
-                final historyList = (devData['history'] as List).map((h) {
-                  final hist = SubscriptionHistory();
-                  hist.startDate = h['startDate'] != null
-                      ? DateTime.parse(h['startDate'])
-                      : null;
-                  hist.endDate = h['endDate'] != null
-                      ? DateTime.parse(h['endDate'])
-                      : null;
-                  hist.price = (h['price'] as num).toDouble();
-                  hist.isAutoRenew = h['isAutoRenew'] ?? false;
-                  hist.recordDate = h['recordDate'] != null
-                      ? DateTime.parse(h['recordDate'])
-                      : null;
-                  hist.note = h['note'];
-                  if (h['cycleType'] != null) {
-                    try {
-                      hist.cycleType = CycleType.values.byName(h['cycleType']);
-                    } catch (_) {}
-                  }
-                  return hist;
-                }).toList();
-                device.history = historyList;
-              }
-
-              await _isar.devices.put(device);
-
-              final catName = devData['categoryName'];
-              if (catName != null && categoryMap.containsKey(catName)) {
-                device.category.value = categoryMap[catName];
-                await device.category.save();
-              }
-            }
-          }
-        });
+        await _restoreToApi(data);
 
         // Cleanup staging
         if (stagingPath != null) {
@@ -423,5 +173,201 @@ class DataTransferService {
     final downloadDir = await getDownloadsDirectory();
     final baseDir = downloadDir ?? await getApplicationDocumentsDirectory();
     return '${baseDir.path}/Ownd';
+  }
+
+  Future<Map<String, dynamic>> _exportItem(Map<String, dynamic> item) async {
+    final id = item['id'] as String;
+    final detail = await _apiClient.get<Map<String, dynamic>>('/items/$id');
+    final histories = await _apiClient.get<List<dynamic>>(
+      '/items/$id/histories',
+    );
+
+    return {
+      'uuid': id,
+      'name': detail['name'],
+      'categoryName': (detail['category'] as Map<String, dynamic>?)?['name'],
+      'categoryUuid': (detail['category'] as Map<String, dynamic>?)?['id'],
+      'price': detail['price'],
+      'purchaseDate': detail['purchaseDate'],
+      'platform': (detail['platform'] as Map<String, dynamic>?)?['name'],
+      'warrantyEndDate': detail['warrantyEndDate'],
+      'scrapDate': detail['scrappedDate'],
+      'backupDate': detail['backupDate'],
+      'imagePath': detail['imagePath'],
+      'notes': detail['notes'],
+      'tags': detail['tags'] ?? const [],
+      'cycleType': _cycleTypeFromApi(detail['currentCycleType'] as String?),
+      'currentCycle': detail['currentCycle'],
+      'isAutoRenew': detail['isAutoRenew'] ?? false,
+      'nextBillingDate': detail['nextBillingDate'],
+      'history': histories
+          .whereType<Map<String, dynamic>>()
+          .map(_exportHistory)
+          .toList(),
+    };
+  }
+
+  Map<String, dynamic> _exportCategory(Map<String, dynamic> category) {
+    return {
+      'uuid': category['id'],
+      'name': category['name'],
+      'iconPath': category['icon'] ?? 'MdiIcons.tag',
+      'isDefault': category['userId'] == null,
+    };
+  }
+
+  Map<String, dynamic> _exportHistory(Map<String, dynamic> history) {
+    return {
+      'type': history['type'] ?? 'RENEWAL',
+      'startDate': history['startDate'],
+      'endDate': history['endDate'],
+      'price': history['price'],
+      'cycleType': _cycleTypeFromApi(history['cycleType'] as String?),
+      'cycle': history['cycle'],
+      'recordDate': history['recordDate'],
+      'note': history['note'],
+    };
+  }
+
+  Future<void> _restoreToApi(Map<String, dynamic> data) async {
+    final categoryMap = await _restoreCategories(data['categories']);
+    final existingItems = await _apiClient.get<List<dynamic>>('/items');
+    final existingIds = existingItems
+        .whereType<Map<String, dynamic>>()
+        .map((item) => item['id'])
+        .whereType<String>()
+        .toSet();
+
+    final devices = (data['devices'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>();
+    for (final device in devices) {
+      final oldUuid = device['uuid'] as String?;
+      if (oldUuid != null && existingIds.contains(oldUuid)) {
+        continue;
+      }
+
+      final created = await _apiClient.post<Map<String, dynamic>>(
+        '/items',
+        data: _itemPayload(device, categoryMap),
+      );
+      await _restoreHistories(
+        created['id'] as String,
+        device['history'] as List<dynamic>? ?? const [],
+      );
+    }
+  }
+
+  Future<Map<String, String>> _restoreCategories(dynamic rawCategories) async {
+    final categoryMap = <String, String>{};
+    final existing = await _apiClient.get<List<dynamic>>('/categories');
+
+    for (final category in existing.whereType<Map<String, dynamic>>().expand(
+      _flattenCategory,
+    )) {
+      final id = category['id'] as String;
+      categoryMap[category['name'] as String] = id;
+      categoryMap[id] = id;
+    }
+
+    final categories = (rawCategories as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>();
+    for (final category in categories) {
+      final name = category['name'] as String?;
+      if (name == null || name.isEmpty || categoryMap.containsKey(name)) {
+        continue;
+      }
+
+      final created = await _apiClient.post<Map<String, dynamic>>(
+        '/categories',
+        data: {'name': name, 'icon': category['iconPath'] ?? 'MdiIcons.tag'},
+      );
+      final id = created['id'] as String;
+      categoryMap[name] = id;
+      final oldUuid = category['uuid'];
+      if (oldUuid is String) categoryMap[oldUuid] = id;
+    }
+
+    return categoryMap;
+  }
+
+  Map<String, dynamic> _itemPayload(
+    Map<String, dynamic> device,
+    Map<String, String> categoryMap,
+  ) {
+    final categoryKey = device['categoryUuid'] ?? device['categoryName'];
+    final cycleType = _cycleTypeToApi(device['cycleType'] as String?);
+
+    return {
+      'name': device['name'],
+      'price': (device['price'] as num?)?.toDouble() ?? 0,
+      'purchaseDate': device['purchaseDate'],
+      if (categoryKey is String && categoryMap[categoryKey] != null)
+        'categoryId': categoryMap[categoryKey],
+      if (device['notes'] != null) 'notes': device['notes'],
+      'tags': device['tags'] ?? const [],
+      'isVirtual': cycleType != null,
+      if (cycleType != null) 'currentCycleType': cycleType,
+      if (cycleType != null) 'currentCycle': device['currentCycle'] ?? 1,
+      'isAutoRenew': device['isAutoRenew'] ?? false,
+      if (device['warrantyEndDate'] != null)
+        'warrantyEndDate': device['warrantyEndDate'],
+      'isBackup': device['backupDate'] != null,
+      if (device['backupDate'] != null) 'backupDate': device['backupDate'],
+      'isScrapped': device['scrapDate'] != null,
+      if (device['scrapDate'] != null) 'scrappedDate': device['scrapDate'],
+    };
+  }
+
+  Future<void> _restoreHistories(String itemId, List<dynamic> histories) async {
+    for (final rawHistory in histories.whereType<Map<String, dynamic>>()) {
+      await _apiClient.post<dynamic>(
+        '/items/$itemId/histories',
+        data: {
+          'type': rawHistory['type'] ?? 'RENEWAL',
+          'price': (rawHistory['price'] as num?)?.toDouble() ?? 0,
+          if (rawHistory['recordDate'] != null)
+            'recordDate': rawHistory['recordDate'],
+          if (rawHistory['note'] != null) 'note': rawHistory['note'],
+          if (rawHistory['startDate'] != null)
+            'startDate': rawHistory['startDate'],
+          if (rawHistory['endDate'] != null) 'endDate': rawHistory['endDate'],
+          if (_cycleTypeToApi(rawHistory['cycleType'] as String?) != null)
+            'cycleType': _cycleTypeToApi(rawHistory['cycleType'] as String?),
+          if (rawHistory['cycle'] != null) 'cycle': rawHistory['cycle'],
+        },
+      );
+    }
+  }
+
+  Iterable<Map<String, dynamic>> _flattenCategory(Map<String, dynamic> json) {
+    return [
+      json,
+      ...((json['children'] as List<dynamic>?) ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .expand(_flattenCategory),
+    ];
+  }
+
+  String? _cycleTypeFromApi(String? value) {
+    return switch (value) {
+      'DAY' => 'daily',
+      'WEEK' => 'weekly',
+      'MONTH' => 'monthly',
+      'QUARTER' => 'quarterly',
+      'YEAR' => 'yearly',
+      _ => value,
+    };
+  }
+
+  String? _cycleTypeToApi(String? value) {
+    return switch (value) {
+      'daily' => 'DAY',
+      'weekly' => 'WEEK',
+      'monthly' => 'MONTH',
+      'quarterly' => 'QUARTER',
+      'yearly' => 'YEAR',
+      'DAY' || 'WEEK' || 'MONTH' || 'QUARTER' || 'YEAR' => value,
+      _ => null,
+    };
   }
 }

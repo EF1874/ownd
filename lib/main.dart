@@ -5,8 +5,6 @@ import 'core/theme/app_theme.dart';
 import 'core/theme/theme_provider.dart';
 import 'features/navigation/app_router.dart';
 import 'data/services/database_service.dart';
-import 'data/services/backup_service.dart';
-import 'data/services/data_transfer_service.dart';
 import 'data/services/preferences_service.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'shared/services/notification_service.dart';
@@ -20,17 +18,6 @@ void main() async {
   final dbService = DatabaseService();
   await dbService.init();
 
-  // Initialize DataTransferService manually
-  final dataTransferService = DataTransferService(dbService.isar);
-
-  // Initialize BackupService manually
-  final backupService = BackupService(dataTransferService);
-  await backupService.init();
-
-  // Perform startup backup and cleanup
-  await backupService.createBackup();
-  await backupService.cleanupOldBackups();
-
   // 2. Initialize PreferencesService
   final prefs = await SharedPreferences.getInstance();
   final preferencesService = PreferencesService(prefs);
@@ -39,8 +26,6 @@ void main() async {
   final container = ProviderContainer(
     overrides: [
       databaseServiceProvider.overrideWithValue(dbService),
-      dataTransferServiceProvider.overrideWithValue(dataTransferService),
-      backupServiceProvider.overrideWithValue(backupService),
       preferencesServiceProvider.overrideWithValue(preferencesService),
     ],
   );
