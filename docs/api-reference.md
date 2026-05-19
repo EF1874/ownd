@@ -5,7 +5,7 @@
 ## 响应协议说明（重要）
 
 - **目标协议（PRD 基线）**: `{"code": number, "data": any, "msg": string}`
-- **当前状态**: 历史实现中存在 `message` 字段返回，已列入 `R1` 修复任务，修复后本文件以 `msg` 为唯一标准。
+- **当前状态**: 成功响应由全局拦截器包装为 `code/data/msg`；错误响应以 `msg` 为标准字段，客户端可兼容历史 `message`。
 
 ## 1. 认证模块 (Auth)
 
@@ -35,9 +35,23 @@
 - **Response**:
   ```json
   {
-    "access_token": "jwt_token_string"
+    "code": 200,
+    "data": {
+      "access_token": "jwt_token_string",
+      "user": {
+        "id": "uuid",
+        "email": "user@example.com",
+        "name": "User Name"
+      }
+    },
+    "msg": "success"
   }
   ```
+
+### 当前用户资料
+- **Method**: `GET`
+- **Path**: `/auth/profile`
+- **Header**: `Authorization: Bearer <token>`
 
 ---
 
@@ -63,6 +77,15 @@
 
 ### 获取单个物品
 - **Method**: `GET`
+- **Path**: `/items/:id`
+
+### 更新物品
+- **Method**: `PATCH`
+- **Path**: `/items/:id`
+- **Content-Type**: `application/json` 或 `multipart/form-data`
+
+### 删除物品
+- **Method**: `DELETE`
 - **Path**: `/items/:id`
 
 ### 图片上传
@@ -96,7 +119,7 @@
 
 ## 5. 统计引擎 (Statistics)
 - **资产概览**: `GET /statistics/summary` (返回总资产 TCO)
-- **单项统计**: `GET /statistics/items/:id` (返回该物品的日均成本等)
+- **单项统计**: `GET /statistics/item/:id` (返回该物品的日均成本等)
 
 ---
 
@@ -116,7 +139,6 @@
   ```json
   {
     "code": 401,
-    "data": null,
     "msg": "Unauthorized",
     "timestamp": "2026-04-20T..."
   }
