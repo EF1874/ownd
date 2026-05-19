@@ -29,13 +29,18 @@ export class AuthController {
 
   @Post('signup')
   @Audit('用户注册')
-  @ApiResponse({ status: 201, description: '注册成功' })
+  @ApiResponse({
+    status: 201,
+    description: '注册成功',
+    type: LoginResultEntity,
+  })
   async signUp(@Body() signupDto: SignupDto) {
-    return this.authService.register(
+    const user = await this.authService.register(
       signupDto.email,
       signupDto.password,
       signupDto.name,
     );
+    return this.authService.login(user);
   }
 
   @Post('login')
