@@ -22,7 +22,7 @@ class AdditionalInfoSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return BaseCard(
       variant: CardVariant.glass,
       child: Column(
@@ -61,7 +61,9 @@ class AdditionalInfoSection extends StatelessWidget {
               height: 120,
               width: double.infinity,
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                color: theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.3,
+                ),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: theme.dividerColor,
@@ -95,12 +97,18 @@ class AdditionalInfoSection extends StatelessWidget {
                   : Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.add_a_photo, 
-                             size: 32, 
-                             color: theme.colorScheme.primary.withValues(alpha: 0.8)),
+                        Icon(
+                          Icons.add_a_photo,
+                          size: 32,
+                          color: theme.colorScheme.primary.withValues(
+                            alpha: 0.8,
+                          ),
+                        ),
                         const SizedBox(height: 8),
-                        Text('添加照片', 
-                             style: TextStyle(color: theme.colorScheme.primary)),
+                        Text(
+                          '添加照片',
+                          style: TextStyle(color: theme.colorScheme.primary),
+                        ),
                       ],
                     ),
             ),

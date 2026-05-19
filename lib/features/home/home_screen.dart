@@ -168,50 +168,62 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     );
                   },
                 ),
-                  SliverPersistentHeader(
-                    pinned: true,
-                    delegate: MultiSelectFilterDelegate(
-                      selectedCategories: _selectedCategories,
-                      onSelectionChanged: (categories) {
-                        setState(() => _selectedCategories = categories);
-                      },
-                    ),
+                SliverPersistentHeader(
+                  pinned: true,
+                  delegate: MultiSelectFilterDelegate(
+                    selectedCategories: _selectedCategories,
+                    onSelectionChanged: (categories) {
+                      setState(() => _selectedCategories = categories);
+                    },
                   ),
-                  if (devicesAsync.valueOrNull != null && devicesAsync.valueOrNull!.any((d) => d.tags.isNotEmpty))
-                    SliverToBoxAdapter(
-                      child: Container(
-                        height: 48,
-                        color: Theme.of(context).scaffoldBackgroundColor,
-                        alignment: Alignment.centerLeft,
-                        child: ListView(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          children: [
-                            for (final tag in (devicesAsync.valueOrNull!.expand((d) => d.tags).toSet().toList()..sort()))
-                              Padding(
-                                padding: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
-                                child: FilterChip(
-                                  label: Text('#$tag'),
-                                  labelStyle: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: _selectedTags.contains(tag) ? FontWeight.bold : FontWeight.normal,
-                                  ),
-                                  selected: _selectedTags.contains(tag),
-                                  onSelected: (selected) {
-                                    setState(() {
-                                      if (selected) {
-                                        _selectedTags.add(tag);
-                                      } else {
-                                        _selectedTags.remove(tag);
-                                      }
-                                    });
-                                  },
-                                ),
+                ),
+                if (devicesAsync.valueOrNull != null &&
+                    devicesAsync.valueOrNull!.any((d) => d.tags.isNotEmpty))
+                  SliverToBoxAdapter(
+                    child: Container(
+                      height: 48,
+                      color: Theme.of(context).scaffoldBackgroundColor,
+                      alignment: Alignment.centerLeft,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        children: [
+                          for (final tag
+                              in (devicesAsync.valueOrNull!
+                                  .expand((d) => d.tags)
+                                  .toSet()
+                                  .toList()
+                                ..sort()))
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                right: 8,
+                                top: 8,
+                                bottom: 8,
                               ),
-                          ],
-                        ),
+                              child: FilterChip(
+                                label: Text('#$tag'),
+                                labelStyle: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: _selectedTags.contains(tag)
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                ),
+                                selected: _selectedTags.contains(tag),
+                                onSelected: (selected) {
+                                  setState(() {
+                                    if (selected) {
+                                      _selectedTags.add(tag);
+                                    } else {
+                                      _selectedTags.remove(tag);
+                                    }
+                                  });
+                                },
+                              ),
+                            ),
+                        ],
                       ),
                     ),
+                  ),
                 devicesAsync.when(
                   data: (devices) {
                     final processed = _processDevices(devices);
@@ -220,8 +232,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       allDevices: devices,
                       showExpiringList: _showExpiringList,
                       isGridView: _isGridView,
-                      categoryName: _selectedCategories.isNotEmpty && _selectedCategories.length == 1 
-                          ? _selectedCategories.first 
+                      categoryName:
+                          _selectedCategories.isNotEmpty &&
+                              _selectedCategories.length == 1
+                          ? _selectedCategories.first
                           : null,
                     );
                   },

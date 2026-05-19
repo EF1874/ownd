@@ -64,7 +64,7 @@ class Device {
       if (days < 1) return price; // First day or invalid dates
       return price / days;
     }
-    
+
     // 2. Subscription Device: Calculate Historical Average Daily Cost
     double totalCost = 0.0;
     int totalDays = 0;
@@ -82,7 +82,7 @@ class Device {
     // B. Add Current Active Period
     final currentCost = periodPrice ?? price;
     totalCost += currentCost;
-    
+
     // Use SubscriptionUtils.getDuration to match snapshot logic exactly
     final currentDuration = SubscriptionUtils.getDuration(cycleType!);
     // If oneTime, duration might be 0.
@@ -158,9 +158,9 @@ class Device {
     // If history is not empty, we assume the calculated start is correct based on the duration.
     // We do NOT force it to match legacy end date to preserve gaps.
     if (history.isEmpty) {
-        if (calculatedStart.isBefore(purchaseDate)) {
-           calculatedStart = purchaseDate;
-        }
+      if (calculatedStart.isBefore(purchaseDate)) {
+        calculatedStart = purchaseDate;
+      }
     }
 
     // Ensure list is growable

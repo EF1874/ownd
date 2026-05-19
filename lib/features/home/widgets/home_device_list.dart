@@ -118,7 +118,10 @@ class HomeDeviceList extends StatelessWidget {
             isGridView
                 ? SliverGrid(
                     delegate: SliverChildBuilderDelegate(
-                      (context, index) => DeviceGridItem(device: normal[index], index: index + expiring.length),
+                      (context, index) => DeviceGridItem(
+                        device: normal[index],
+                        index: index + expiring.length,
+                      ),
                       childCount: normal.length,
                     ),
                     gridDelegate:
@@ -131,7 +134,10 @@ class HomeDeviceList extends StatelessWidget {
                   )
                 : SliverList(
                     delegate: SliverChildBuilderDelegate(
-                      (context, index) => DeviceListItem(device: normal[index], index: index + expiring.length),
+                      (context, index) => DeviceListItem(
+                        device: normal[index],
+                        index: index + expiring.length,
+                      ),
                       childCount: normal.length,
                     ),
                   ),
@@ -145,34 +151,48 @@ class HomeDeviceList extends StatelessWidget {
             SliverFillRemaining(
               hasScrollBody: false,
               child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.inbox_outlined,
-                      size: 64,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.outline.withValues(alpha: 0.5),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      '暂无数据',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.outline,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '当前分类下没有相关物品',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.outline,
-                      ),
-                    ),
-                    const SizedBox(height: 32), // Visual balance
-                  ],
-                ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.1, duration: 500.ms, curve: Curves.easeOutCubic),
+                child:
+                    Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.inbox_outlined,
+                              size: 64,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.outline.withValues(alpha: 0.5),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              '暂无数据',
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.outline,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '当前分类下没有相关物品',
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.outline,
+                                  ),
+                            ),
+                            const SizedBox(height: 32), // Visual balance
+                          ],
+                        )
+                        .animate()
+                        .fadeIn(duration: 500.ms)
+                        .slideY(
+                          begin: 0.1,
+                          duration: 500.ms,
+                          curve: Curves.easeOutCubic,
+                        ),
               ),
             ),
         ],

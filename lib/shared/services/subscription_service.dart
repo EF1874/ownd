@@ -18,11 +18,7 @@ class SubscriptionService {
   final NotificationService _notificationService;
   final PreferencesService _prefs;
 
-  SubscriptionService(
-    this._deviceRepo,
-    this._notificationService,
-    this._prefs,
-  );
+  SubscriptionService(this._deviceRepo, this._notificationService, this._prefs);
 
   /// Checks all auto-renew subscriptions and updates them if they are due.
   Future<void> checkAndRenewSubscriptions() async {
@@ -59,7 +55,8 @@ class SubscriptionService {
     final billingDate = device.nextBillingDate!;
     // Calculate notification date: billingDate - reminderDays
     final reminderDate = billingDate.subtract(
-        Duration(days: device.reminderDays));
+      Duration(days: device.reminderDays),
+    );
 
     // Parse user preference time
     final timeParts = _prefs.notificationTime.split(':');
@@ -81,7 +78,8 @@ class SubscriptionService {
 
     String body = '您的订阅 ${device.name} 即将到期';
     if (device.isAutoRenew) {
-      body += '，将在 ${DateFormat('MM-dd').format(billingDate)} 自动续费 ${device.price} 元';
+      body +=
+          '，将在 ${DateFormat('MM-dd').format(billingDate)} 自动续费 ${device.price} 元';
     } else {
       body += '，将于 ${DateFormat('MM-dd').format(billingDate)} 到期';
     }
@@ -124,7 +122,8 @@ class SubscriptionService {
       return;
     }
 
-    String body = '您的物品 ${device.name} 的保修即将在 ${DateFormat('MM-dd').format(warrantyDate)} 到期';
+    String body =
+        '您的物品 ${device.name} 的保修即将在 ${DateFormat('MM-dd').format(warrantyDate)} 到期';
 
     await _notificationService.scheduleNotification(
       id: device.id + 100000, // Offset to avoid collision with subscription IDs
@@ -148,13 +147,15 @@ class SubscriptionService {
     final timeParts = _prefs.notificationTime.split(':');
     final hour = int.parse(timeParts[0]);
     final minute = int.parse(timeParts[1]);
-    
+
     for (final device in devices) {
       if (!device.hasReminder || device.nextBillingDate == null) continue;
 
       final billingDate = device.nextBillingDate!;
-      final reminderDate = billingDate.subtract(Duration(days: device.reminderDays));
-      
+      final reminderDate = billingDate.subtract(
+        Duration(days: device.reminderDays),
+      );
+
       // Determine the precise time the notification *should* have happened
       final scheduledDateTime = DateTime(
         reminderDate.year,
@@ -170,32 +171,34 @@ class SubscriptionService {
         // Generally, we only want to remind if the billing hasn't happened yet or is happening today.
         // Let's say we remind until the billing date passes.
         if (now.isBefore(billingDate.add(const Duration(days: 1)))) {
-             // Condition 3: Logic to prevent spamming every time app opens.
-             // Requirement: "Max once per day"
-             if (_prefs.hasCheckedToday(device.id)) continue;
+          // Condition 3: Logic to prevent spamming every time app opens.
+          // Requirement: "Max once per day"
+          if (_prefs.hasCheckedToday(device.id)) continue;
 
-             // Check if already active in tray (from OS schedule or previous check)
-             final isActive = await _notificationService.isNotificationActive(device.id);
-             if (isActive) continue;
-             
-             // Robustness Requirement: "prevent user killing app... immediately send... check on app start"
-             // Implementation: We will send an IMMEDIATE notification if we are in the [ReminderTime, BillingDate] window.
-             // Optimization: We rely on the user dismissing it.
-             
-             await _notificationService.showNotification(
-                id: device.id,
-                title: '订阅提醒',
-                body: '您的订阅 ${device.name} 即将到期/续费',
-                payload: '/device/${device.id}',
-             );
+          // Check if already active in tray (from OS schedule or previous check)
+          final isActive = await _notificationService.isNotificationActive(
+            device.id,
+          );
+          if (isActive) continue;
 
-             // Record that we notified today (manually)
-             await _prefs.setCheckToday(device.id);
+          // Robustness Requirement: "prevent user killing app... immediately send... check on app start"
+          // Implementation: We will send an IMMEDIATE notification if we are in the [ReminderTime, BillingDate] window.
+          // Optimization: We rely on the user dismissing it.
+
+          await _notificationService.showNotification(
+            id: device.id,
+            title: '订阅提醒',
+            body: '您的订阅 ${device.name} 即将到期/续费',
+            payload: '/device/${device.id}',
+          );
+
+          // Record that we notified today (manually)
+          await _prefs.setCheckToday(device.id);
         }
       }
     }
   }
-  
+
   Future<void> rescheduleAllNotifications() async {
     await _notificationService.cancelAllNotifications();
     final devices = await _deviceRepo.getAllDevices();

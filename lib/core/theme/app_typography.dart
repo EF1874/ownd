@@ -14,64 +14,55 @@ class AppTypography {
   static const String monoFamily = 'monospace';
 
   // ─── Display (Large numbers, hero text) ───────────────────
-  static TextStyle displayLarge(BuildContext context) =>
-      Theme.of(context).textTheme.displayLarge!.copyWith(
-            fontWeight: FontWeight.w700,
-            letterSpacing: -1.5,
-          );
+  static TextStyle displayLarge(BuildContext context) => Theme.of(context)
+      .textTheme
+      .displayLarge!
+      .copyWith(fontWeight: FontWeight.w700, letterSpacing: -1.5);
 
   // ─── Headlines ────────────────────────────────────────────
-  static TextStyle headlineLarge(BuildContext context) =>
-      Theme.of(context).textTheme.headlineLarge!.copyWith(
-            fontWeight: FontWeight.w600,
-            letterSpacing: -0.5,
-          );
+  static TextStyle headlineLarge(BuildContext context) => Theme.of(context)
+      .textTheme
+      .headlineLarge!
+      .copyWith(fontWeight: FontWeight.w600, letterSpacing: -0.5);
 
-  static TextStyle headlineMedium(BuildContext context) =>
-      Theme.of(context).textTheme.headlineMedium!.copyWith(
-            fontWeight: FontWeight.w600,
-          );
+  static TextStyle headlineMedium(BuildContext context) => Theme.of(
+    context,
+  ).textTheme.headlineMedium!.copyWith(fontWeight: FontWeight.w600);
 
   // ─── Money / Numbers (Monospace for geek look) ────────────
   static TextStyle moneyLarge(BuildContext context) =>
       Theme.of(context).textTheme.headlineMedium!.copyWith(
-            fontFamily: monoFamily,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.5,
-          );
+        fontFamily: monoFamily,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -0.5,
+      );
 
-  static TextStyle moneyMedium(BuildContext context) =>
-      Theme.of(context).textTheme.titleMedium!.copyWith(
-            fontFamily: monoFamily,
-            fontWeight: FontWeight.w600,
-          );
+  static TextStyle moneyMedium(BuildContext context) => Theme.of(context)
+      .textTheme
+      .titleMedium!
+      .copyWith(fontFamily: monoFamily, fontWeight: FontWeight.w600);
 
-  static TextStyle moneySmall(BuildContext context) =>
-      Theme.of(context).textTheme.bodyMedium!.copyWith(
-            fontFamily: monoFamily,
-            fontWeight: FontWeight.w500,
-          );
+  static TextStyle moneySmall(BuildContext context) => Theme.of(context)
+      .textTheme
+      .bodyMedium!
+      .copyWith(fontFamily: monoFamily, fontWeight: FontWeight.w500);
 
   // ─── Labels ───────────────────────────────────────────────
-  static TextStyle labelSmall(BuildContext context) =>
-      Theme.of(context).textTheme.labelSmall!.copyWith(
-            fontWeight: FontWeight.w500,
-            letterSpacing: 0.5,
-          );
+  static TextStyle labelSmall(BuildContext context) => Theme.of(context)
+      .textTheme
+      .labelSmall!
+      .copyWith(fontWeight: FontWeight.w500, letterSpacing: 0.5);
 
-  static TextStyle labelMedium(BuildContext context) =>
-      Theme.of(context).textTheme.labelMedium!.copyWith(
-            fontWeight: FontWeight.w500,
-          );
+  static TextStyle labelMedium(BuildContext context) => Theme.of(
+    context,
+  ).textTheme.labelMedium!.copyWith(fontWeight: FontWeight.w500);
 
   // ─── Body ─────────────────────────────────────────────────
-  static TextStyle bodyLarge(BuildContext context) =>
-      Theme.of(context).textTheme.bodyLarge!.copyWith(
-            fontWeight: FontWeight.w400,
-          );
+  static TextStyle bodyLarge(BuildContext context) => Theme.of(
+    context,
+  ).textTheme.bodyLarge!.copyWith(fontWeight: FontWeight.w400);
 
-  static TextStyle bodyMedium(BuildContext context) =>
-      Theme.of(context).textTheme.bodyMedium!.copyWith(
-            fontWeight: FontWeight.w400,
-          );
+  static TextStyle bodyMedium(BuildContext context) => Theme.of(
+    context,
+  ).textTheme.bodyMedium!.copyWith(fontWeight: FontWeight.w400);
 }

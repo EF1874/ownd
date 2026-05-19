@@ -8,32 +8,34 @@ import '../../../shared/config/category_config.dart';
 class TimelineNode extends StatelessWidget {
   final TimelineEvent event;
 
-  const TimelineNode({
-    super.key,
-    required this.event,
-  });
+  const TimelineNode({super.key, required this.event});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     // Icon Logic
     late Widget iconWidget;
-    if (event.customIconPath != null && File(event.customIconPath!).existsSync()) {
-        iconWidget = ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.file(
-            File(event.customIconPath!),
-            width: 32,
-            height: 32,
-            fit: BoxFit.cover,
-          ),
-        );
+    if (event.customIconPath != null &&
+        File(event.customIconPath!).existsSync()) {
+      iconWidget = ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.file(
+          File(event.customIconPath!),
+          width: 32,
+          height: 32,
+          fit: BoxFit.cover,
+        ),
+      );
     } else {
-        // Fallback to Category Icon
-        final catItem = CategoryConfig.getItem(event.categoryName);
-        final iconData = IconUtils.getIconData(catItem.iconPath);
-        iconWidget = Icon(iconData, size: 20, color: theme.colorScheme.onSurfaceVariant);
+      // Fallback to Category Icon
+      final catItem = CategoryConfig.getItem(event.categoryName);
+      final iconData = IconUtils.getIconData(catItem.iconPath);
+      iconWidget = Icon(
+        iconData,
+        size: 20,
+        color: theme.colorScheme.onSurfaceVariant,
+      );
     }
 
     return Card(
@@ -46,7 +48,7 @@ class TimelineNode extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 40, 
+              width: 40,
               height: 40,
               decoration: BoxDecoration(
                 color: theme.colorScheme.surfaceContainerHigh,
@@ -70,18 +72,21 @@ class TimelineNode extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: _getTypeColor(event.type).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _getTypeColor(event.type).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      _getTypeName(event.type),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: _getTypeColor(event.type),
+                        fontSize: 10,
                       ),
-                      child: Text(
-                        _getTypeName(event.type),
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: _getTypeColor(event.type),
-                          fontSize: 10,
-                        ),
-                      ),
+                    ),
                   ),
                 ],
               ),
@@ -89,20 +94,23 @@ class TimelineNode extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
+                Text(
+                  '-¥${FormatUtils.formatCurrency(event.cost)}',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: theme.colorScheme.error,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                if (event.note != null && event.note?.isNotEmpty == true)
                   Text(
-                    '-¥${FormatUtils.formatCurrency(event.cost)}',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      color: theme.colorScheme.error,
-                      fontWeight: FontWeight.bold,                               
+                    event.note ?? '',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontSize: 10,
+                      color: theme.colorScheme.outline,
                     ),
                   ),
-                  if (event.note != null && event.note?.isNotEmpty == true)
-                     Text(
-                       event.note ?? '',
-                       style: theme.textTheme.bodySmall?.copyWith(fontSize: 10, color: theme.colorScheme.outline),
-                     )
               ],
-            )
+            ),
           ],
         ),
       ),

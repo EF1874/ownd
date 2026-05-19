@@ -8,7 +8,6 @@ import 'data/services/database_service.dart';
 import 'data/services/backup_service.dart';
 import 'data/services/data_transfer_service.dart';
 import 'data/services/preferences_service.dart';
-import 'data/repositories/category_repository.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'shared/services/notification_service.dart';
 import 'shared/services/subscription_service.dart';
@@ -46,10 +45,6 @@ void main() async {
     ],
   );
 
-  // 4. Initialize default data using the container
-  final categoryRepo = container.read(categoryRepositoryProvider);
-  await categoryRepo.initDefaultCategories();
-
   // 4a. Initialize Notification Service
   try {
     await container.read(notificationServiceProvider).init();
@@ -63,7 +58,9 @@ void main() async {
         .read(subscriptionServiceProvider)
         .checkAndRenewSubscriptions();
     // 4c. Check for missed notifications
-    await container.read(subscriptionServiceProvider).checkMissedNotifications();
+    await container
+        .read(subscriptionServiceProvider)
+        .checkMissedNotifications();
   } catch (e) {
     debugPrint('Subscription Renewal Error: $e');
   }

@@ -78,7 +78,11 @@ class _BaseCardState extends State<BaseCard> {
     Widget cardVariant;
     switch (widget.variant) {
       case CardVariant.glass:
-        cardVariant = _buildGlassCard(context, widget.backgroundImagePath != null || isDark, cardContent);
+        cardVariant = _buildGlassCard(
+          context,
+          widget.backgroundImagePath != null || isDark,
+          cardContent,
+        );
         break;
       case CardVariant.glow:
         cardVariant = _buildGlowCard(context, isDark, cardContent);
@@ -115,7 +119,10 @@ class _BaseCardState extends State<BaseCard> {
   }
 
   Widget _buildGlassCard(
-      BuildContext context, bool useDarkGlass, Widget cardContent) {
+    BuildContext context,
+    bool useDarkGlass,
+    Widget cardContent,
+  ) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: BackdropFilter(
@@ -127,7 +134,9 @@ class _BaseCardState extends State<BaseCard> {
                 ? AppColors.charcoal.withValues(alpha: 0.45)
                 : Colors.white.withValues(alpha: 0.70),
             border: Border.all(
-              color: useDarkGlass ? Colors.white.withValues(alpha: 0.15) : Colors.black.withValues(alpha: 0.05),
+              color: useDarkGlass
+                  ? Colors.white.withValues(alpha: 0.15)
+                  : Colors.black.withValues(alpha: 0.05),
               width: 1,
             ),
           ),
@@ -137,8 +146,7 @@ class _BaseCardState extends State<BaseCard> {
     );
   }
 
-  Widget _buildGlowCard(
-      BuildContext context, bool isDark, Widget cardContent) {
+  Widget _buildGlowCard(BuildContext context, bool isDark, Widget cardContent) {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
@@ -152,16 +160,9 @@ class _BaseCardState extends State<BaseCard> {
               ]
             : null,
       ),
-      child: Card(
-        color: widget.color,
-        child: cardContent,
-      ),
+      child: Card(color: widget.color, child: cardContent),
     );
   }
 }
 
-enum CardVariant {
-  standard,
-  glass,
-  glow,
-}
+enum CardVariant { standard, glass, glow }

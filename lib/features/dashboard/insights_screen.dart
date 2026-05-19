@@ -45,16 +45,16 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen>
           indicatorColor: theme.colorScheme.primary,
           labelColor: theme.colorScheme.primary,
           unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
-          labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          labelStyle: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
           unselectedLabelStyle: const TextStyle(fontSize: 12),
         ),
       ),
       body: TabBarView(
         controller: _tabController,
-        children: const [
-          DashboardContent(),
-          TimelineContent(),
-        ],
+        children: const [DashboardContent(), TimelineContent()],
       ),
     );
   }

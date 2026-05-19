@@ -6,15 +6,15 @@ class AppColors {
   AppColors._();
 
   // ─── Primary Palette ─────────────────────────────────────
-  static const cyberMint = Color(0xFF4FD1C5);    // Soft Teal
+  static const cyberMint = Color(0xFF4FD1C5); // Soft Teal
   static const electricViolet = Color(0xFF818CF8); // Soft Indigo
-  static const neonCoral = Color(0xFFFC8181);      // Soft Rose
+  static const neonCoral = Color(0xFFFC8181); // Soft Rose
 
   // ─── Dark Mode Surfaces ──────────────────────────────────
-  static const deepSpace = Color(0xFF1E293B);      // Slate 800
-  static const charcoal = Color(0xFF334155);       // Slate 700
-  static const graphite = Color(0xFF475569);       // Slate 600
-  static const slate = Color(0xFF64748B);          // Slate 500
+  static const deepSpace = Color(0xFF1E293B); // Slate 800
+  static const charcoal = Color(0xFF334155); // Slate 700
+  static const graphite = Color(0xFF475569); // Slate 600
+  static const slate = Color(0xFF64748B); // Slate 500
 
   // ─── Light Mode Surfaces ─────────────────────────────────
   static const snow = Color(0xFFF8FAFC);

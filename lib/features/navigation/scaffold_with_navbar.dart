@@ -22,7 +22,7 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
   Widget build(BuildContext context) {
     final index = _calculateSelectedIndex(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+
     // Only show FAB on Home (0) and Insights (1)
     final showFab = index == 0 || index == 1;
 
@@ -45,10 +45,7 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
           ScaffoldMessenger.of(context).clearSnackBars();
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text(
-                '再按一次退出应用',
-                textAlign: TextAlign.center,
-              ),
+              content: Text('再按一次退出应用', textAlign: TextAlign.center),
               duration: Duration(seconds: 2),
             ),
           );
@@ -58,13 +55,10 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
         // 3. Exit App
         await SystemNavigator.pop();
       },
-      child: Stack( 
+      child: Stack(
         children: [
           Scaffold(
-            body: SizedBox(
-               key: ValueKey<int>(index),
-               child: widget.child,
-            ),
+            body: SizedBox(key: ValueKey<int>(index), child: widget.child),
             resizeToAvoidBottomInset: false,
             bottomNavigationBar: ClipRRect(
               child: BackdropFilter(

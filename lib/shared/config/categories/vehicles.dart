@@ -51,7 +51,8 @@ final List<CategoryItem> vehiclesCategories = [
   ),
   const CategoryItem(
     name: '充气泵',
-    iconPath: 'MdiIcons.airFilter', // MDI doesn't have pump specific, airFilter usage
+    iconPath:
+        'MdiIcons.airFilter', // MDI doesn't have pump specific, airFilter usage
     color: Colors.blue,
   ),
   const CategoryItem(

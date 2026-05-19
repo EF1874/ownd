@@ -33,8 +33,8 @@ class DeviceDetailScreen extends ConsumerWidget {
           );
         }
         final device = devices[idx];
-        final isSub = CategoryConfig.getMajorCategory(
-                device.category.value?.name) ==
+        final isSub =
+            CategoryConfig.getMajorCategory(device.category.value?.name) ==
             '虚拟订阅';
 
         return Scaffold(
@@ -68,10 +68,7 @@ class DeviceDetailScreen extends ConsumerWidget {
                           gradient: LinearGradient(
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.black54,
-                              Colors.transparent,
-                            ],
+                            colors: [Colors.black54, Colors.transparent],
                             stops: [0.0, 0.4],
                           ),
                         ),
@@ -115,8 +112,7 @@ class DeviceDetailScreen extends ConsumerWidget {
                       _buildBasicInfoCard(device, theme),
                       const SizedBox(height: 16),
                       if (isSub) _buildSubscriptionHistory(device, theme),
-                      if (device.notes != null &&
-                          device.notes!.isNotEmpty) ...[
+                      if (device.notes != null && device.notes!.isNotEmpty) ...[
                         const SizedBox(height: 16),
                         _buildNotesSection(device.notes!, theme),
                       ],
@@ -143,8 +139,8 @@ class DeviceDetailScreen extends ConsumerWidget {
       );
     }
 
-    final color = CategoryUtils.getCategoryColor(
-            device.category.value?.name) ??
+    final color =
+        CategoryUtils.getCategoryColor(device.category.value?.name) ??
         theme.colorScheme.primary;
     final item = CategoryConfig.getItem(device.category.value?.name);
     final iconData = IconUtils.getIconData(item.iconPath);
@@ -172,9 +168,8 @@ class DeviceDetailScreen extends ConsumerWidget {
 
   Widget _buildCostAnalysisCard(Device device, ThemeData theme) {
     final dailyCostStr = FormatUtils.formatCurrency(device.dailyCost);
-    final isSub = CategoryConfig.getMajorCategory(
-            device.category.value?.name) ==
-        '虚拟订阅';
+    final isSub =
+        CategoryConfig.getMajorCategory(device.category.value?.name) == '虚拟订阅';
     final costColor = CostConfig.getCostColor(device.dailyCost);
 
     return BaseCard(
@@ -184,12 +179,18 @@ class DeviceDetailScreen extends ConsumerWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.analytics_outlined,
-                  color: theme.colorScheme.primary, size: 20),
+              Icon(
+                Icons.analytics_outlined,
+                color: theme.colorScheme.primary,
+                size: 20,
+              ),
               const SizedBox(width: 8),
-              Text('成本分析',
-                  style: theme.textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.bold)),
+              Text(
+                '成本分析',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -199,7 +200,7 @@ class DeviceDetailScreen extends ConsumerWidget {
               _CostMetric(
                 label: '购入价格',
                 value: '¥${FormatUtils.formatCurrency(device.price)}',
-                valueColor: theme.colorScheme.primary, 
+                valueColor: theme.colorScheme.primary,
               ),
               _CostMetric(
                 label: isSub ? '累计支出' : '日均成本',
@@ -215,12 +216,18 @@ class DeviceDetailScreen extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('已使用 ${device.daysUsed} 天',
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: AppColors.ash)),
-                Text('月均 ¥${FormatUtils.formatCurrency(device.dailyCost * 30)}',
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: AppColors.ash)),
+                Text(
+                  '已使用 ${device.daysUsed} 天',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: AppColors.ash,
+                  ),
+                ),
+                Text(
+                  '月均 ¥${FormatUtils.formatCurrency(device.dailyCost * 30)}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: AppColors.ash,
+                  ),
+                ),
               ],
             ),
           ],
@@ -231,9 +238,8 @@ class DeviceDetailScreen extends ConsumerWidget {
 
   Widget _buildBasicInfoCard(Device device, ThemeData theme) {
     final dateFormat = DateFormat('yyyy-MM-dd');
-    final isSub = CategoryConfig.getMajorCategory(
-            device.category.value?.name) ==
-        '虚拟订阅';
+    final isSub =
+        CategoryConfig.getMajorCategory(device.category.value?.name) == '虚拟订阅';
 
     return BaseCard(
       variant: CardVariant.standard,
@@ -242,22 +248,27 @@ class DeviceDetailScreen extends ConsumerWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.info_outline,
-                  color: theme.colorScheme.primary, size: 20),
+              Icon(
+                Icons.info_outline,
+                color: theme.colorScheme.primary,
+                size: 20,
+              ),
               const SizedBox(width: 8),
-              Text('基础信息',
-                  style: theme.textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.bold)),
+              Text(
+                '基础信息',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),
-          _InfoRow(
-              label: '分类',
-              value: device.category.value?.name ?? '未分类'),
+          _InfoRow(label: '分类', value: device.category.value?.name ?? '未分类'),
           const Divider(height: 24),
           _InfoRow(
-              label: '购入日期',
-              value: dateFormat.format(device.purchaseDate)),
+            label: '购入日期',
+            value: dateFormat.format(device.purchaseDate),
+          ),
           if (!isSub && (device.platform ?? '').isNotEmpty) ...[
             const Divider(height: 24),
             _InfoRow(label: '平台/渠道', value: device.platform!),
@@ -265,14 +276,16 @@ class DeviceDetailScreen extends ConsumerWidget {
           if (!isSub && device.warrantyEndDate != null) ...[
             const Divider(height: 24),
             _InfoRow(
-                label: '保修截止',
-                value: dateFormat.format(device.warrantyEndDate!)),
+              label: '保修截止',
+              value: dateFormat.format(device.warrantyEndDate!),
+            ),
           ],
           if (isSub && device.nextBillingDate != null) ...[
             const Divider(height: 24),
             _InfoRow(
-                label: '下次续费',
-                value: dateFormat.format(device.nextBillingDate!)),
+              label: '下次续费',
+              value: dateFormat.format(device.nextBillingDate!),
+            ),
           ],
         ],
       ),
@@ -289,19 +302,22 @@ class DeviceDetailScreen extends ConsumerWidget {
         runSpacing: 8,
         children: device.tags.map((tag) {
           return Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               color: theme.colorScheme.primary.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.3)),
+                color: theme.colorScheme.primary.withValues(alpha: 0.3),
+              ),
             ),
-            child: Text('#$tag',
-                style: TextStyle(
-                    color: theme.colorScheme.primary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold)),
+            child: Text(
+              '#$tag',
+              style: TextStyle(
+                color: theme.colorScheme.primary,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           );
         }).toList(),
       ),
@@ -318,14 +334,16 @@ class DeviceDetailScreen extends ConsumerWidget {
             children: [
               const Icon(Icons.notes, color: AppColors.ash, size: 20),
               const SizedBox(width: 8),
-              Text('备注',
-                  style: theme.textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.bold)),
+              Text(
+                '备注',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
-          Text(notes,
-              style: theme.textTheme.bodyMedium?.copyWith(height: 1.5)),
+          Text(notes, style: theme.textTheme.bodyMedium?.copyWith(height: 1.5)),
         ],
       ),
     );
@@ -344,9 +362,12 @@ class DeviceDetailScreen extends ConsumerWidget {
             children: [
               const Icon(Icons.history, color: AppColors.ash, size: 20),
               const SizedBox(width: 8),
-              Text('续费记录',
-                  style: theme.textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.bold)),
+              Text(
+                '续费记录',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -354,20 +375,20 @@ class DeviceDetailScreen extends ConsumerWidget {
             final start = h.startDate != null
                 ? dateFormat.format(h.startDate!)
                 : '?';
-            final end = h.endDate != null
-                ? dateFormat.format(h.endDate!)
-                : '?';
+            final end = h.endDate != null ? dateFormat.format(h.endDate!) : '?';
             return Padding(
               padding: const EdgeInsets.only(bottom: 8.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('$start 至 $end',
-                      style: theme.textTheme.bodySmall),
-                  Text('¥${h.price}',
-                      style: TextStyle(
-                          fontFamily: 'monospace',
-                          color: theme.colorScheme.error)),
+                  Text('$start 至 $end', style: theme.textTheme.bodySmall),
+                  Text(
+                    '¥${h.price}',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      color: theme.colorScheme.error,
+                    ),
+                  ),
                 ],
               ),
             );
@@ -383,28 +404,33 @@ class _CostMetric extends StatelessWidget {
   final String value;
   final Color valueColor;
 
-  const _CostMetric(
-      {required this.label,
-      required this.value,
-      required this.valueColor});
+  const _CostMetric({
+    required this.label,
+    required this.value,
+    required this.valueColor,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(color: AppColors.ash)),
+        Text(
+          label,
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppColors.ash),
+        ),
         const SizedBox(height: 4),
-        Text(value,
-            style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: valueColor)),
+        Text(
+          value,
+          style: TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: valueColor,
+          ),
+        ),
       ],
     );
   }
@@ -421,16 +447,18 @@ class _InfoRow extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label,
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(color: AppColors.ash)),
-        Text(value,
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(fontWeight: FontWeight.w500)),
+        Text(
+          label,
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: AppColors.ash),
+        ),
+        Text(
+          value,
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+        ),
       ],
     );
   }

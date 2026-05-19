@@ -48,219 +48,266 @@ class DeviceGridItem extends ConsumerWidget {
 
     // Handle adaptive color for null categoryColor
     final effectiveCategoryColor = categoryColor ?? theme.colorScheme.onSurface;
-    
+
     final hasBg = device.imagePath != null || device.customIconPath != null;
 
     return BaseCard(
-      variant: CardVariant.glass,
-      backgroundImagePath: device.imagePath ?? device.customIconPath,
-      onTap: () => _navigateToDetail(context),
-      onLongPress: () {
-        showModalBottomSheet(
-          context: context,
-          builder: (ctx) => Column(
-            mainAxisSize: MainAxisSize.min,
+          variant: CardVariant.glass,
+          backgroundImagePath: device.imagePath ?? device.customIconPath,
+          onTap: () => _navigateToDetail(context),
+          onLongPress: () {
+            showModalBottomSheet(
+              context: context,
+              builder: (ctx) => Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.edit),
+                    title: const Text('编辑'),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _navigateToEdit(context);
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.delete, color: Colors.red),
+                    title: const Text(
+                      '删除',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      ref
+                          .read(deviceRepositoryProvider)
+                          .deleteDevice(device.id);
+                    },
+                  ),
+                ],
+              ),
+            );
+          },
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.start,
             children: [
-              ListTile(
-                leading: const Icon(Icons.edit),
-                title: const Text('编辑'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _navigateToEdit(context);
-                },
+              Hero(
+                tag: 'device_icon_${device.id}',
+                child: Container(
+                  height: 80,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: effectiveCategoryColor.withAlpha(25),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: effectiveCategoryColor.withAlpha(50),
+                      width: 1,
+                    ),
+                  ),
+                  alignment: Alignment.center,
+                  child: device.customIconPath != null
+                      ? GestureDetector(
+                          onTap: () => ImagePreviewDialog.show(
+                            context,
+                            device.customIconPath!,
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(11),
+                            child: Image.file(
+                              File(device.customIconPath!),
+                              width: double.infinity,
+                              height: double.infinity,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        )
+                      : Icon(
+                          categoryIcon,
+                          size: 28,
+                          color: effectiveCategoryColor,
+                        ),
+                ),
               ),
-              ListTile(
-                leading: const Icon(Icons.delete, color: Colors.red),
-                title: const Text('删除', style: TextStyle(color: Colors.red)),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  ref.read(deviceRepositoryProvider).deleteDevice(device.id);
-                },
+              const SizedBox(height: 12),
+              Text(
+                device.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: hasBg ? Colors.white : theme.colorScheme.onSurface,
+                ),
               ),
-            ],
-          ),
-        );
-      },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          Hero(
-            tag: 'device_icon_${device.id}',
-            child: Container(
-              height: 80,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: effectiveCategoryColor.withAlpha(25),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: effectiveCategoryColor.withAlpha(50), width: 1),
-              ),
-              alignment: Alignment.center,
-              child: device.customIconPath != null
-                  ? GestureDetector(
-                      onTap: () =>
-                          ImagePreviewDialog.show(context, device.customIconPath!),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(11),
-                        child: Image.file(
-                          File(device.customIconPath!),
-                          width: double.infinity,
-                          height: double.infinity,
-                          fit: BoxFit.cover,
+              const SizedBox(height: 6),
+              RichText(
+                textAlign: TextAlign.center,
+                text: TextSpan(
+                  children: [
+                    if (CategoryConfig.getMajorCategory(
+                          device.category.value?.name,
+                        ) ==
+                        '虚拟订阅') ...[
+                      TextSpan(
+                        text: '剩余',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: hasBg
+                              ? Colors.white
+                              : theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
                         ),
                       ),
-                    )
-                  : Icon(categoryIcon, size: 28, color: effectiveCategoryColor),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            device.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: hasBg ? Colors.white : theme.colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 6),
-          RichText(
-            textAlign: TextAlign.center,
-            text: TextSpan(
-              children: [
-                if (CategoryConfig.getMajorCategory(
-                      device.category.value?.name,
-                    ) ==
-                    '虚拟订阅') ...[
-                  TextSpan(
-                    text: '剩余',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: hasBg ? Colors.white : theme.colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
-                    ),
-                  ),
-                  TextSpan(
-                    text: () {
-                      if (device.nextBillingDate == null) return '0';
-                      final diff =
-                          device.nextBillingDate!
-                              .difference(DateTime.now())
-                              .inDays +
-                          1;
-                      return (diff < 0 ? 0 : diff).toString();
-                    }(),
+                      TextSpan(
+                        text: () {
+                          if (device.nextBillingDate == null) return '0';
+                          final diff =
+                              device.nextBillingDate!
+                                  .difference(DateTime.now())
+                                  .inDays +
+                              1;
+                          return (diff < 0 ? 0 : diff).toString();
+                        }(),
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontWeight: FontWeight.bold,
+                          color: hasBg
+                              ? Colors.white
+                              : theme.colorScheme.primary, // Cyber Mint
+                          fontSize: 20,
+                        ),
+                      ),
+                      TextSpan(
+                        text: '天',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: hasBg
+                              ? Colors.white
+                              : theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ] else ...[
+                      TextSpan(
+                        text: '使用',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: hasBg
+                              ? Colors.white
+                              : theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                      TextSpan(
+                        text: '${device.daysUsed}',
+                        style: TextStyle(
+                          fontFamily: 'monospace',
+                          fontWeight: FontWeight.bold,
+                          color: hasBg
+                              ? Colors.white
+                              : theme.colorScheme.primary, // Cyber Mint
+                          fontSize: 20,
+                        ),
+                      ),
+                      TextSpan(
+                        text: '天',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: hasBg
+                              ? Colors.white
+                              : theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 4),
+              Column(
+                children: [
+                  Text(
+                    '¥${FormatUtils.formatCurrency(device.price)}',
                     style: TextStyle(
                       fontFamily: 'monospace',
+                      color: hasBg ? Colors.white : theme.colorScheme.onSurface,
                       fontWeight: FontWeight.bold,
-                      color: hasBg ? Colors.white : theme.colorScheme.primary, // Cyber Mint
-                      fontSize: 20,
+                      fontSize: 15,
                     ),
                   ),
-                  TextSpan(
-                    text: '天',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: hasBg ? Colors.white : theme.colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
-                    ),
-                  ),
-                ] else ...[
-                  TextSpan(
-                    text: '使用',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: hasBg ? Colors.white : theme.colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
-                    ),
-                  ),
-                  TextSpan(
-                    text: '${device.daysUsed}',
+                  const SizedBox(height: 2),
+                  Text(
+                    '¥${FormatUtils.formatCurrency(dailyCost)}/天',
                     style: TextStyle(
                       fontFamily: 'monospace',
+                      color: hasBg
+                          ? Colors.white
+                          : (costColor ?? theme.colorScheme.onSurfaceVariant),
                       fontWeight: FontWeight.bold,
-                      color: hasBg ? Colors.white : theme.colorScheme.primary, // Cyber Mint
-                      fontSize: 20,
-                    ),
-                  ),
-                  TextSpan(
-                    text: '天',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: hasBg ? Colors.white : theme.colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
+                      fontSize: 11,
                     ),
                   ),
                 ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 4),
-          Column(
-            children: [
-              Text(
-                '¥${FormatUtils.formatCurrency(device.price)}',
-                style: TextStyle(
-                  fontFamily: 'monospace',
-                  color: hasBg ? Colors.white : theme.colorScheme.onSurface,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15,
-                ),
               ),
-              const SizedBox(height: 2),
-              Text(
-                '¥${FormatUtils.formatCurrency(dailyCost)}/天',
-                style: TextStyle(
-                  fontFamily: 'monospace',
-                  color: hasBg ? Colors.white : (costColor ?? theme.colorScheme.onSurfaceVariant),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 11,
+              const SizedBox(height: 6),
+              SizedBox(
+                height: 20,
+                child: device.tags.isNotEmpty
+                    ? Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: 4,
+                        runSpacing: 4,
+                        children: device.tags
+                            .take(3)
+                            .map(
+                              (tag) => Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.primaryContainer
+                                      .withAlpha(hasBg ? 100 : 50),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(
+                                    color: theme.colorScheme.primary.withAlpha(
+                                      hasBg ? 200 : 100,
+                                    ),
+                                    width: 0.5,
+                                  ),
+                                ),
+                                child: Text(
+                                  '#$tag',
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: hasBg
+                                        ? Colors.white
+                                        : theme.colorScheme.primary,
+                                    fontSize: 9,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            )
+                            .toList(),
+                      )
+                    : null,
+              ),
+              const Spacer(),
+              SizedBox(
+                height: 24,
+                child: Center(
+                  child: Transform.scale(
+                    scale: 0.8,
+                    child: _buildStatusBadges(device),
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          SizedBox(
-            height: 20,
-            child: device.tags.isNotEmpty
-                ? Wrap(
-                    alignment: WrapAlignment.center,
-                    spacing: 4,
-                    runSpacing: 4,
-                    children: device.tags.take(3).map((tag) => Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primaryContainer.withAlpha(hasBg ? 100 : 50),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: theme.colorScheme.primary.withAlpha(hasBg ? 200 : 100), width: 0.5),
-                      ),
-                      child: Text(
-                        '#$tag',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: hasBg ? Colors.white : theme.colorScheme.primary,
-                          fontSize: 9,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    )).toList(),
-                  )
-                : null,
-          ),
-          const Spacer(),
-          SizedBox(
-            height: 24,
-            child: Center(
-              child: Transform.scale(
-                scale: 0.8,
-                child: _buildStatusBadges(device),
-              ),
-            ),
-          ),
-        ],
-      ),
-    ).animate().fadeIn(delay: (index * 50).ms).slideY(
+        )
+        .animate()
+        .fadeIn(delay: (index * 50).ms)
+        .slideY(
           begin: 0.1,
           delay: (index * 50).ms,
           duration: 300.ms,

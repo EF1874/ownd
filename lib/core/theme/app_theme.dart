@@ -20,15 +20,47 @@ class AppTheme {
       ),
       scaffoldBackgroundColor: AppColors.deepSpace,
       textTheme: const TextTheme(
-        titleLarge: TextStyle(fontWeight: FontWeight.w800, color: AppColors.silver, letterSpacing: -0.5),
-        titleMedium: TextStyle(fontWeight: FontWeight.w700, color: AppColors.silver, letterSpacing: -0.3),
-        titleSmall: TextStyle(fontWeight: FontWeight.w600, color: AppColors.silver),
-        bodyLarge: TextStyle(fontWeight: FontWeight.w400, color: AppColors.silver, height: 1.5),
-        bodyMedium: TextStyle(fontWeight: FontWeight.w400, color: AppColors.silver, height: 1.5),
-        bodySmall: TextStyle(fontWeight: FontWeight.w400, color: AppColors.ash, height: 1.4),
-        labelLarge: TextStyle(fontWeight: FontWeight.w600, color: AppColors.ash),
-        labelMedium: TextStyle(fontWeight: FontWeight.w500, color: AppColors.ash),
-        labelSmall: TextStyle(fontWeight: FontWeight.w500, color: AppColors.ash),
+        titleLarge: TextStyle(
+          fontWeight: FontWeight.w800,
+          color: AppColors.silver,
+          letterSpacing: -0.5,
+        ),
+        titleMedium: TextStyle(
+          fontWeight: FontWeight.w700,
+          color: AppColors.silver,
+          letterSpacing: -0.3,
+        ),
+        titleSmall: TextStyle(
+          fontWeight: FontWeight.w600,
+          color: AppColors.silver,
+        ),
+        bodyLarge: TextStyle(
+          fontWeight: FontWeight.w400,
+          color: AppColors.silver,
+          height: 1.5,
+        ),
+        bodyMedium: TextStyle(
+          fontWeight: FontWeight.w400,
+          color: AppColors.silver,
+          height: 1.5,
+        ),
+        bodySmall: TextStyle(
+          fontWeight: FontWeight.w400,
+          color: AppColors.ash,
+          height: 1.4,
+        ),
+        labelLarge: TextStyle(
+          fontWeight: FontWeight.w600,
+          color: AppColors.ash,
+        ),
+        labelMedium: TextStyle(
+          fontWeight: FontWeight.w500,
+          color: AppColors.ash,
+        ),
+        labelSmall: TextStyle(
+          fontWeight: FontWeight.w500,
+          color: AppColors.ash,
+        ),
       ),
       appBarTheme: const AppBarTheme(
         centerTitle: true,
@@ -98,8 +130,10 @@ class AppTheme {
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
         ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         hintStyle: const TextStyle(color: AppColors.ash),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -107,26 +141,21 @@ class AppTheme {
           elevation: 0,
           backgroundColor: const Color(0xFF4F46E5),
           foregroundColor: Colors.white,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           padding: const EdgeInsets.symmetric(vertical: 14),
-          textStyle:
-              const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+          textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(
-          foregroundColor: const Color(0xFF4F46E5),
-        ),
+        style: TextButton.styleFrom(foregroundColor: const Color(0xFF4F46E5)),
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: Color(0xFF4F46E5),
         foregroundColor: Colors.white,
       ),
-      dividerTheme: DividerThemeData(
-        color: AppColors.darkBorder,
-        thickness: 1,
-      ),
+      dividerTheme: DividerThemeData(color: AppColors.darkBorder, thickness: 1),
       chipTheme: ChipThemeData(
         backgroundColor: AppColors.graphite,
         selectedColor: const Color(0xFF4F46E5).withValues(alpha: 0.2),
@@ -177,15 +206,47 @@ class AppTheme {
       ),
       scaffoldBackgroundColor: AppColors.snow,
       textTheme: const TextTheme(
-        titleLarge: TextStyle(fontWeight: FontWeight.w800, color: AppColors.ink, letterSpacing: -0.5),
-        titleMedium: TextStyle(fontWeight: FontWeight.w700, color: AppColors.ink, letterSpacing: -0.3),
-        titleSmall: TextStyle(fontWeight: FontWeight.w600, color: AppColors.ink),
-        bodyLarge: TextStyle(fontWeight: FontWeight.w400, color: AppColors.ink, height: 1.5),
-        bodyMedium: TextStyle(fontWeight: FontWeight.w400, color: AppColors.ink, height: 1.5),
-        bodySmall: TextStyle(fontWeight: FontWeight.w400, color: AppColors.dimInk, height: 1.4),
-        labelLarge: TextStyle(fontWeight: FontWeight.w600, color: AppColors.dimInk),
-        labelMedium: TextStyle(fontWeight: FontWeight.w500, color: AppColors.dimInk),
-        labelSmall: TextStyle(fontWeight: FontWeight.w500, color: AppColors.dimInk),
+        titleLarge: TextStyle(
+          fontWeight: FontWeight.w800,
+          color: AppColors.ink,
+          letterSpacing: -0.5,
+        ),
+        titleMedium: TextStyle(
+          fontWeight: FontWeight.w700,
+          color: AppColors.ink,
+          letterSpacing: -0.3,
+        ),
+        titleSmall: TextStyle(
+          fontWeight: FontWeight.w600,
+          color: AppColors.ink,
+        ),
+        bodyLarge: TextStyle(
+          fontWeight: FontWeight.w400,
+          color: AppColors.ink,
+          height: 1.5,
+        ),
+        bodyMedium: TextStyle(
+          fontWeight: FontWeight.w400,
+          color: AppColors.ink,
+          height: 1.5,
+        ),
+        bodySmall: TextStyle(
+          fontWeight: FontWeight.w400,
+          color: AppColors.dimInk,
+          height: 1.4,
+        ),
+        labelLarge: TextStyle(
+          fontWeight: FontWeight.w600,
+          color: AppColors.dimInk,
+        ),
+        labelMedium: TextStyle(
+          fontWeight: FontWeight.w500,
+          color: AppColors.dimInk,
+        ),
+        labelSmall: TextStyle(
+          fontWeight: FontWeight.w500,
+          color: AppColors.dimInk,
+        ),
       ),
       appBarTheme: const AppBarTheme(
         centerTitle: true,
@@ -255,8 +316,10 @@ class AppTheme {
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
         ),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         hintStyle: const TextStyle(color: AppColors.dimInk),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -264,17 +327,15 @@ class AppTheme {
           elevation: 0,
           backgroundColor: const Color(0xFF4F46E5),
           foregroundColor: Colors.white,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           padding: const EdgeInsets.symmetric(vertical: 14),
-          textStyle:
-              const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+          textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(
-          foregroundColor: const Color(0xFF4F46E5),
-        ),
+        style: TextButton.styleFrom(foregroundColor: const Color(0xFF4F46E5)),
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: Color(0xFF4F46E5),

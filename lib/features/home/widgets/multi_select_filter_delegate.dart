@@ -20,7 +20,7 @@ class MultiSelectFilterDelegate extends SliverPersistentHeaderDelegate {
     final allCategories = CategoryConfig.hierarchy.keys.toList();
     // Logic: If selectedCategories size equals allCategories size, "All" is active logic-wise.
     // User requirement: "When 'All' is selected, all chips are active. Clicking 'All' again cancels all."
-    // Actually, usually "All" is a separate chip. 
+    // Actually, usually "All" is a separate chip.
     // Implementation:
     // 1. "All" Chip:
     //    - Active if selectedCategories contains ALL categories.
@@ -60,20 +60,20 @@ class MultiSelectFilterDelegate extends SliverPersistentHeaderDelegate {
                     fontWeight: isSelected ? FontWeight.bold : null,
                   ),
                   onSelected: (_) {
-                     if (isSelected) {
-                       // Deselect All (turns off all chips, effectively returning to show-all default)
-                       onSelectionChanged({});
-                     } else {
-                       // Select All (turns on all chips, user can now deselect specific ones)
-                       onSelectionChanged(allCategories.toSet());
-                     }
+                    if (isSelected) {
+                      // Deselect All (turns off all chips, effectively returning to show-all default)
+                      onSelectionChanged({});
+                    } else {
+                      // Select All (turns on all chips, user can now deselect specific ones)
+                      onSelectionChanged(allCategories.toSet());
+                    }
                   },
                 );
               }
 
               final category = allCategories[i - 1];
               final isSelected = selectedCategories.contains(category);
-              
+
               return ChoiceChip(
                 label: Text(category),
                 selected: isSelected,
@@ -81,12 +81,12 @@ class MultiSelectFilterDelegate extends SliverPersistentHeaderDelegate {
                 padding: EdgeInsets.zero,
                 selectedColor: theme.colorScheme.primary,
                 backgroundColor: theme.colorScheme.surfaceContainerHigh,
-                 labelStyle: theme.textTheme.bodySmall?.copyWith(
-                    color: isSelected
-                        ? theme.colorScheme.onPrimary
-                        : theme.colorScheme.onSurface,
-                    fontWeight: isSelected ? FontWeight.bold : null,
-                  ),
+                labelStyle: theme.textTheme.bodySmall?.copyWith(
+                  color: isSelected
+                      ? theme.colorScheme.onPrimary
+                      : theme.colorScheme.onSurface,
+                  fontWeight: isSelected ? FontWeight.bold : null,
+                ),
                 onSelected: (val) {
                   final newSet = Set<String>.from(selectedCategories);
                   if (val) {
@@ -115,7 +115,9 @@ class MultiSelectFilterDelegate extends SliverPersistentHeaderDelegate {
     // Determine if rebuild needed. Set equality check using setEquals from flutter/foundation or logic?
     // Sets are not equal if different instances usually, but content check is better.
     // Simple length check + containsAll is enough.
-    if (oldDelegate.selectedCategories.length != selectedCategories.length) return true;
+    if (oldDelegate.selectedCategories.length != selectedCategories.length) {
+      return true;
+    }
     return !oldDelegate.selectedCategories.containsAll(selectedCategories);
   }
 }

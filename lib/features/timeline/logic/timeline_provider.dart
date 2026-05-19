@@ -11,43 +11,48 @@ final timelineEventsProvider = StreamProvider<List<YearlyTimeline>>((ref) {
   final repository = ref.watch(deviceRepositoryProvider);
   final filterCategory = ref.watch(timelineFilterProvider);
   final filterTags = ref.watch(timelineTagFilterProvider);
-  
+
   return repository.watchAllDevices().map((devices) {
     List<TimelineEvent> allEvents = [];
 
     // Flatten devices into events
     for (var device in devices) {
       // 1. Purchase Event
-      allEvents.add(TimelineEvent(
-        id: '${device.uuid}_purchase',
-        deviceId: device.uuid,
-        deviceName: device.name,
-        customIconPath: device.customIconPath,
-        categoryName: device.category.value?.name,
-        date: device.purchaseDate,
-        type: TimelineEventType.purchase,
-        cost: device.price,
-        note: 'Purchased',
-        tags: device.tags,
-      ));
-
-      // 2. Renewal History
-      for (var i = 0; i < device.history.length; i++) {
-        final history = device.history[i];
-        final eventDate = history.recordDate ?? history.startDate ?? DateTime.now();
-        
-        allEvents.add(TimelineEvent(
-          id: '${device.uuid}_renew_$i',
+      allEvents.add(
+        TimelineEvent(
+          id: '${device.uuid}_purchase',
           deviceId: device.uuid,
           deviceName: device.name,
           customIconPath: device.customIconPath,
           categoryName: device.category.value?.name,
-          date: eventDate,
-          type: TimelineEventType.renewal,
-          cost: history.price,
-          note: history.note ?? 'Renewed',
+          date: device.purchaseDate,
+          type: TimelineEventType.purchase,
+          cost: device.price,
+          note: 'Purchased',
           tags: device.tags,
-        ));
+        ),
+      );
+
+      // 2. Renewal History
+      for (var i = 0; i < device.history.length; i++) {
+        final history = device.history[i];
+        final eventDate =
+            history.recordDate ?? history.startDate ?? DateTime.now();
+
+        allEvents.add(
+          TimelineEvent(
+            id: '${device.uuid}_renew_$i',
+            deviceId: device.uuid,
+            deviceName: device.name,
+            customIconPath: device.customIconPath,
+            categoryName: device.category.value?.name,
+            date: eventDate,
+            type: TimelineEventType.renewal,
+            cost: history.price,
+            note: history.note ?? 'Renewed',
+            tags: device.tags,
+          ),
+        );
       }
     }
 
@@ -85,9 +90,9 @@ final timelineEventsProvider = StreamProvider<List<YearlyTimeline>>((ref) {
         final monthEvents = months[month]!;
         final monthTotal = monthEvents.fold(0.0, (sum, e) => sum + e.cost);
         return MonthlyTimeline(
-          month: month, 
-          totalCost: monthTotal, 
-          events: monthEvents
+          month: month,
+          totalCost: monthTotal,
+          events: monthEvents,
         );
       }).toList();
 

@@ -68,7 +68,7 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
   double _lastRenewPrice = 0.0;
   DateTime? _preRenewalNextBillingDate;
   double _baseAccumulatedPrice = 0.0;
-  
+
   late final String _uuid; // Track UUID for file naming
 
   bool get _isSub =>
@@ -134,7 +134,7 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
     _tagsCtr.dispose();
     super.dispose();
   }
-  
+
   Future<void> _pickCustomIcon() async {
     final imageService = ref.read(imageServiceProvider);
     final file = await imageService.pickAndCropImage(
@@ -142,9 +142,13 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
       source: ImageSource.gallery,
       isSquare: true,
     );
-    
+
     if (file != null) {
-      final savedPath = await imageService.saveImageToAppDirectory(file, _uuid, isIcon: true);
+      final savedPath = await imageService.saveImageToAppDirectory(
+        file,
+        _uuid,
+        isIcon: true,
+      );
       if (savedPath != null) {
         updateState(() => _customIconPath = savedPath);
       }
@@ -158,9 +162,13 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
       source: ImageSource.gallery,
       isSquare: false,
     );
-    
+
     if (file != null) {
-      final savedPath = await imageService.saveImageToAppDirectory(file, _uuid, isIcon: false);
+      final savedPath = await imageService.saveImageToAppDirectory(
+        file,
+        _uuid,
+        isIcon: false,
+      );
       if (savedPath != null) {
         updateState(() => _imagePath = savedPath);
       }
@@ -289,7 +297,9 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
                       onPickImage: _pickPhoto,
                       onRemoveImage: _removePhoto,
                     ),
-                    const SizedBox(height: 48), // Padding at the bottom for scroll
+                    const SizedBox(
+                      height: 48,
+                    ), // Padding at the bottom for scroll
                   ],
                 ),
               ),

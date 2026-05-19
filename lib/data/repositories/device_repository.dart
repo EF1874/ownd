@@ -1,14 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/device.dart';
 import '../datasource/device_datasource.dart';
-import '../datasource/local/isar_device_datasource.dart';
-import '../services/database_service.dart';
+import '../datasource/remote/remote_device_datasource.dart';
+import '../../core/network/api_client.dart';
 
 /// Riverpod provider for the DeviceDataSource.
 /// Swap this to a remote implementation when backend is ready.
 final deviceDataSourceProvider = Provider<DeviceDataSource>((ref) {
-  final dbService = ref.watch(databaseServiceProvider);
-  return IsarDeviceDataSource(dbService.isar);
+  return RemoteDeviceDataSource(ref.watch(apiClientProvider));
 });
 
 /// Riverpod provider for the DeviceRepository.

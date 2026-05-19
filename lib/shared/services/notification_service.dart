@@ -137,7 +137,8 @@ class NotificationService {
     if (!_isized) await init();
     // Android only for now, iOS doesn't easily support getting active without heavy lifting or it's similar
     // flutter_local_notifications support:
-    final activeNotifications = await _notificationsPlugin.getActiveNotifications();
+    final activeNotifications = await _notificationsPlugin
+        .getActiveNotifications();
     return activeNotifications.any((n) => n.id == id);
   }
 }

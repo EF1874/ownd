@@ -46,7 +46,9 @@ class DataTransferService {
 
     // Prepare Temp Directory for Staging
     final tempDir = await getTemporaryDirectory();
-    final stagingDir = Directory('${tempDir.path}/backup_staging_${DateTime.now().millisecondsSinceEpoch}');
+    final stagingDir = Directory(
+      '${tempDir.path}/backup_staging_${DateTime.now().millisecondsSinceEpoch}',
+    );
     if (await stagingDir.exists()) {
       await stagingDir.delete(recursive: true);
     }
@@ -56,55 +58,57 @@ class DataTransferService {
     await imagesDir.create();
 
     // Process Devices and Copy Images
-    final devicesData = await Future.wait(devices.map((e) async {
-      String? relativeIconPath;
-      if (e.customIconPath != null) {
-        final originalFile = File(e.customIconPath!);
-        if (await originalFile.exists()) {
-          final fileName = p.basename(e.customIconPath!);
-          // Copy to staging images folder
-          // Use UUID in filename to avoid collisions if multiple devices use "image.jpg"
-          final newFileName = '${e.uuid}_$fileName';
-          await originalFile.copy('${imagesDir.path}/$newFileName');
-          relativeIconPath = 'images/$newFileName';
+    final devicesData = await Future.wait(
+      devices.map((e) async {
+        String? relativeIconPath;
+        if (e.customIconPath != null) {
+          final originalFile = File(e.customIconPath!);
+          if (await originalFile.exists()) {
+            final fileName = p.basename(e.customIconPath!);
+            // Copy to staging images folder
+            // Use UUID in filename to avoid collisions if multiple devices use "image.jpg"
+            final newFileName = '${e.uuid}_$fileName';
+            await originalFile.copy('${imagesDir.path}/$newFileName');
+            relativeIconPath = 'images/$newFileName';
+          }
         }
-      }
 
-      return {
-        'uuid': e.uuid,
-        'name': e.name,
-        'categoryName': e.category.value?.name,
-        'price': e.price,
-        'purchaseDate': e.purchaseDate.toIso8601String(),
-        'platform': e.platform,
-        'warrantyEndDate': e.warrantyEndDate?.toIso8601String(),
-        'scrapDate': e.scrapDate?.toIso8601String(),
-        'backupDate': e.backupDate?.toIso8601String(),
-        'customIconPath': relativeIconPath, // Store relative path in ZIP
-        // Subscription Fields
-        'cycleType': e.cycleType?.name,
-        'isAutoRenew': e.isAutoRenew,
-        'nextBillingDate': e.nextBillingDate?.toIso8601String(),
-        'reminderDays': e.reminderDays,
-        'hasReminder': e.hasReminder,
-        'firstPeriodPrice': e.firstPeriodPrice,
-        'periodPrice': e.periodPrice,
-        'totalAccumulatedPrice': e.totalAccumulatedPrice,
-        'history': e.history
-            .map(
-              (h) => {
-                'startDate': h.startDate?.toIso8601String(),
-                'endDate': h.endDate?.toIso8601String(),
-                'price': h.price,
-                'cycleType': h.cycleType.name,
-                'isAutoRenew': h.isAutoRenew,
-                'recordDate': h.recordDate?.toIso8601String(),
-                'note': h.note,
-              },
-            )
-            .toList(),
-      };
-    }).toList());
+        return {
+          'uuid': e.uuid,
+          'name': e.name,
+          'categoryName': e.category.value?.name,
+          'price': e.price,
+          'purchaseDate': e.purchaseDate.toIso8601String(),
+          'platform': e.platform,
+          'warrantyEndDate': e.warrantyEndDate?.toIso8601String(),
+          'scrapDate': e.scrapDate?.toIso8601String(),
+          'backupDate': e.backupDate?.toIso8601String(),
+          'customIconPath': relativeIconPath, // Store relative path in ZIP
+          // Subscription Fields
+          'cycleType': e.cycleType?.name,
+          'isAutoRenew': e.isAutoRenew,
+          'nextBillingDate': e.nextBillingDate?.toIso8601String(),
+          'reminderDays': e.reminderDays,
+          'hasReminder': e.hasReminder,
+          'firstPeriodPrice': e.firstPeriodPrice,
+          'periodPrice': e.periodPrice,
+          'totalAccumulatedPrice': e.totalAccumulatedPrice,
+          'history': e.history
+              .map(
+                (h) => {
+                  'startDate': h.startDate?.toIso8601String(),
+                  'endDate': h.endDate?.toIso8601String(),
+                  'price': h.price,
+                  'cycleType': h.cycleType.name,
+                  'isAutoRenew': h.isAutoRenew,
+                  'recordDate': h.recordDate?.toIso8601String(),
+                  'note': h.note,
+                },
+              )
+              .toList(),
+        };
+      }).toList(),
+    );
 
     final data = {
       'version': 2, // Bump version to 2 for ZIP format
@@ -176,50 +180,51 @@ class DataTransferService {
 
         // Detect if ZIP or JSON (Legacy support)
         if (path.toLowerCase().endsWith('.zip')) {
-           final bytes = await file.readAsBytes();
-           final archive = ZipDecoder().decodeBytes(bytes);
+          final bytes = await file.readAsBytes();
+          final archive = ZipDecoder().decodeBytes(bytes);
 
-           final tempDir = await getTemporaryDirectory();
-           stagingPath = '${tempDir.path}/import_staging_${DateTime.now().millisecondsSinceEpoch}';
-           await Directory(stagingPath).create();
+          final tempDir = await getTemporaryDirectory();
+          stagingPath =
+              '${tempDir.path}/import_staging_${DateTime.now().millisecondsSinceEpoch}';
+          await Directory(stagingPath).create();
 
-           // Extract all files
-           for (final file in archive) {
-             final filename = file.name;
-              if (file.isFile) {
-                final data = file.content as List<int>;
-                File('$stagingPath/$filename')
-                  ..createSync(recursive: true)
-                  ..writeAsBytesSync(data);
-              } else {
-                await Directory('$stagingPath/$filename').create(recursive: true);
-              }
-           }
+          // Extract all files
+          for (final file in archive) {
+            final filename = file.name;
+            if (file.isFile) {
+              final data = file.content as List<int>;
+              File('$stagingPath/$filename')
+                ..createSync(recursive: true)
+                ..writeAsBytesSync(data);
+            } else {
+              await Directory('$stagingPath/$filename').create(recursive: true);
+            }
+          }
 
-           // Find backup.json
-           // The structure inside zip might be "backup_staging_xxx/backup.json" or just "backup.json" 
-           // depending on how zipEncoder.addDirectory works (it usually includes the dir name).
-           // Let's find any .json file recursively or check known structure.
-           final dir = Directory(stagingPath);
-           File? jsonFile;
-           await for (final entity in dir.list(recursive: true)) {
-             if (entity is File && entity.path.endsWith('.json')) {
-               jsonFile = entity;
-               break;
-             }
-           }
+          // Find backup.json
+          // The structure inside zip might be "backup_staging_xxx/backup.json" or just "backup.json"
+          // depending on how zipEncoder.addDirectory works (it usually includes the dir name).
+          // Let's find any .json file recursively or check known structure.
+          final dir = Directory(stagingPath);
+          File? jsonFile;
+          await for (final entity in dir.list(recursive: true)) {
+            if (entity is File && entity.path.endsWith('.json')) {
+              jsonFile = entity;
+              break;
+            }
+          }
 
-           if (jsonFile == null) {
-             throw 'Invalid backup file: No JSON found in ZIP';
-           }
+          if (jsonFile == null) {
+            throw 'Invalid backup file: No JSON found in ZIP';
+          }
 
-           data = jsonDecode(await jsonFile.readAsString());
+          data = jsonDecode(await jsonFile.readAsString());
         } else {
           // Legacy JSON import
           final jsonString = await file.readAsString();
           data = jsonDecode(jsonString);
         }
-        
+
         await _isar.writeTxn(() async {
           // 1. Restore Categories
           final categoryMap = <String, Category>{};
@@ -231,9 +236,15 @@ class DataTransferService {
 
               Category? category;
               if (uuid != null) {
-                category = await _isar.categorys.filter().uuidEqualTo(uuid).findFirst();
+                category = await _isar.categorys
+                    .filter()
+                    .uuidEqualTo(uuid)
+                    .findFirst();
               }
-              category ??= await _isar.categorys.filter().nameEqualTo(name).findFirst();
+              category ??= await _isar.categorys
+                  .filter()
+                  .nameEqualTo(name)
+                  .findFirst();
 
               if (category == null) {
                 category = Category()
@@ -260,13 +271,16 @@ class DataTransferService {
               final uuid = devData['uuid'];
 
               if (uuid != null) {
-                // Check if device exists. If so, update it or skip? 
-                // Usually restore implies overwriting or adding missing. 
+                // Check if device exists. If so, update it or skip?
+                // Usually restore implies overwriting or adding missing.
                 // Let's skip existing to prevent duplicates, OR update if it's the same device.
                 // For simplicity, skip if UUID exists.
-                final existing = await _isar.devices.filter().uuidEqualTo(uuid).findFirst();
+                final existing = await _isar.devices
+                    .filter()
+                    .uuidEqualTo(uuid)
+                    .findFirst();
                 if (existing != null) {
-                  continue; 
+                  continue;
                 }
               }
 
@@ -312,27 +326,31 @@ class DataTransferService {
                 String path = devData['customIconPath'];
                 if (stagingPath != null && path.startsWith('images/')) {
                   // It's a relative path from ZIP
-                  // Note: The zip might have extracted to "staging/backup_staging_xxx/images/..." 
+                  // Note: The zip might have extracted to "staging/backup_staging_xxx/images/..."
                   // or "staging/images/..." depending on zip structure.
                   // We need to find the file in staging dir.
-                  
+
                   // Construct potential full path in staging
                   // Assuming flat unzip or preserving structure.
                   // Let's search for the image file by name in the staging dir if strict path fails.
                   final fileName = p.basename(path);
-                  
+
                   File? sourceFile;
                   final stagingDirectory = Directory(stagingPath);
-                  await for (final entity in stagingDirectory.list(recursive: true)) {
-                     if (entity is File && p.basename(entity.path) == fileName) {
-                       sourceFile = entity;
-                       break;
-                     }
+                  await for (final entity in stagingDirectory.list(
+                    recursive: true,
+                  )) {
+                    if (entity is File && p.basename(entity.path) == fileName) {
+                      sourceFile = entity;
+                      break;
+                    }
                   }
 
                   if (sourceFile != null) {
                     final appDir = await getApplicationDocumentsDirectory();
-                    final appDocsImagesDir = Directory('${appDir.path}/imported_icons'); // Separate folder or root?
+                    final appDocsImagesDir = Directory(
+                      '${appDir.path}/imported_icons',
+                    ); // Separate folder or root?
                     if (!await appDocsImagesDir.exists()) {
                       await appDocsImagesDir.create();
                     }
@@ -341,12 +359,12 @@ class DataTransferService {
                     device.customIconPath = newPath;
                   }
                 } else {
-                   // Legacy: absolute path or Base64 (if we kept it, but we removed it).
-                   // Base64 field check (backward compat for the version we just wrote but didn't release? No, user won't have it).
-                   // If it's an old absolute path, check if it exists (local restore).
-                   if (await File(path).exists()) {
-                     device.customIconPath = path;
-                   }
+                  // Legacy: absolute path or Base64 (if we kept it, but we removed it).
+                  // Base64 field check (backward compat for the version we just wrote but didn't release? No, user won't have it).
+                  // If it's an old absolute path, check if it exists (local restore).
+                  if (await File(path).exists()) {
+                    device.customIconPath = path;
+                  }
                 }
               }
 
@@ -366,7 +384,7 @@ class DataTransferService {
                       ? DateTime.parse(h['recordDate'])
                       : null;
                   hist.note = h['note'];
-                   if (h['cycleType'] != null) {
+                  if (h['cycleType'] != null) {
                     try {
                       hist.cycleType = CycleType.values.byName(h['cycleType']);
                     } catch (_) {}
@@ -386,7 +404,7 @@ class DataTransferService {
             }
           }
         });
-        
+
         // Cleanup staging
         if (stagingPath != null) {
           await Directory(stagingPath).delete(recursive: true);

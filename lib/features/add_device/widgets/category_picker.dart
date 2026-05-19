@@ -91,7 +91,9 @@ class CategoryPicker extends ConsumerWidget {
                   width: 80,
                   height: 80,
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha(50),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest.withAlpha(50),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: Theme.of(context).dividerColor,
@@ -140,12 +142,13 @@ class CategoryPicker extends ConsumerWidget {
                 ),
               ),
               if (customIconPath != null) ...[
-                 const SizedBox(width: 16),
-                 TextButton.icon(
-                    onPressed: () => ImagePreviewDialog.show(context, customIconPath!),
-                    icon: const Icon(Icons.visibility_outlined),
-                    label: const Text('查看大图'),
-                 ),
+                const SizedBox(width: 16),
+                TextButton.icon(
+                  onPressed: () =>
+                      ImagePreviewDialog.show(context, customIconPath!),
+                  icon: const Icon(Icons.visibility_outlined),
+                  label: const Text('查看大图'),
+                ),
               ],
             ],
           ),
@@ -209,7 +212,7 @@ class _CategorySheetContentState extends ConsumerState<_CategorySheetContent> {
         _selectedMajor = CategoryConfig.getMajorCategory(name);
       }
     }
-    
+
     _searchController.addListener(() {
       setState(() {
         _searchText = _searchController.text.trim();
@@ -288,7 +291,7 @@ class _CategorySheetContentState extends ConsumerState<_CategorySheetContent> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16, 
+                    horizontal: 16,
                     vertical: 8,
                   ),
                   suffixIcon: _searchText.isNotEmpty
@@ -304,7 +307,7 @@ class _CategorySheetContentState extends ConsumerState<_CategorySheetContent> {
               ),
             ),
             const SizedBox(height: 16),
-            
+
             // If searching, hide tabs
             if (_searchText.isEmpty)
               SizedBox(
@@ -326,7 +329,8 @@ class _CategorySheetContentState extends ConsumerState<_CategorySheetContent> {
                         if (selected) setState(() => _selectedMajor = major);
                       },
                       avatar: Icon(
-                        CategoryConfig.majorCategoryIcons[major] ?? Icons.circle,
+                        CategoryConfig.majorCategoryIcons[major] ??
+                            Icons.circle,
                         size: 16,
                         color: isSelected
                             ? Theme.of(context).colorScheme.onPrimary
@@ -336,15 +340,15 @@ class _CategorySheetContentState extends ConsumerState<_CategorySheetContent> {
                   },
                 ),
               ),
-              
+
             if (_searchText.isEmpty) const Divider(height: 32),
-            
+
             // Level 2: Sub Categories OR Search Results
             Expanded(
               child: categoriesAsync.when(
                 data: (allCategories) {
                   List<String> displayNames;
-                  
+
                   if (_searchText.isNotEmpty) {
                     // Search Mode: Filter all config categories
                     displayNames = CategoryConfig.defaultCategories
@@ -395,7 +399,7 @@ class _CategorySheetContentState extends ConsumerState<_CategorySheetContent> {
                           Padding(
                             padding: const EdgeInsets.only(bottom: 12),
                             child: Text(
-                              '搜索结果', 
+                              '搜索结果',
                               style: Theme.of(context).textTheme.titleSmall,
                             ),
                           ),

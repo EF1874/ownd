@@ -1,10 +1,4 @@
-
-enum TimelineEventType {
-  purchase,
-  renewal,
-  maintenance,
-  other
-}
+enum TimelineEventType { purchase, renewal, maintenance, other }
 
 class TimelineEvent {
   final String id;

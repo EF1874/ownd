@@ -42,7 +42,9 @@ class HomeSliverAppBar extends ConsumerWidget {
     return SliverAppBar(
       floating: false, // Changed to false to keep it persistent
       pinned: true,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor, // Ensure opaque
+      backgroundColor: Theme.of(
+        context,
+      ).scaffoldBackgroundColor, // Ensure opaque
       surfaceTintColor: Theme.of(context).scaffoldBackgroundColor,
       expandedHeight: 130,
       title: Row(
@@ -74,7 +76,9 @@ class HomeSliverAppBar extends ConsumerWidget {
             onPressed: () => onGridViewChanged(!isGridView),
           ),
           PopupMenuButton<String>(
-            icon: const Icon(Icons.tune_rounded), // Changed to tune icon as it's more for filters/sort
+            icon: const Icon(
+              Icons.tune_rounded,
+            ), // Changed to tune icon as it's more for filters/sort
             itemBuilder: (context) {
               const double itemHeight = 36.0;
               final textStyle = Theme.of(context).textTheme.bodyMedium;

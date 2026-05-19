@@ -16,6 +16,7 @@ import '../../data/services/preferences_service.dart';
 import '../../shared/services/notification_service.dart';
 import '../../shared/services/subscription_service.dart';
 import '../../features/navigation/navigation_provider.dart';
+import '../../features/auth/auth_controller.dart';
 import '../../core/theme/theme_provider.dart';
 
 import '../../shared/widgets/base_card.dart';
@@ -26,6 +27,8 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final transferService = ref.watch(dataTransferServiceProvider);
+    final authState = ref.watch(authControllerProvider);
+    final user = authState.asData?.value?.user;
 
     return Scaffold(
       appBar: AppBar(title: const Text('个人中心')),
@@ -41,6 +44,22 @@ class ProfileScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            if (user != null) ...[
+              BaseCard(
+                child: ListTile(
+                  leading: const Icon(Icons.account_circle_outlined),
+                  title: Text(user.name ?? user.email),
+                  subtitle: Text(user.email),
+                  trailing: TextButton(
+                    onPressed: () async {
+                      await ref.read(authControllerProvider.notifier).logout();
+                    },
+                    child: const Text('退出登录'),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
             _buildSectionHeader(context, '数据管理'),
             const SizedBox(height: 8),
             BaseCard(
@@ -162,26 +181,26 @@ class ProfileScreen extends ConsumerWidget {
                 builder: (context, ref, child) {
                   final currentMode = ref.watch(themeProvider);
                   // We also need to watch preferences_service to get updates on notificationTime
-                  // But preferences_service is not a notifier, it's a provider. 
+                  // But preferences_service is not a notifier, it's a provider.
                   // Ideally we should make PreferencesService notify listeners or use a StateNotifier.
-                  // For now, we will just read it since we don't have a stream. 
+                  // For now, we will just read it since we don't have a stream.
                   // Wait, if it's not reactive, the UI won't update.
                   // Let's make a small temp provider for it or just use Stateful?
                   // Actually, to keep it simple and consistent with the codebase:
                   // The codebase seems to use SharedPreferences directly in service.
                   // We can wrap the time string in a FutureProvider or just read it.
-                  // Let's use a FutureBuilder or ref.watch if we can. 
+                  // Let's use a FutureBuilder or ref.watch if we can.
                   // The plan didn't specify refactoring Prefs to be reactive.
                   // I'll assume we can just read it and setState/rebuild when changed.
                   // However, for the UI to reflect the change, we need state.
                   // Let's use a Stateful wrapper or just a simple variable if possible.
                   // Actually, let's look at `themeProvider`. It is reactive.
                   // I'll implement the UI and assume we can refresh it.
-                  
+
                   final prefs = ref.watch(preferencesServiceProvider);
                   // Just for display, we might need a force rebuild if we change it.
                   // Or better, let's create a local state or use `ref.refresh`.
-                  
+
                   return Column(
                     children: [
                       ListTile(
@@ -195,7 +214,8 @@ class ProfileScreen extends ConsumerWidget {
                               : '暗色模式',
                         ),
                         trailing: const Icon(Icons.chevron_right),
-                        onTap: () => _showThemeDialog(context, ref, currentMode),
+                        onTap: () =>
+                            _showThemeDialog(context, ref, currentMode),
                       ),
                       const Divider(),
                       StatefulBuilder(
@@ -216,21 +236,29 @@ class ProfileScreen extends ConsumerWidget {
                                 ),
                                 builder: (context, child) {
                                   return MediaQuery(
-                                    data: MediaQuery.of(context).copyWith(
-                                      alwaysUse24HourFormat: true,
-                                    ),
+                                    data: MediaQuery.of(
+                                      context,
+                                    ).copyWith(alwaysUse24HourFormat: true),
                                     child: child!,
                                   );
                                 },
                               );
-                              
+
                               if (time != null) {
-                                final hour = time.hour.toString().padLeft(2, '0');
-                                final minute = time.minute.toString().padLeft(2, '0');
+                                final hour = time.hour.toString().padLeft(
+                                  2,
+                                  '0',
+                                );
+                                final minute = time.minute.toString().padLeft(
+                                  2,
+                                  '0',
+                                );
                                 final newTime = '$hour:$minute';
                                 await prefs.setNotificationTime(newTime);
                                 // Reschedule
-                                await ref.read(subscriptionServiceProvider).rescheduleAllNotifications();
+                                await ref
+                                    .read(subscriptionServiceProvider)
+                                    .rescheduleAllNotifications();
                                 setState(() {}); // Rebuild local widget
                                 if (context.mounted) {
                                   _showSnackBar(context, '通知时间已更新');
@@ -238,7 +266,7 @@ class ProfileScreen extends ConsumerWidget {
                               }
                             },
                           );
-                        }
+                        },
                       ),
                     ],
                   );

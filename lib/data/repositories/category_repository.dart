@@ -1,15 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/category.dart';
 import '../datasource/category_datasource.dart';
-import '../datasource/local/isar_category_datasource.dart';
-import '../services/database_service.dart';
+import '../datasource/remote/remote_category_datasource.dart';
 import '../../shared/config/category_config.dart';
 import 'package:uuid/uuid.dart';
+import '../../core/network/api_client.dart';
 
 /// Riverpod provider for the CategoryDataSource.
 final categoryDataSourceProvider = Provider<CategoryDataSource>((ref) {
-  final dbService = ref.watch(databaseServiceProvider);
-  return IsarCategoryDataSource(dbService.isar);
+  return RemoteCategoryDataSource(ref.watch(apiClientProvider));
 });
 
 /// Riverpod provider for the CategoryRepository.

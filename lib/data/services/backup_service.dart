@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 
-
 import 'data_transfer_service.dart';
 
 final backupServiceProvider = Provider<BackupService>((ref) {
@@ -48,7 +47,9 @@ class BackupService {
       final now = DateTime.now();
       final sevenDaysAgo = now.subtract(const Duration(days: 7));
       // Matches: auto_backup_YYYY-MM-DD.zip or legacy .json
-      final fileNameRegex = RegExp(r'auto_backup_(\d{4}-\d{2}-\d{2})\.(zip|json)');
+      final fileNameRegex = RegExp(
+        r'auto_backup_(\d{4}-\d{2}-\d{2})\.(zip|json)',
+      );
 
       for (final file in files) {
         if (file is File) {

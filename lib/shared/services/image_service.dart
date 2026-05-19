@@ -19,6 +19,7 @@ class ImageService {
     bool isSquare = false, // Set true for icons
   }) async {
     try {
+      final colorScheme = Theme.of(context).colorScheme;
       final XFile? pickedFile = await _picker.pickImage(
         source: source,
         imageQuality: 80,
@@ -31,15 +32,14 @@ class ImageService {
         uiSettings: [
           AndroidUiSettings(
             toolbarTitle: '裁剪',
-            toolbarColor: Theme.of(context).colorScheme.primary,
+            toolbarColor: colorScheme.primary,
             toolbarWidgetColor: Colors.white,
-            initAspectRatio: isSquare ? CropAspectRatioPreset.square : CropAspectRatioPreset.ratio16x9,
+            initAspectRatio: isSquare
+                ? CropAspectRatioPreset.square
+                : CropAspectRatioPreset.ratio16x9,
             lockAspectRatio: false,
           ),
-          IOSUiSettings(
-            title: '裁剪',
-            aspectRatioLockEnabled: false,
-          ),
+          IOSUiSettings(title: '裁剪', aspectRatioLockEnabled: false),
         ],
       );
 
@@ -53,11 +53,15 @@ class ImageService {
 
   /// Saves an image to the local AppDir/Images folder.
   /// Uses device UUID and timestamp to ensure uniqueness.
-  Future<String?> saveImageToAppDirectory(File imageFile, String deviceUuid, {bool isIcon = false}) async {
+  Future<String?> saveImageToAppDirectory(
+    File imageFile,
+    String deviceUuid, {
+    bool isIcon = false,
+  }) async {
     try {
       final appDir = await getApplicationDocumentsDirectory();
       final imagesDir = Directory('${appDir.path}/images');
-      
+
       if (!await imagesDir.exists()) {
         await imagesDir.create(recursive: true);
       }
@@ -67,7 +71,7 @@ class ImageService {
       final typePrefix = isIcon ? 'icon' : 'item';
       final fileName = '${typePrefix}_${deviceUuid}_$timestamp$extension';
       final savedPath = '${imagesDir.path}/$fileName';
-      
+
       final savedImage = await imageFile.copy(savedPath);
       return savedImage.path;
     } catch (e) {

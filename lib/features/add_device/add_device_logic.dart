@@ -52,7 +52,7 @@ extension AddDeviceLogic on _AddDeviceScreenState {
     // If editing existing device, do not auto-calculate next billing date
     // This allows users to modify fields without resetting the billing cycle
     if (widget.device != null) return;
-    
+
     if (_cycleType == null || _cycleType == CycleType.oneTime) return;
     updateState(
       () => _nextBillingDate = SubscriptionUtils.calculateNextBillingDate(
@@ -110,11 +110,11 @@ extension AddDeviceLogic on _AddDeviceScreenState {
     updateState(() => _isLoading = true);
     try {
       Category finalCat = _selectedCategory!;
-      if (_selectedCategory?.name == '其它') {
+      if (_selectedCategory?.uuid == null || _selectedCategory!.id < 0) {
         final custom = _catCtr.text.trim();
         finalCat = await ref
             .read(categoryRepositoryProvider)
-            .ensureCategory(custom.isNotEmpty ? custom : '其它');
+            .ensureCategory(custom.isNotEmpty ? custom : finalCat.name);
       }
 
       final device = widget.device ?? Device();
@@ -137,7 +137,11 @@ extension AddDeviceLogic on _AddDeviceScreenState {
         ..notes = _notesCtr.text.trim().isEmpty ? null : _notesCtr.text.trim()
         ..tags = _tagsCtr.text.trim().isEmpty
             ? []
-            : _tagsCtr.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList()
+            : _tagsCtr.text
+                  .split(',')
+                  .map((e) => e.trim())
+                  .where((e) => e.isNotEmpty)
+                  .toList()
         ..category.value = finalCat
         ..cycleType = _isSub ? _cycleType : null
         ..isAutoRenew = _isSub ? _isAutoRenew : true
@@ -181,7 +185,7 @@ extension AddDeviceLogic on _AddDeviceScreenState {
 
       // Handle Notifications
       final subService = ref.read(subscriptionServiceProvider);
-      
+
       // Subscriptions
       if (device.hasReminder && device.nextBillingDate != null) {
         await subService.scheduleSubscriptionNotification(device);

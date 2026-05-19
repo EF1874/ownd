@@ -21,9 +21,7 @@ class ImagePreviewDialog extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          InteractiveViewer(
-            child: Image.file(File(imagePath)),
-          ),
+          InteractiveViewer(child: Image.file(File(imagePath))),
           Positioned(
             top: 40,
             right: 20,

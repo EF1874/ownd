@@ -13,12 +13,9 @@ class DatabaseService {
 
   Future<void> init() async {
     final dir = await getApplicationDocumentsDirectory();
-    isar = await Isar.open(
-      [CategorySchema, DeviceSchema],
-      directory: dir.path,
-    );
+    isar = await Isar.open([CategorySchema, DeviceSchema], directory: dir.path);
   }
-  
+
   Future<void> cleanDb() async {
     await isar.writeTxn(() async {
       await isar.clear();
