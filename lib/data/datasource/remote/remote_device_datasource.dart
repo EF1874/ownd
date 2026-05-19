@@ -9,6 +9,7 @@ class RemoteDeviceDataSource implements DeviceDataSource {
   final ApiClient _apiClient;
   final _controller = StreamController<List<Device>>.broadcast();
   List<Device> _cache = [];
+  bool _isDisposed = false;
 
   RemoteDeviceDataSource(this._apiClient);
 
@@ -16,7 +17,9 @@ class RemoteDeviceDataSource implements DeviceDataSource {
   Future<List<Device>> getAll() async {
     final data = await _apiClient.get<List<dynamic>>('/items');
     _cache = data.whereType<Map<String, dynamic>>().map(deviceFromApi).toList();
-    _controller.add(List.unmodifiable(_cache));
+    if (!_isDisposed) {
+      _controller.add(List.unmodifiable(_cache));
+    }
     return List.unmodifiable(_cache);
   }
 
@@ -57,5 +60,11 @@ class RemoteDeviceDataSource implements DeviceDataSource {
     final device = _cache.firstWhere((item) => item.id == id);
     await _apiClient.delete<dynamic>('/items/${device.uuid}');
     await getAll();
+  }
+
+  Future<void> dispose() async {
+    _isDisposed = true;
+    _cache = [];
+    await _controller.close();
   }
 }

@@ -7,7 +7,9 @@ import '../../core/network/api_client.dart';
 /// Riverpod provider for the DeviceDataSource.
 /// Swap this to a remote implementation when backend is ready.
 final deviceDataSourceProvider = Provider<DeviceDataSource>((ref) {
-  return RemoteDeviceDataSource(ref.watch(apiClientProvider));
+  final dataSource = RemoteDeviceDataSource(ref.watch(apiClientProvider));
+  ref.onDispose(dataSource.dispose);
+  return dataSource;
 });
 
 /// Riverpod provider for the DeviceRepository.
