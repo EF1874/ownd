@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'logic/timeline_provider.dart';
 import 'models/timeline_event.dart';
 import 'widgets/timeline_node.dart';
+import '../../data/repositories/category_repository.dart';
 import '../../shared/utils/format_utils.dart';
 import '../home/widgets/multi_select_filter_delegate.dart';
 import '../home/home_screen.dart'; // for deviceListProvider
@@ -45,6 +46,12 @@ Widget _buildTimelineBody(
   final selectedFilter = ref.watch(timelineFilterProvider);
   final selectedTags = ref.watch(timelineTagFilterProvider);
   final devicesAsync = ref.watch(deviceListProvider);
+  final categoryTreeAsync = ref.watch(categoryTreeProvider);
+  final majorCategories =
+      categoryTreeAsync.valueOrNull
+          ?.map((category) => category.name)
+          .toList() ??
+      const <String>[];
   final theme = Theme.of(context);
 
   // Color definitions for lines
@@ -75,6 +82,7 @@ Widget _buildTimelineBody(
         pinned: true,
         delegate: MultiSelectFilterDelegate(
           selectedCategories: selectedFilter,
+          categories: majorCategories,
           onSelectionChanged: (categories) {
             ref.read(timelineFilterProvider.notifier).state = categories;
           },

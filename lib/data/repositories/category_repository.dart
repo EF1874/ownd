@@ -17,6 +17,10 @@ final categoryRepositoryProvider = Provider<CategoryRepository>((ref) {
   return CategoryRepository(dataSource);
 });
 
+final categoryTreeProvider = FutureProvider<List<Category>>((ref) async {
+  return ref.read(categoryRepositoryProvider).getCategoryTree();
+});
+
 /// Repository layer for Category entities.
 class CategoryRepository {
   final CategoryDataSource _dataSource;
@@ -24,7 +28,7 @@ class CategoryRepository {
   CategoryRepository(this._dataSource);
 
   Future<List<Category>> getAllCategories() async {
-    final categories = await _dataSource.getAll();
+    final categories = List<Category>.from(await _dataSource.getAll());
 
     // Sort based on the order in CategoryConfig.defaultCategories
     final orderMap = {
@@ -41,24 +45,39 @@ class CategoryRepository {
     return categories;
   }
 
+  Future<List<Category>> getCategoryTree() => _dataSource.getTree();
+
   Future<int> addCategory(Category category) => _dataSource.add(category);
 
-  Future<Category> ensureCategory(String name) async {
-    final existing = await findCategoryByName(name);
+  Future<Category> ensureCategory(String name, {Category? parent}) async {
+    final existing = await findCategoryByName(name, parent: parent);
     if (existing != null) return existing;
 
     final newCat = Category()
       ..name = name
       ..iconPath = 'MdiIcons.tag'
-      ..isDefault = false;
+      ..isDefault = false
+      ..parentUuid = parent?.parentUuid ?? parent?.uuid
+      ..parentName = parent?.parentName ?? parent?.name;
 
     final id = await addCategory(newCat);
     newCat.id = id;
     return newCat;
   }
 
-  Future<Category?> findCategoryByName(String name) =>
-      _dataSource.findByName(name);
+  Future<Category?> findCategoryByName(String name, {Category? parent}) async {
+    final categories = await _dataSource.getAll();
+    final parentUuid = parent?.parentUuid ?? parent?.uuid;
+
+    for (final category in categories) {
+      if (category.name != name) continue;
+      if (parent == null || category.parentUuid == parentUuid) {
+        return category;
+      }
+    }
+
+    return null;
+  }
 
   Future<void> deleteCategory(int id) => _dataSource.delete(id);
 

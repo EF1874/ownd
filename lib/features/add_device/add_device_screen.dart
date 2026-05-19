@@ -10,6 +10,7 @@ import '../../data/models/category.dart';
 import '../../data/models/device.dart';
 import '../../data/repositories/category_repository.dart';
 import '../../data/repositories/device_repository.dart';
+import '../../data/repositories/platform_repository.dart';
 import '../../features/navigation/navigation_provider.dart';
 import '../../shared/config/category_config.dart';
 import '../../shared/utils/subscription_utils.dart';
@@ -72,7 +73,9 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
   late final String _uuid; // Track UUID for file naming
 
   bool get _isSub =>
-      CategoryConfig.getMajorCategory(_selectedCategory?.name) == '虚拟订阅';
+      (_selectedCategory?.parentName ??
+          CategoryConfig.getMajorCategory(_selectedCategory?.name)) ==
+      '虚拟订阅';
 
   @override
   void initState() {

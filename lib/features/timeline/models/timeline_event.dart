@@ -6,6 +6,7 @@ class TimelineEvent {
   final String deviceName;
   final String? customIconPath;
   final String? categoryName;
+  final String? majorCategoryName;
   final DateTime date;
   final TimelineEventType type;
   final double cost;
@@ -18,6 +19,7 @@ class TimelineEvent {
     required this.deviceName,
     this.customIconPath,
     this.categoryName,
+    this.majorCategoryName,
     required this.date,
     required this.type,
     required this.cost,

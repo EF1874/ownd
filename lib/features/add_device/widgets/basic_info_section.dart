@@ -70,7 +70,8 @@ class BasicInfoSection extends StatelessWidget {
             labelStyle: TextStyle(color: Theme.of(context).hintColor),
           ),
         ],
-        if (CategoryConfig.getMajorCategory(selectedCategory?.name) !=
+        if ((selectedCategory?.parentName ??
+                CategoryConfig.getMajorCategory(selectedCategory?.name)) !=
             '虚拟订阅') ...[
           const SizedBox(height: 16),
           Row(

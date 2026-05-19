@@ -14,6 +14,11 @@ class IsarCategoryDataSource implements CategoryDataSource {
   }
 
   @override
+  Future<List<Category>> getTree() async {
+    return await getAll();
+  }
+
+  @override
   Future<Id> add(Category category) async {
     return await _isar.writeTxn(() async {
       return await _isar.categorys.put(category);

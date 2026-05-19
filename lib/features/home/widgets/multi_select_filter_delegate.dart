@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
-import '../../../shared/config/category_config.dart';
 
 class MultiSelectFilterDelegate extends SliverPersistentHeaderDelegate {
   final Set<String> selectedCategories;
+  final List<String> categories;
   final ValueChanged<Set<String>> onSelectionChanged;
 
   MultiSelectFilterDelegate({
     required this.selectedCategories,
+    required this.categories,
     required this.onSelectionChanged,
   });
 
@@ -17,7 +18,7 @@ class MultiSelectFilterDelegate extends SliverPersistentHeaderDelegate {
     bool overlapsContent,
   ) {
     final theme = Theme.of(context);
-    final allCategories = CategoryConfig.hierarchy.keys.toList();
+    final allCategories = categories;
     // Logic: If selectedCategories size equals allCategories size, "All" is active logic-wise.
     // User requirement: "When 'All' is selected, all chips are active. Clicking 'All' again cancels all."
     // Actually, usually "All" is a separate chip.
@@ -118,6 +119,12 @@ class MultiSelectFilterDelegate extends SliverPersistentHeaderDelegate {
     if (oldDelegate.selectedCategories.length != selectedCategories.length) {
       return true;
     }
-    return !oldDelegate.selectedCategories.containsAll(selectedCategories);
+    if (!oldDelegate.selectedCategories.containsAll(selectedCategories)) {
+      return true;
+    }
+    if (oldDelegate.categories.length != categories.length) {
+      return true;
+    }
+    return !oldDelegate.categories.every(categories.contains);
   }
 }

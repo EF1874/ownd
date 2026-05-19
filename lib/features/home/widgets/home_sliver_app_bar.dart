@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/widgets/app_text_field.dart';
-import '../../../shared/config/platform_config.dart';
+import '../../../data/models/purchase_platform.dart';
+import '../../../data/repositories/platform_repository.dart';
 import '../../../core/theme/theme_provider.dart';
+import '../../../shared/utils/icon_utils.dart';
 
 class HomeSliverAppBar extends ConsumerWidget {
   final TextEditingController searchController;
@@ -263,70 +265,99 @@ class HomeSliverAppBar extends ConsumerWidget {
       context: context,
       builder: (context) {
         return Dialog(
-          child: Container(
-            width: 300,
-            constraints: const BoxConstraints(maxHeight: 400),
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(
-                    bottom: 8,
-                    left: 16,
-                    right: 16,
-                  ),
-                  child: Text(
-                    '选择平台',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                ),
-                Expanded(
-                  child: ListView(
-                    shrinkWrap: true,
-                    children: [
-                      ListTile(
-                        dense: true,
-                        title: const Text('全部平台'),
-                        leading: selectedPlatformFilter == null
-                            ? Icon(
-                                Icons.check,
-                                size: 20,
-                                color: Theme.of(context).colorScheme.primary,
-                              )
-                            : const SizedBox(width: 20),
-                        onTap: () {
-                          onPlatformFilterChanged(null);
-                          Navigator.pop(context);
-                        },
+          child: Consumer(
+            builder: (context, ref, child) {
+              final platformsAsync = ref.watch(platformsProvider);
+
+              return Container(
+                width: 300,
+                constraints: const BoxConstraints(maxHeight: 400),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(
+                        bottom: 8,
+                        left: 16,
+                        right: 16,
                       ),
-                      ...PlatformConfig.shoppingPlatforms.map((p) {
-                        final isSelected = selectedPlatformFilter == p.name;
-                        return ListTile(
-                          dense: true,
-                          leading: Icon(p.icon, size: 20, color: p.color),
-                          title: Text(p.name),
-                          trailing: isSelected
-                              ? Icon(
-                                  Icons.check,
+                      child: Text(
+                        '选择平台',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
+                    Expanded(
+                      child: platformsAsync.when(
+                        data: (platforms) => ListView(
+                          shrinkWrap: true,
+                          children: [
+                            ListTile(
+                              dense: true,
+                              title: const Text('全部平台'),
+                              leading: selectedPlatformFilter == null
+                                  ? Icon(
+                                      Icons.check,
+                                      size: 20,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
+                                    )
+                                  : const SizedBox(width: 20),
+                              onTap: () {
+                                onPlatformFilterChanged(null);
+                                Navigator.pop(context);
+                              },
+                            ),
+                            ...platforms.map((p) {
+                              final isSelected =
+                                  selectedPlatformFilter == p.name;
+                              return ListTile(
+                                dense: true,
+                                leading: Icon(
+                                  IconUtils.getIconData(p.iconPath),
                                   size: 20,
-                                  color: Theme.of(context).colorScheme.primary,
-                                )
-                              : null,
-                          onTap: () {
-                            onPlatformFilterChanged(p.name);
-                            Navigator.pop(context);
-                          },
-                        );
-                      }),
-                    ],
-                  ),
+                                  color: _platformColor(p),
+                                ),
+                                title: Text(p.name),
+                                trailing: isSelected
+                                    ? Icon(
+                                        Icons.check,
+                                        size: 20,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.primary,
+                                      )
+                                    : null,
+                                onTap: () {
+                                  onPlatformFilterChanged(p.name);
+                                  Navigator.pop(context);
+                                },
+                              );
+                            }),
+                          ],
+                        ),
+                        loading: () =>
+                            const Center(child: CircularProgressIndicator()),
+                        error: (err, stack) =>
+                            Center(child: Text('Error: $err')),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              );
+            },
           ),
         );
       },
     );
+  }
+
+  Color _platformColor(PurchasePlatform platform) {
+    final normalized = platform.colorHex.replaceFirst('#', '');
+    final value = int.tryParse(normalized, radix: 16);
+    if (value == null) return Colors.grey;
+
+    return Color(0xFF000000 | value);
   }
 }

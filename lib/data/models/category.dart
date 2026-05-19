@@ -15,4 +15,13 @@ class Category {
   late String iconPath;
 
   bool isDefault = false;
+
+  @ignore
+  String? parentUuid;
+
+  @ignore
+  String? parentName;
+
+  @ignore
+  List<Category> children = [];
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/device.dart';
+import '../../data/repositories/category_repository.dart';
 import '../../data/repositories/device_repository.dart';
 import '../../shared/config/category_config.dart';
 import '../../data/services/preferences_service.dart';
@@ -68,7 +69,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // Filter by Category
     if (_selectedCategories.isNotEmpty) {
       result = result.where((d) {
-        final major = CategoryConfig.getMajorCategory(d.category.value?.name);
+        final category = d.category.value;
+        final major =
+            category?.parentName ??
+            CategoryConfig.getMajorCategory(category?.name);
         return _selectedCategories.contains(major);
       }).toList();
     }
@@ -113,7 +117,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   DateTime? _getExpiryDate(Device d) {
-    if (CategoryConfig.getMajorCategory(d.category.value?.name) == '虚拟订阅') {
+    final category = d.category.value;
+    final major =
+        category?.parentName ?? CategoryConfig.getMajorCategory(category?.name);
+    if (major == '虚拟订阅') {
       return d.nextBillingDate;
     }
     return d.scrapDate ?? d.warrantyEndDate;
@@ -122,6 +129,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final devicesAsync = ref.watch(deviceListProvider);
+    final categoryTreeAsync = ref.watch(categoryTreeProvider);
+    final majorCategories =
+        categoryTreeAsync.valueOrNull
+            ?.map((category) => category.name)
+            .toList() ??
+        const <String>[];
 
     return Scaffold(
       body: Stack(
@@ -172,6 +185,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   pinned: true,
                   delegate: MultiSelectFilterDelegate(
                     selectedCategories: _selectedCategories,
+                    categories: majorCategories,
                     onSelectionChanged: (categories) {
                       setState(() => _selectedCategories = categories);
                     },

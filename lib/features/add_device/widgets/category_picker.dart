@@ -7,10 +7,6 @@ import '../../../shared/config/category_config.dart';
 import '../../../shared/utils/icon_utils.dart';
 import '../../../shared/widgets/image_preview_dialog.dart';
 
-final categoriesProvider = FutureProvider<List<Category>>((ref) async {
-  return ref.read(categoryRepositoryProvider).getAllCategories();
-});
-
 class CategoryPicker extends ConsumerWidget {
   final Category? selectedCategory;
   final ValueChanged<Category?> onCategorySelected;
@@ -205,8 +201,10 @@ class _CategorySheetContentState extends ConsumerState<_CategorySheetContent> {
 
     if (widget.selectedCategory != null) {
       final name = widget.selectedCategory!.name;
-      // Robust check: if name is directly a Major Category, use it.
-      if (CategoryConfig.hierarchy.containsKey(name)) {
+      if (widget.selectedCategory!.parentName != null) {
+        _selectedMajor = widget.selectedCategory!.parentName!;
+        // Robust check: if name is directly a Major Category, use it.
+      } else if (CategoryConfig.hierarchy.containsKey(name)) {
         _selectedMajor = name;
       } else {
         _selectedMajor = CategoryConfig.getMajorCategory(name);
@@ -227,16 +225,11 @@ class _CategorySheetContentState extends ConsumerState<_CategorySheetContent> {
     super.dispose();
   }
 
-  void _confirmMajorCategory() {
-    // Construct a Category object for the Major Category
-    final iconPath =
-        CategoryConfig.majorCategoryIconStrings[_selectedMajor] ??
-        'MdiIcons.shape';
-
-    final category = Category()
-      ..name = _selectedMajor
-      ..iconPath = iconPath
-      ..id = -2;
+  void _confirmMajorCategory(List<Category> categoryTree) {
+    final category = categoryTree.firstWhere(
+      (item) => item.name == _selectedMajor,
+      orElse: () => categoryTree.first,
+    );
 
     _selectionMade = true;
     widget.onCategorySelected(category);
@@ -244,23 +237,25 @@ class _CategorySheetContentState extends ConsumerState<_CategorySheetContent> {
 
   @override
   Widget build(BuildContext context) {
-    final categoriesAsync = ref.watch(categoriesProvider);
-    final majorCategories = CategoryConfig.hierarchy.keys.toList();
+    final categoriesAsync = ref.watch(categoryTreeProvider);
 
     return PopScope(
       canPop: true,
       onPopInvokedWithResult: (didPop, result) {
+        final categoryTree = categoriesAsync.valueOrNull;
+        if (categoryTree == null || categoryTree.isEmpty) return;
+
         if (didPop && !_selectionMade && widget.selectedCategory == null) {
-          _confirmMajorCategory();
+          _confirmMajorCategory(categoryTree);
         } else if (didPop &&
             !_selectionMade &&
             widget.selectedCategory != null) {
           // Check if we navigated away from the original Major selection
-          final originalMajor = CategoryConfig.getMajorCategory(
-            widget.selectedCategory!.name,
-          );
+          final originalMajor =
+              widget.selectedCategory!.parentName ??
+              CategoryConfig.getMajorCategory(widget.selectedCategory!.name);
           if (_selectedMajor != originalMajor) {
-            _confirmMajorCategory();
+            _confirmMajorCategory(categoryTree);
           }
         }
       },
@@ -308,78 +303,76 @@ class _CategorySheetContentState extends ConsumerState<_CategorySheetContent> {
             ),
             const SizedBox(height: 16),
 
-            // If searching, hide tabs
-            if (_searchText.isEmpty)
-              SizedBox(
-                height: 48,
-                child: ListView.separated(
-                  controller: _majorScrollController,
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: majorCategories.length,
-                  separatorBuilder: (ctx, i) => const SizedBox(width: 8),
-                  itemBuilder: (ctx, i) {
-                    final major = majorCategories[i];
-                    final isSelected = major == _selectedMajor;
-                    return ChoiceChip(
-                      label: Text(major),
-                      selected: isSelected,
-                      showCheckmark: false,
-                      onSelected: (selected) {
-                        if (selected) setState(() => _selectedMajor = major);
-                      },
-                      avatar: Icon(
-                        CategoryConfig.majorCategoryIcons[major] ??
-                            Icons.circle,
-                        size: 16,
-                        color: isSelected
-                            ? Theme.of(context).colorScheme.onPrimary
-                            : CategoryConfig.majorCategoryColors[major],
-                      ),
-                    );
-                  },
-                ),
-              ),
+            categoriesAsync.maybeWhen(
+              data: (categoryTree) {
+                if (_searchText.isNotEmpty || categoryTree.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+
+                final majorCategories = categoryTree
+                    .map((e) => e.name)
+                    .toList();
+                final selectedMajor = majorCategories.contains(_selectedMajor)
+                    ? _selectedMajor
+                    : majorCategories.first;
+
+                return SizedBox(
+                  height: 48,
+                  child: ListView.separated(
+                    controller: _majorScrollController,
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: majorCategories.length,
+                    separatorBuilder: (ctx, i) => const SizedBox(width: 8),
+                    itemBuilder: (ctx, i) {
+                      final major = majorCategories[i];
+                      final isSelected = major == selectedMajor;
+                      return ChoiceChip(
+                        label: Text(major),
+                        selected: isSelected,
+                        showCheckmark: false,
+                        onSelected: (selected) {
+                          if (selected) setState(() => _selectedMajor = major);
+                        },
+                        avatar: Icon(
+                          IconUtils.getIconData(categoryTree[i].iconPath),
+                          size: 16,
+                          color: isSelected
+                              ? Theme.of(context).colorScheme.onPrimary
+                              : CategoryConfig.majorCategoryColors[major],
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
+              orElse: () => const SizedBox.shrink(),
+            ),
 
             if (_searchText.isEmpty) const Divider(height: 32),
 
             // Level 2: Sub Categories OR Search Results
             Expanded(
               child: categoriesAsync.when(
-                data: (allCategories) {
-                  List<String> displayNames;
+                data: (categoryTree) {
+                  final allCategories = categoryTree
+                      .expand((category) => [category, ...category.children])
+                      .toList();
+                  List<Category> visualCategories;
 
                   if (_searchText.isNotEmpty) {
-                    // Search Mode: Filter all config categories
-                    displayNames = CategoryConfig.defaultCategories
-                        .where((c) => c.name.contains(_searchText))
-                        .map((c) => c.name)
+                    visualCategories = allCategories
+                        .where(
+                          (category) => category.name.contains(_searchText),
+                        )
                         .toList();
                   } else {
-                    // Standard Mode: Filter by Major
-                    final subNames =
-                        CategoryConfig.hierarchy[_selectedMajor] ?? [];
-                    displayNames = List<String>.from(subNames);
-                    if (!displayNames.contains('其它')) {
-                      displayNames.add('其它');
-                    }
-                  }
-
-                  final visualCategories = displayNames.map((name) {
-                    // Try to find existing category from DB
-                    final found = allCategories.firstWhere(
-                      (c) => c.name == name,
-                      orElse: () => Category()
-                        ..name = name
-                        ..iconPath = CategoryConfig.getItem(name).iconPath
-                        ..id = -1,
+                    final major = categoryTree.firstWhere(
+                      (category) => category.name == _selectedMajor,
+                      orElse: () => categoryTree.first,
                     );
-                    // Fix icon for Other
-                    if (name == '其它') {
-                      found.iconPath = 'MdiIcons.dotsHorizontal';
-                    }
-                    return found;
-                  }).toList();
+                    visualCategories = major.children;
+                  }
 
                   if (visualCategories.isEmpty) {
                     return Center(
@@ -416,8 +409,8 @@ class _CategorySheetContentState extends ConsumerState<_CategorySheetContent> {
                                 widget.selectedCategory?.name == category.name;
                             final isScopedOther =
                                 isOther &&
-                                widget.selectedCategory?.name ==
-                                    '$_selectedMajor-其它';
+                                widget.selectedCategory?.parentName ==
+                                    _selectedMajor;
 
                             final isSelected =
                                 (widget.selectedCategory != null) &&
@@ -437,20 +430,11 @@ class _CategorySheetContentState extends ConsumerState<_CategorySheetContent> {
                               onSelected: (selected) {
                                 if (selected) {
                                   _selectionMade = true;
-                                  if (isOther) {
-                                    // Construct scoped Other category
-                                    final scopedOther = Category()
-                                      ..name = '$_selectedMajor-其它'
-                                      ..iconPath = 'MdiIcons.dotsHorizontal'
-                                      ..id = -1;
-                                    widget.onCategorySelected(scopedOther);
-                                  } else {
-                                    widget.onCategorySelected(category);
-                                  }
+                                  widget.onCategorySelected(category);
                                   Navigator.of(context).pop();
                                 } else {
                                   // Deselect -> Revert to Major Category
-                                  _confirmMajorCategory();
+                                  _confirmMajorCategory(categoryTree);
                                   Navigator.of(context).pop();
                                 }
                               },

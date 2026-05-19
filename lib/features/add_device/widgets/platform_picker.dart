@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../../shared/config/platform_config.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../data/models/purchase_platform.dart';
+import '../../../data/repositories/platform_repository.dart';
+import '../../../shared/utils/icon_utils.dart';
 
-class PlatformPicker extends StatelessWidget {
+class PlatformPicker extends ConsumerWidget {
   final String? selectedPlatform;
   final ValueChanged<String> onPlatformSelected;
 
@@ -12,14 +15,17 @@ class PlatformPicker extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    // Find the current platform model, or default to custom/unknown
-    final selectedModel = PlatformConfig.shoppingPlatforms.firstWhere(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final platformsAsync = ref.watch(platformsProvider);
+    final selectedModel = platformsAsync.valueOrNull?.firstWhere(
       (p) => p.name == selectedPlatform,
-      orElse: () => PlatformModel(
+      orElse: () => PurchasePlatform(
+        id: -1,
+        uuid: '',
         name: selectedPlatform ?? '',
-        icon: Icons.shopping_bag,
-        color: Colors.grey,
+        iconPath: 'MdiIcons.store',
+        colorHex: '#9E9E9E',
+        isDefault: false,
       ),
     );
 
@@ -40,9 +46,11 @@ class PlatformPicker extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        selectedModel.icon,
+                        IconUtils.getIconData(
+                          selectedModel?.iconPath ?? 'MdiIcons.store',
+                        ),
                         size: 20,
-                        color: selectedModel.color,
+                        color: _platformColor(selectedModel),
                       ),
                       const SizedBox(width: 8),
                       Text(selectedPlatform!),
@@ -59,43 +67,65 @@ class PlatformPicker extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.all(16),
-        width: double.infinity,
-        height: 500, // Fixed height for existing scroll
-        child: Column(
-          children: [
-            Text('选择购买平台', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 16),
-            Expanded(
-              child: SingleChildScrollView(
-                child: Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: PlatformConfig.shoppingPlatforms.map((platform) {
-                    final isSelected = selectedPlatform == platform.name;
-                    return ChoiceChip(
-                      label: Text(platform.name),
-                      selected: isSelected,
-                      onSelected: (selected) {
-                        if (selected) {
-                          onPlatformSelected(platform.name);
-                          Navigator.pop(ctx);
-                        }
-                      },
-                      avatar: Icon(
-                        platform.icon,
-                        size: 18,
-                        color: platform.color,
+      builder: (ctx) => Consumer(
+        builder: (context, ref, child) {
+          final sheetPlatformsAsync = ref.watch(platformsProvider);
+
+          return Container(
+            padding: const EdgeInsets.all(16),
+            width: double.infinity,
+            height: 500,
+            child: Column(
+              children: [
+                Text('选择购买平台', style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: sheetPlatformsAsync.when(
+                    data: (platforms) => SingleChildScrollView(
+                      child: Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: platforms.map((platform) {
+                          final isSelected = selectedPlatform == platform.name;
+                          return ChoiceChip(
+                            label: Text(platform.name),
+                            selected: isSelected,
+                            onSelected: (selected) {
+                              if (selected) {
+                                onPlatformSelected(platform.name);
+                                Navigator.pop(ctx);
+                              }
+                            },
+                            avatar: Icon(
+                              IconUtils.getIconData(platform.iconPath),
+                              size: 18,
+                              color: _platformColor(platform),
+                            ),
+                          );
+                        }).toList(),
                       ),
-                    );
-                  }).toList(),
+                    ),
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
+                    error: (err, stack) => Center(child: Text('Error: $err')),
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
+  }
+
+  Color _platformColor(PurchasePlatform? platform) {
+    final colorHex = platform?.colorHex;
+    if (colorHex == null || colorHex.isEmpty) return Colors.grey;
+
+    final normalized = colorHex.replaceFirst('#', '');
+    final value = int.tryParse(normalized, radix: 16);
+    if (value == null) return Colors.grey;
+
+    return Color(0xFF000000 | value);
   }
 }

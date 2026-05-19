@@ -8,18 +8,26 @@ import '../category_datasource.dart';
 class RemoteCategoryDataSource implements CategoryDataSource {
   final ApiClient _apiClient;
   List<Category> _cache = [];
+  List<Category> _treeCache = [];
 
   RemoteCategoryDataSource(this._apiClient);
 
   @override
   Future<List<Category>> getAll() async {
-    final data = await _apiClient.get<List<dynamic>>('/categories');
-    _cache = data
-        .whereType<Map<String, dynamic>>()
-        .expand(_flattenCategory)
-        .map(categoryFromApi)
-        .toList();
+    final tree = await getTree();
+    _cache = tree.expand(_flattenCategoryNode).toList();
     return List.unmodifiable(_cache);
+  }
+
+  @override
+  Future<List<Category>> getTree() async {
+    final data = await _apiClient.get<List<dynamic>>('/categories');
+    _treeCache = data
+        .whereType<Map<String, dynamic>>()
+        .map(categoryTreeFromApi)
+        .toList();
+    _cache = _treeCache.expand(_flattenCategoryNode).toList();
+    return List.unmodifiable(_treeCache);
   }
 
   @override
@@ -65,12 +73,7 @@ class RemoteCategoryDataSource implements CategoryDataSource {
     }
   }
 
-  Iterable<Map<String, dynamic>> _flattenCategory(Map<String, dynamic> json) {
-    return [
-      json,
-      ...((json['children'] as List<dynamic>?) ?? const [])
-          .whereType<Map<String, dynamic>>()
-          .expand(_flattenCategory),
-    ];
+  Iterable<Category> _flattenCategoryNode(Category category) {
+    return [category, ...category.children.expand(_flattenCategoryNode)];
   }
 }

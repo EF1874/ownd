@@ -110,12 +110,28 @@ extension AddDeviceLogic on _AddDeviceScreenState {
     updateState(() => _isLoading = true);
     try {
       Category finalCat = _selectedCategory!;
-      if (_selectedCategory?.uuid == null || _selectedCategory!.id < 0) {
-        final custom = _catCtr.text.trim();
+      final customCategory = _catCtr.text.trim();
+      if (_selectedCategory?.name == '其它' && customCategory.isNotEmpty) {
         finalCat = await ref
             .read(categoryRepositoryProvider)
-            .ensureCategory(custom.isNotEmpty ? custom : finalCat.name);
+            .ensureCategory(customCategory, parent: _selectedCategory);
+      } else if (_selectedCategory?.uuid == null || _selectedCategory!.id < 0) {
+        finalCat = await ref
+            .read(categoryRepositoryProvider)
+            .ensureCategory(
+              customCategory.isNotEmpty ? customCategory : finalCat.name,
+            );
       }
+
+      final selectedPlatformName =
+          (_selectedPlatform == '其它' ? _platformCtr.text : _selectedPlatform)
+              ?.trim();
+      final selectedPlatform =
+          selectedPlatformName != null && selectedPlatformName.isNotEmpty
+          ? await ref
+                .read(platformRepositoryProvider)
+                .ensurePlatform(selectedPlatformName)
+          : null;
 
       final device = widget.device ?? Device();
       device
@@ -124,11 +140,8 @@ extension AddDeviceLogic on _AddDeviceScreenState {
             : _nameCtr.text.trim()
         ..price = double.parse(_priceCtr.text)
         ..purchaseDate = _purchaseDate
-        ..platform =
-            (_selectedPlatform == '其它'
-                ? _platformCtr.text
-                : _selectedPlatform) ??
-            ''
+        ..platform = selectedPlatform?.name ?? ''
+        ..platformUuid = selectedPlatform?.uuid
         ..warrantyEndDate = _warrantyDate
         ..backupDate = _backupDate
         ..scrapDate = _scrapDate

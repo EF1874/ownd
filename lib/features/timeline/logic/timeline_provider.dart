@@ -17,6 +17,11 @@ final timelineEventsProvider = StreamProvider<List<YearlyTimeline>>((ref) {
 
     // Flatten devices into events
     for (var device in devices) {
+      final category = device.category.value;
+      final majorCategory =
+          category?.parentName ??
+          CategoryConfig.getMajorCategory(category?.name);
+
       // 1. Purchase Event
       allEvents.add(
         TimelineEvent(
@@ -24,7 +29,8 @@ final timelineEventsProvider = StreamProvider<List<YearlyTimeline>>((ref) {
           deviceId: device.uuid,
           deviceName: device.name,
           customIconPath: device.customIconPath,
-          categoryName: device.category.value?.name,
+          categoryName: category?.name,
+          majorCategoryName: majorCategory,
           date: device.purchaseDate,
           type: TimelineEventType.purchase,
           cost: device.price,
@@ -45,7 +51,8 @@ final timelineEventsProvider = StreamProvider<List<YearlyTimeline>>((ref) {
             deviceId: device.uuid,
             deviceName: device.name,
             customIconPath: device.customIconPath,
-            categoryName: device.category.value?.name,
+            categoryName: category?.name,
+            majorCategoryName: majorCategory,
             date: eventDate,
             type: TimelineEventType.renewal,
             cost: history.price,
@@ -59,7 +66,9 @@ final timelineEventsProvider = StreamProvider<List<YearlyTimeline>>((ref) {
     // Filter events
     if (filterCategory.isNotEmpty) {
       allEvents = allEvents.where((e) {
-        final major = CategoryConfig.getMajorCategory(e.categoryName);
+        final major =
+            e.majorCategoryName ??
+            CategoryConfig.getMajorCategory(e.categoryName);
         return filterCategory.contains(major);
       }).toList();
     }

@@ -14,6 +14,8 @@ Device deviceFromApi(Map<String, dynamic> json) {
     ..backupDate = _date(json['backupDate'])
     ..scrapDate = _date(json['scrappedDate'])
     ..platform = (json['platform'] as Map<String, dynamic>?)?['name'] as String?
+    ..platformUuid =
+        (json['platform'] as Map<String, dynamic>?)?['id'] as String?
     ..imagePath = json['imagePath'] as String?
     ..notes = json['notes'] as String?
     ..tags = ((json['tags'] as List<dynamic>?) ?? const [])
@@ -55,13 +57,16 @@ Map<String, dynamic> deviceToApi(Device device) {
   final category = device.category.value;
   final isVirtual =
       device.cycleType != null ||
-      CategoryConfig.getMajorCategory(category?.name) == '虚拟订阅';
+      (category?.parentName ??
+              CategoryConfig.getMajorCategory(category?.name)) ==
+          '虚拟订阅';
 
   return {
     'name': device.name,
     'price': device.price,
     'purchaseDate': device.purchaseDate.toIso8601String(),
     if (category?.uuid != null) 'categoryId': category!.uuid,
+    if (device.platformUuid != null) 'platformId': device.platformUuid,
     if (device.notes != null) 'notes': device.notes,
     'tags': device.tags,
     'isVirtual': isVirtual,

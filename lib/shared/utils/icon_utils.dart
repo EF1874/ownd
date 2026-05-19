@@ -203,6 +203,21 @@ class IconUtils {
     'MdiIcons.tag': MdiIcons.tag,
     'MdiIcons.viewDashboard': MdiIcons.viewDashboard,
     'MdiIcons.dotsHorizontal': MdiIcons.dotsHorizontal,
+    'MdiIcons.shopping': MdiIcons.shopping,
+    'MdiIcons.cat': MdiIcons.cat,
+    'MdiIcons.dog': MdiIcons.dog,
+    'MdiIcons.accountGroup': MdiIcons.accountGroup,
+    'MdiIcons.store': MdiIcons.store,
+    'MdiIcons.tagHeart': MdiIcons.tagHeart,
+    'MdiIcons.notebook': MdiIcons.notebook,
+    'MdiIcons.recycle': MdiIcons.recycle,
+    'MdiIcons.kangaroo': MdiIcons.kangaroo,
+    'MdiIcons.cow': MdiIcons.cow,
+    'MdiIcons.carrot': MdiIcons.carrot,
+    'MdiIcons.cartVariant': MdiIcons.cartVariant,
+    'MdiIcons.apple': MdiIcons.apple,
+    'MdiIcons.homeCity': MdiIcons.homeCity,
+    'MdiIcons.briefcase': MdiIcons.briefcase,
   };
 
   static IconData getIconData(String iconName) {
