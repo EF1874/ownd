@@ -26,15 +26,18 @@ export class MinioService {
     const endPoint = this.getRequiredConfig('MINIO_ENDPOINT');
     const accessKey = this.getRequiredConfig('MINIO_ROOT_USER');
     const secretKey = this.getRequiredConfig('MINIO_ROOT_PASSWORD');
+    const port = Number(this.configService.get<string>('MINIO_PORT') ?? 9000);
+    const useSSL = this.configService.get<string>('MINIO_USE_SSL') === 'true';
 
     this.client = new Minio.Client({
-      port: 9000,
+      port,
       endPoint,
       accessKey,
       secretKey,
-      useSSL: false,
+      useSSL,
     });
-    this.bucketName = 'ownd-items';
+    this.bucketName =
+      this.configService.get<string>('MINIO_BUCKET') ?? 'ownd-items';
   }
 
   async initBucket() {

@@ -14,6 +14,15 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: WinstonModule.createLogger(winstonConfig),
   });
+  const configService = app.get(ConfigService);
+  const corsOrigin = configService.get<string>('CORS_ORIGIN');
+
+  if (corsOrigin) {
+    app.enableCors({
+      origin: corsOrigin.split(',').map((origin) => origin.trim()),
+      credentials: true,
+    });
+  }
 
   app.setGlobalPrefix('api/v1');
 
@@ -43,12 +52,12 @@ async function bootstrap() {
   );
 
   // 全局错误过滤器
-  const configService = app.get(ConfigService);
   app.useGlobalFilters(
     new HttpExceptionFilter(),
     new PrismaClientExceptionFilter(configService),
   );
 
-  await app.listen(3000);
+  const port = Number(configService.get<string>('PORT') ?? 3000);
+  await app.listen(port);
 }
 void bootstrap();

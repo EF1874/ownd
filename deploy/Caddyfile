@@ -1,0 +1,11 @@
+{$API_DOMAIN} {
+	reverse_proxy api:3000
+}
+
+{$MINIO_DOMAIN} {
+	reverse_proxy minio:9000
+}
+
+{$MINIO_CONSOLE_DOMAIN} {
+	reverse_proxy minio:9001
+}
