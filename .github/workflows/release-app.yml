@@ -1,0 +1,109 @@
+name: Release App
+
+on:
+  push:
+    tags:
+      - 'v*'
+    branches:
+      - 'master'
+    paths:
+      - 'ownd-app/pubspec.yaml'
+      - 'ownd-app/config/prod.json'
+      - '.github/workflows/release-app.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ownd-app
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Get Version
+        id: get_version
+        shell: bash
+        run: |
+          VERSION=$(grep 'version:' pubspec.yaml | cut -d ' ' -f 2 | cut -d '+' -f 1)
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Detected Version: $VERSION"
+
+      - name: Check and Create Tag
+        id: check_tag
+        shell: bash
+        run: |
+          VERSION=${{ steps.get_version.outputs.VERSION }}
+          TAG_NAME="v$VERSION"
+          
+          # Fetch tags to ensure we can check for existence
+          git fetch --tags
+          
+          SHOULD_BUILD="false"
+
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+              echo "Event is a tag push. Proceeding with build."
+              SHOULD_BUILD="true"
+          else
+              if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+                echo "Tag $TAG_NAME already exists. Skipping build."
+                SHOULD_BUILD="false"
+              else
+                echo "Tag $TAG_NAME does not exist. Creating new release tag..."
+                git config --global user.name "GitHub Actions"
+                git config --global user.email "actions@github.com"
+                git tag $TAG_NAME
+                git push origin $TAG_NAME
+                SHOULD_BUILD="true"
+              fi
+          fi
+          
+          echo "SHOULD_BUILD=$SHOULD_BUILD" >> $GITHUB_OUTPUT
+
+      - name: Setup Java
+        if: steps.check_tag.outputs.SHOULD_BUILD == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        if: steps.check_tag.outputs.SHOULD_BUILD == 'true'
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Install Dependencies
+        if: steps.check_tag.outputs.SHOULD_BUILD == 'true'
+        run: flutter pub get
+
+      - name: Build APK
+        if: steps.check_tag.outputs.SHOULD_BUILD == 'true'
+        shell: bash
+        run: |
+          API_BASE_URL=$(python -c "import json; print(json.load(open('config/prod.json'))['OWND_API_BASE_URL'])")
+          flutter build apk --split-per-abi --release --build-number=${{ github.run_number }} --dart-define=OWND_API_BASE_URL="$API_BASE_URL"
+
+      - name: Rename APK
+        if: steps.check_tag.outputs.SHOULD_BUILD == 'true'
+        run: |
+          cd build/app/outputs/flutter-apk/
+          for file in app-*-release.apk; do
+            ABI=$(echo $file | sed 's/app-\(.*\)-release.apk/\1/')
+            mv "$file" "Ownd_v${{ steps.get_version.outputs.VERSION }}_${ABI}.apk"
+          done
+
+      - name: Create Release
+        if: steps.check_tag.outputs.SHOULD_BUILD == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.get_version.outputs.VERSION }}
+          files: ownd-app/build/app/outputs/flutter-apk/Ownd_v*.apk
+          generate_release_notes: true
