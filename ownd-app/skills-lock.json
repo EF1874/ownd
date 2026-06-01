@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "skills": {
+    "flutter-animating-apps": {
+      "source": "flutter/skills",
+      "sourceType": "github",
+      "computedHash": "df4443b32d5d2f266a3fd4f58e4bff44f6ed6264df723a904d5ef3108785db18"
+    },
+    "flutter-building-layouts": {
+      "source": "flutter/skills",
+      "sourceType": "github",
+      "computedHash": "1010c7fbc41061aa1c7d215cbea36cb9ffbb851bd33aea2e4175f74215e7b602"
+    },
+    "flutter-expert": {
+      "source": "jeffallan/claude-skills",
+      "sourceType": "github",
+      "computedHash": "d260811d0d6d769174e0615ae06e189a67ee04c70e6cf57b19e9096be2d205f1"
+    },
+    "flutter-theming-apps": {
+      "source": "flutter/skills",
+      "sourceType": "github",
+      "computedHash": "03f05d2aaad597d1a74c2e82d127088a5a822da79e00e3e77dd65449c9db7f7b"
+    },
+    "flutter-ui-ux": {
+      "source": "ajianaz/skills-collection",
+      "sourceType": "github",
+      "computedHash": "9e74fa709465fa235164ce83b4407708f1fc5205feb0e889495d1e387f544d15"
+    },
+    "persona-project-manager": {
+      "source": "googleworkspace/cli",
+      "sourceType": "github",
+      "computedHash": "f10c39a32470bbf10df20b438438935fcd030286c70f75f2f4dade9ada444011"
+    },
+    "product-manager-toolkit": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "computedHash": "3ba3f08befb53b2de4459a5da008b4a56943cbc3728a2644656535da941cda1d"
+    }
+  }
+}

@@ -1,0 +1,89 @@
+name: ownd
+description: 'A new Flutter project.'
+publish_to: 'none'
+version: 1.1.0
+
+environment:
+    sdk: '>=3.10.0 <4.0.0'
+
+dependencies:
+    flutter:
+        sdk: flutter
+    flutter_localizations:
+        sdk: flutter
+    cupertino_icons: ^1.0.2
+
+    # State Management
+    flutter_riverpod: ^2.5.1
+    riverpod_annotation: ^2.3.5
+
+    # Database
+    isar: ^3.1.0+1
+    isar_flutter_libs: ^3.1.0+1
+    path_provider: ^2.1.2
+
+    # Navigation
+    go_router: ^14.0.0
+
+    # UI & Utilities
+    flutter_animate: ^4.5.0
+    intl: any
+    uuid: ^4.3.3
+    gap: ^3.0.0
+    archive: ^3.3.7
+    path: ^1.8.3
+
+    # File & Share
+    share_plus: ^9.0.0
+    file_picker: ^8.0.0
+    flutter_displaymode: ^0.6.0
+    url_launcher: ^6.1.14
+    flutter_slidable: ^4.0.3
+    permission_handler: ^12.0.1
+    android_intent_plus: ^6.0.0
+    open_file: ^3.3.2
+    open_file_macos: any
+    shared_preferences: ^2.5.3
+    material_design_icons_flutter: ^7.0.7296
+    flutter_local_notifications: ^19.5.0
+    flutter_timezone: ^5.0.1
+    image_cropper: ^11.0.0
+    image_picker: ^1.2.1
+    package_info_plus: ^9.0.0
+    fl_chart: ^1.2.0
+    collection: ^1.19.1
+    timezone: ^0.10.1
+    dio: ^5.9.2
+    flutter_secure_storage: ^10.2.0
+
+dev_dependencies:
+    flutter_test:
+        sdk: flutter
+    flutter_lints: ^3.0.0
+
+    # Code Generation
+    build_runner: ^2.4.8
+    riverpod_generator: ^2.4.0
+    isar_generator: ^3.1.0+1
+    flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+    android: 'launcher_icon'
+    ios: true
+    image_path: 'assets/icon.png'
+    min_sdk_android: 21 # android min sdk min:16, default 21
+    web:
+        generate: true
+        image_path: 'assets/icon.png'
+        background_color: '#hex_code'
+        theme_color: '#hex_code'
+    windows:
+        generate: true
+        image_path: 'assets/icon.png'
+        icon_size: 48 # min:48, max:256, default: 48
+    macos:
+        generate: true
+        image_path: 'assets/icon.png'
+
+flutter:
+    uses-material-design: true
