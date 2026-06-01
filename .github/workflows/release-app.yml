@@ -25,6 +25,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Get Version
         id: get_version
@@ -86,7 +88,7 @@ jobs:
         if: steps.check_tag.outputs.SHOULD_BUILD == 'true'
         shell: bash
         run: |
-          API_BASE_URL=$(python -c "import json; print(json.load(open('config/prod.json'))['OWND_API_BASE_URL'])")
+          API_BASE_URL=$(jq -r '.OWND_API_BASE_URL' config/prod.json)
           flutter build apk --split-per-abi --release --build-number=${{ github.run_number }} --dart-define=OWND_API_BASE_URL="$API_BASE_URL"
 
       - name: Rename APK
