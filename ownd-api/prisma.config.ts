@@ -3,8 +3,10 @@
 import * as dotenv from 'dotenv';
 import { defineConfig } from 'prisma/config';
 
-// 显式加载我们的测试/开发环境配置
-dotenv.config({ path: '.env.development' });
+// 根据当前 NODE_ENV 动态加载对应的环境配置文件
+const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.env.development';
+dotenv.config({ path: envFile });
+
 export default defineConfig({
   schema: 'prisma/schema.prisma',
   migrations: {

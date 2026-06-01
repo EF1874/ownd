@@ -6,7 +6,7 @@ services:
     restart: unless-stopped
     env_file:
       - path: .env.production
-        required: false
+        required: true
     depends_on:
       postgres:
         condition: service_healthy
@@ -17,17 +17,13 @@ services:
 
   postgres:
     image: postgres:16-alpine
-    container_name: ownd-postgres
+    container_name: ownd-postgres-prod
     restart: unless-stopped
     env_file:
       - path: .env.production
-        required: false
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+        required: true
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data_prod:/var/lib/postgresql/data
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
       interval: 10s
@@ -36,42 +32,39 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: ownd-redis
+    container_name: ownd-redis-prod
     restart: unless-stopped
     expose:
       - '6379'
 
   minio:
     image: minio/minio
-    container_name: ownd-minio
+    container_name: ownd-minio-prod
     restart: unless-stopped
     env_file:
       - path: .env.production
-        required: false
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+        required: true
     command: server /data --console-address ':9001'
     volumes:
-      - minio_data:/data
+      - minio_data_prod:/data
     expose:
       - '9000'
       - '9001'
 
   caddy:
     image: caddy:2-alpine
-    container_name: ownd-caddy
+    container_name: ownd-caddy-prod
     restart: unless-stopped
     env_file:
       - path: .env.production
-        required: false
+        required: true
     ports:
       - '80:80'
       - '443:443'
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
+      - caddy_data_prod:/data
+      - caddy_config_prod:/config
     depends_on:
       - api
       - minio
@@ -79,16 +72,17 @@ services:
 
   blog:
     image: halohub/halo:2.20
-    container_name: ownd-blog
+    container_name: ownd-blog-prod
     restart: unless-stopped
     expose:
       - '8090'
     volumes:
-      - ./blog_data:/root/.halo2
+      - ./blog_data_prod:/root/.halo2
 
 volumes:
-  postgres_data:
-  minio_data:
-  caddy_data:
-  caddy_config:
+  postgres_data_prod:
+  minio_data_prod:
+  caddy_data_prod:
+  caddy_config_prod:
+
 
