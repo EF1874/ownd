@@ -1,0 +1,20 @@
+# API 服务 (自动 HTTPS)
+api.ownd.cc {
+	reverse_proxy api:3000
+}
+
+# MinIO API 服务 (自动 HTTPS)
+minio.ownd.cc {
+	reverse_proxy minio:9000
+}
+
+# MinIO 控制台 (自动 HTTPS)
+console.ownd.cc {
+	reverse_proxy minio:9001
+}
+
+# Halo 个人博客 (自动 HTTPS)
+blog.ownd.cc {
+	reverse_proxy blog:8090
+}
+

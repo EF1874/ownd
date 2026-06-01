@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  # 1. 关系型数据库：存储所有核心业务数据（物品、用户、分类）
+  postgres:
+    image: postgres:16-alpine # 使用轻量级版本，稳定且占用空间小
+    container_name: ownd-postgres
+    ports:
+      - '5432:5432' # 映射格式：[宿主机端口]:[容器内端口]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    env_file:
+      - .env.development
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # 数据持久化，防止容器重启后数据丢失
+
+  # 2. 缓存：用于统计数据提速和接口限流
+  redis:
+    image: redis:7-alpine
+    container_name: ownd-redis
+    ports:
+      - '6379:6379'
+
+  # 3. 对象存储：专门存储物品的照片、附件（企业级替代方案，不直接存本地硬盘）
+  minio:
+    image: minio/minio
+    container_name: ownd-minio
+    ports:
+      - '9000:9000' # API 端口
+      - '9001:9001' # 控制台界面端口
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    env_file:
+      - .env.development
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+
+volumes:
+  postgres_data:
+  minio_data:

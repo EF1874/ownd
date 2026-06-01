@@ -1,0 +1,94 @@
+services:
+  api:
+    build:
+      context: .
+    container_name: ownd-api
+    restart: unless-stopped
+    env_file:
+      - path: .env.production
+        required: false
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    expose:
+      - '3000'
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: ownd-postgres
+    restart: unless-stopped
+    env_file:
+      - path: .env.production
+        required: false
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: ownd-redis
+    restart: unless-stopped
+    expose:
+      - '6379'
+
+  minio:
+    image: minio/minio
+    container_name: ownd-minio
+    restart: unless-stopped
+    env_file:
+      - path: .env.production
+        required: false
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    command: server /data --console-address ':9001'
+    volumes:
+      - minio_data:/data
+    expose:
+      - '9000'
+      - '9001'
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: ownd-caddy
+    restart: unless-stopped
+    env_file:
+      - path: .env.production
+        required: false
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - minio
+      - blog
+
+  blog:
+    image: halohub/halo:2.20
+    container_name: ownd-blog
+    restart: unless-stopped
+    expose:
+      - '8090'
+    volumes:
+      - ./blog_data:/root/.halo2
+
+volumes:
+  postgres_data:
+  minio_data:
+  caddy_data:
+  caddy_config:
+
