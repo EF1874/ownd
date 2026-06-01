@@ -5,6 +5,7 @@
   "scripts": {
     "android:dev": "node scripts/build.mjs android dev debug",
     "android:prod": "node scripts/build.mjs android prod release",
+    "android:prod:debug": "node scripts/build.mjs android prod debug",
     "android:aab": "node scripts/build.mjs android:aab prod release",
     "ios:prod": "node scripts/build.mjs ios prod release",
     "windows:prod": "node scripts/build.mjs windows prod release",
