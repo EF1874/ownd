@@ -5,7 +5,6 @@ import 'package:archive/archive_io.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' hide Category;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../../core/network/api_client.dart';
@@ -388,5 +387,14 @@ class DataTransferService {
       'DAY' || 'WEEK' || 'MONTH' || 'QUARTER' || 'YEAR' => value,
       _ => null,
     };
+  }
+
+  Future<String> getBackupDirectoryPath() async {
+    if (Platform.isAndroid) {
+      return '/storage/emulated/0/Download/DeviceManager';
+    }
+    final downloadDir = await getDownloadsDirectory();
+    final baseDir = downloadDir ?? await getApplicationDocumentsDirectory();
+    return '${baseDir.path}/DeviceManager';
   }
 }
