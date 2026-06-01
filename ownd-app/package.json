@@ -1,7 +1,7 @@
 {
   "name": "ownd-app",
   "private": true,
-  "version": "2.0.1",
+  "version": "2.0.0",
   "scripts": {
     "android:dev": "node scripts/build.mjs android dev debug",
     "android:prod": "node scripts/build.mjs android prod release",
