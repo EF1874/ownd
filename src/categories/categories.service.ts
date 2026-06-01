@@ -34,11 +34,12 @@ export class CategoriesService {
   async findAll(userId: string) {
     const cacheKey = `user:${userId}:categories`;
     try {
-      const cached = await this.cacheManager.get<any[]>(cacheKey);
+      const cached =
+        await this.cacheManager.get<CategoryWithChildren[]>(cacheKey);
       if (cached) {
         return cached;
       }
-    } catch (err) {
+    } catch {
       // ignore
     }
 
@@ -56,7 +57,7 @@ export class CategoriesService {
     const result = this.buildTree(categories);
     try {
       await this.cacheManager.set(cacheKey, result, 600000); // 缓存 10 分钟
-    } catch (err) {
+    } catch {
       // ignore
     }
     return result;
@@ -103,7 +104,7 @@ export class CategoriesService {
     userId: string,
     updateCategoryDto: UpdateCategoryDto,
   ) {
-    const category = await this.findOne(id, userId);
+    await this.findOne(id, userId);
     if (updateCategoryDto.parentId) {
       await this.findOne(updateCategoryDto.parentId, userId);
     }
@@ -129,7 +130,7 @@ export class CategoriesService {
   private async clearCache(userId: string) {
     try {
       await this.cacheManager.del(`user:${userId}:categories`);
-    } catch (err) {
+    } catch {
       // ignore
     }
   }
