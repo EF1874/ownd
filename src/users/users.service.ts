@@ -1,10 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import * as cacheManager from 'cache-manager';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private cacheManager: cacheManager.Cache,
+  ) {}
 
   // 注册：创建新用户
   async create(email: string, pass: string, name?: string) {
@@ -38,8 +43,29 @@ export class UsersService {
    * @returns 用户对象
    */
   async findById(userId: string) {
-    return this.prisma.user.findUnique({
+    const cacheKey = `user:profile:${userId}`;
+    try {
+      const cached =
+        await this.cacheManager.get<import('@prisma/client').User>(cacheKey);
+      if (cached) {
+        return cached;
+      }
+    } catch {
+      // ignore
+    }
+
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
+
+    if (user) {
+      try {
+        await this.cacheManager.set(cacheKey, user, 300000); // 缓存 5 分钟
+      } catch {
+        // ignore
+      }
+    }
+
+    return user;
   }
 }

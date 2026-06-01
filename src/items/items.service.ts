@@ -2,6 +2,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Inject,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateItemDto } from './dto/create-item.dto';
@@ -9,10 +10,26 @@ import { UpdateItemDto } from './dto/update-item.dto';
 import { CreateItemHistoryDto } from './dto/create-item-history.dto';
 import { ItemCycleType, ItemRecordType, Prisma } from '@prisma/client';
 import dayjs from 'dayjs';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import * as cacheManager from 'cache-manager';
+
+type ItemWithRelations = Prisma.ItemGetPayload<{
+  include: {
+    category: { include: { parent: true } };
+    platform: true;
+    itemHistories: {
+      orderBy: { startDate: 'desc' };
+      take: 1;
+    };
+  };
+}>;
 
 @Injectable()
 export class ItemsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private cacheManager: cacheManager.Cache,
+  ) {}
 
   private readonly itemInclude = {
     category: { include: { parent: true } },
@@ -58,7 +75,7 @@ export class ItemsService {
     }
 
     // 3. 事务性创建物品和历史记录
-    return this.prisma.item.create({
+    const created = await this.prisma.item.create({
       data: {
         ...data,
         imagePath,
@@ -73,6 +90,8 @@ export class ItemsService {
       },
       include: this.itemInclude,
     });
+    await this.clearCache(userId);
+    return created;
   }
 
   /**
@@ -104,7 +123,17 @@ export class ItemsService {
   }
 
   async findAll(userId: string) {
-    return this.prisma.item.findMany({
+    const cacheKey = `user:${userId}:items`;
+    try {
+      const cached = await this.cacheManager.get<ItemWithRelations[]>(cacheKey);
+      if (cached) {
+        return cached;
+      }
+    } catch {
+      // ignore
+    }
+
+    const items = await this.prisma.item.findMany({
       where: { userId },
       include: {
         category: { include: { parent: true } },
@@ -115,6 +144,14 @@ export class ItemsService {
         },
       },
     });
+
+    try {
+      await this.cacheManager.set(cacheKey, items, 600000); // 缓存 10 分钟
+    } catch {
+      // ignore
+    }
+
+    return items;
   }
 
   async findOne(userId: string, id: string) {
@@ -145,7 +182,7 @@ export class ItemsService {
     await this.ensureCategoryAccess(userId, categoryId);
     await this.ensurePlatformAccess(userId, platformId);
 
-    return this.prisma.item.update({
+    const updated = await this.prisma.item.update({
       where: { id },
       data: {
         ...data,
@@ -158,6 +195,8 @@ export class ItemsService {
         platform: true,
       },
     });
+    await this.clearCache(userId);
+    return updated;
   }
 
   private async ensureCategoryAccess(userId: string, categoryId?: string) {
@@ -192,19 +231,23 @@ export class ItemsService {
 
   async updateImagePath(userId: string, id: string, imagePath: string) {
     await this.findOne(userId, id);
-    return this.prisma.item.update({
+    const updated = await this.prisma.item.update({
       where: { id },
       data: { imagePath },
     });
+    await this.clearCache(userId);
+    return updated;
   }
 
   async remove(userId: string, id: string) {
     // 先检查是否存在
     await this.findOne(userId, id);
 
-    return this.prisma.item.delete({
+    const deleted = await this.prisma.item.delete({
       where: { id },
     });
+    await this.clearCache(userId);
+    return deleted;
   }
 
   // --- 历史记录管理 (ItemHistory) ---
@@ -214,7 +257,7 @@ export class ItemsService {
     await this.findOne(userId, itemId);
 
     // 2. 事务处理：创建历史记录 + (如果是续费) 更新物品账单日
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const history = await tx.itemHistory.create({
         data: {
           ...dto,
@@ -233,6 +276,8 @@ export class ItemsService {
 
       return history;
     });
+    await this.clearCache(userId);
+    return result;
   }
 
   async findHistories(userId: string, itemId: string) {
@@ -258,8 +303,19 @@ export class ItemsService {
       throw new NotFoundException('历史记录不存在或不属于该物品');
     }
 
-    return this.prisma.itemHistory.delete({
+    const deleted = await this.prisma.itemHistory.delete({
       where: { id: historyId },
     });
+    await this.clearCache(userId);
+    return deleted;
+  }
+
+  private async clearCache(userId: string) {
+    try {
+      await this.cacheManager.del(`user:${userId}:items`);
+      await this.cacheManager.del(`user:stats:${userId}`);
+    } catch {
+      // ignore
+    }
   }
 }

@@ -1,4 +1,5 @@
 import {
+  Inject,
   Injectable,
   ForbiddenException,
   NotFoundException,
@@ -6,24 +7,44 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePlatformDto } from './dto/create-platform.dto';
 import { UpdatePlatformDto } from './dto/update-platform.dto';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import * as cacheManager from 'cache-manager';
 
 @Injectable()
 export class PlatformService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private cacheManager: cacheManager.Cache,
+  ) {}
 
   async create(userId: string, createPlatformDto: CreatePlatformDto) {
-    return this.prisma.platform.create({
+    const result = await this.prisma.platform.create({
       data: {
         ...createPlatformDto,
         userId,
       },
     });
+    await this.clearCache(userId);
+    return result;
   }
 
   async findAll(userId: string) {
+    const cacheKey = `user:platforms:${userId}`;
+    try {
+      const cached =
+        await this.cacheManager.get<import('@prisma/client').Platform[]>(
+          cacheKey,
+        );
+      if (cached) {
+        return cached;
+      }
+    } catch {
+      // ignore
+    }
+
     await this.ensureUserDefaultPlatforms(userId);
 
-    return this.prisma.platform.findMany({
+    const platforms = await this.prisma.platform.findMany({
       where: {
         userId,
       },
@@ -31,6 +52,14 @@ export class PlatformService {
         createdAt: 'asc',
       },
     });
+
+    try {
+      await this.cacheManager.set(cacheKey, platforms, 600000); // 缓存 10 分钟
+    } catch {
+      // ignore
+    }
+
+    return platforms;
   }
 
   async findOne(id: string, userId: string) {
@@ -66,10 +95,12 @@ export class PlatformService {
       throw new ForbiddenException('你没有权限修改此平台');
     }
 
-    return this.prisma.platform.update({
+    const result = await this.prisma.platform.update({
       where: { id },
       data: updatePlatformDto,
     });
+    await this.clearCache(userId);
+    return result;
   }
 
   async remove(id: string, userId: string) {
@@ -85,9 +116,19 @@ export class PlatformService {
       throw new ForbiddenException('你没有权限删除此平台');
     }
 
-    return this.prisma.platform.delete({
+    const result = await this.prisma.platform.delete({
       where: { id },
     });
+    await this.clearCache(userId);
+    return result;
+  }
+
+  private async clearCache(userId: string) {
+    try {
+      await this.cacheManager.del(`user:platforms:${userId}`);
+    } catch {
+      // ignore
+    }
   }
 
   private async ensureUserDefaultPlatforms(userId: string) {

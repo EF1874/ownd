@@ -11,10 +11,12 @@ import { CategoriesModule } from './categories/categories.module';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { StatisticsModule } from './statistics/statistics.module';
 import { PlatformModule } from './platform/platform.module';
-import { APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { CacheModule } from '@nestjs/cache-manager';
 import { redisStore } from 'cache-manager-redis-yet';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerStorageRedisService } from 'nestjs-throttler-storage-redis';
 
 @Module({
   imports: [
@@ -46,6 +48,32 @@ import { redisStore } from 'cache-manager-redis-yet';
       },
       inject: [ConfigService],
     }),
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        const host = configService.get<string>('REDIS_HOST', 'localhost');
+        const port = Number(configService.get<string>('REDIS_PORT', '6379'));
+        return {
+          throttlers: [
+            {
+              name: 'default',
+              ttl: 60000,
+              limit: 100,
+            },
+            {
+              name: 'auth',
+              ttl: 60000,
+              limit: 10,
+            },
+          ],
+          storage: new ThrottlerStorageRedisService({
+            host,
+            port,
+          }),
+        };
+      },
+    }),
     ScheduleModule.forRoot(),
     PrismaModule,
     AuthModule,
@@ -61,6 +89,10 @@ import { redisStore } from 'cache-manager-redis-yet';
     {
       provide: APP_INTERCEPTOR,
       useClass: AuditInterceptor,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
     },
   ],
 })

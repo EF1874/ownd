@@ -1,15 +1,31 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import dayjs from 'dayjs';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import * as cacheManager from 'cache-manager';
 
 @Injectable()
 export class StatisticsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(CACHE_MANAGER) private cacheManager: cacheManager.Cache,
+  ) {}
 
   /**
    * 获取用户资产概览统计
    */
   async getSummary(userId: string) {
+    const cacheKey = `user:stats:${userId}`;
+    try {
+      const cached =
+        await this.cacheManager.get<Record<string, unknown>>(cacheKey);
+      if (cached) {
+        return cached;
+      }
+    } catch {
+      // ignore cache get error
+    }
+
     const items = await this.prisma.item.findMany({
       where: { userId },
       include: {
@@ -43,13 +59,21 @@ export class StatisticsService {
       dailyAverage = totalTco / Math.max(days, 1);
     }
 
-    return {
+    const result = {
       itemCount: items.length,
       totalOriginalPrice,
       totalHistoryExpense,
       totalTco,
       dailyAverage: parseFloat(dailyAverage.toFixed(2)),
     };
+
+    try {
+      await this.cacheManager.set(cacheKey, result, 600000); // 缓存 10 分钟
+    } catch {
+      // ignore cache set error
+    }
+
+    return result;
   }
 
   /**
