@@ -60,12 +60,12 @@ jobs:
           cd build/app/outputs/flutter-apk/
           for file in app-*-release.apk; do
             ABI=$(echo $file | sed 's/app-\(.*\)-release.apk/\1/')
-            mv "$file" "Ownd_v${{ steps.get_version.outputs.VERSION }}_${ABI}.apk"
+            mv "$file" "ownd_v${{ steps.get_version.outputs.VERSION }}_${ABI}.apk"
           done
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.get_version.outputs.VERSION }}
-          files: ownd-app/build/app/outputs/flutter-apk/Ownd_v*.apk
+          files: ownd-app/build/app/outputs/flutter-apk/ownd_v*.apk
           generate_release_notes: true
