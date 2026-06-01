@@ -1,86 +1,129 @@
-# Ownd - 个人数字资产管理平台
+<p align="center">
+  <img src="ownd-app/assets/icon.png" width="120" alt="Ownd Logo" />
+</p>
 
-Ownd 是一个全栈的个人数字资产与订阅管理平台，采用前后端分离的架构：
-- **后端**：使用 NestJS + PostgreSQL + Prisma + Redis + MinIO 搭建，支持分布式部署及高性能缓存。
-- **前端**：使用 Flutter 跨平台框架构建，支持 Android、iOS 以及桌面端，提供流畅的移动端交互体验。
+<h1 align="center">Ownd — 物记</h1>
+<p align="center">
+  <b>个人数字资产管理平台</b><br/>
+  追踪你拥有的每一件物品、订阅和数字资产
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Flutter-3.41-02569B?logo=flutter" />
+  <img src="https://img.shields.io/badge/NestJS-11-E0234E?logo=nestjs" />
+  <img src="https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white" />
+  <img src="https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white" />
+  <img src="https://img.shields.io/badge/License-MIT-green" />
+</p>
+
+---
+
+## ✨ 功能亮点
+
+- 📦 **物品全生命周期管理** — 记录购买、使用、转手、退役的完整历史
+- 📊 **资产统计看板** — TCO 总拥有成本、日均持有支出等实时数据分析
+- 🏷️ **分类与平台标签** — 自定义分类体系，追踪购买渠道与平台
+- 🔒 **安全认证** — JWT 令牌 + Redis 黑名单机制
+- ☁️ **云端同步** — MinIO 对象存储，支持图片上传与备份
+- 🚀 **一键部署** — Docker Compose 生产环境一键启动
+- 📝 **个人博客** — 集成 Halo 博客系统，通过 `blog.ownd.cc` 访问
+
+---
+
+## 🏗️ 技术架构
+
+| 层级 | 技术栈 |
+|------|--------|
+| **移动端** | Flutter 3.41 · Dart · Riverpod · Isar |
+| **后端 API** | NestJS 11 · TypeScript · Prisma ORM |
+| **数据库** | PostgreSQL 16 · Redis 7 |
+| **对象存储** | MinIO (S3 兼容) |
+| **反向代理** | Caddy 2 (自动 HTTPS) |
+| **博客** | Halo 2.20 |
+| **CI/CD** | GitHub Actions |
 
 ---
 
 ## 📂 项目目录结构
 
-当前项目采用 **多仓库联合（Git Submodules）** 的元仓库架构进行管理：
+本项目采用 **单体大仓 (Monorepo)** 架构，前后端代码统一管理：
 
 ```text
-ownd/ (总仓库)
-├── .github/                # GitHub Actions 自动化流水线配置
-│   └── workflows/
-│       ├── deploy-backend.yml # 后端自动部署流水线
-│       └── release-app.yml    # 移动端 App 自动编译打包流水线
-├── .vscode/                # VS Code 推荐开发环境配置
-├── docs/                   # 项目深度设计与运维文档
-│   ├── deployment-vps.md   # 服务器 VPS 部署指南
-│   ├── api-reference.md    # 后端 API 接口设计参考
-│   └── frontend-integration.md # 前后端接口联调说明
-├── ownd-api/               # [Git Submodule] 后端 NestJS 项目目录
-└── ownd-app/               # [Git Submodule] 前端 Flutter 移动端项目目录
+ownd/
+├── .github/workflows/          # CI/CD 自动化流水线
+│   ├── deploy-backend.yml      #   后端自动部署到云服务器
+│   └── release-app.yml         #   App 自动编译打包并发布 Release
+├── ownd-api/                   # 后端 NestJS 项目
+│   ├── src/                    #   业务源码 (auth, items, categories, etc.)
+│   ├── prisma/                 #   数据库 Schema 与迁移文件
+│   ├── deploy/                 #   Caddy 反向代理配置
+│   ├── docker-compose.yaml     #   本地开发容器编排
+│   └── docker-compose.prod.yaml#   生产环境容器编排
+├── ownd-app/                   # 前端 Flutter 移动端项目
+│   ├── lib/                    #   Dart 业务源码
+│   ├── android/                #   Android 原生配置
+│   ├── ios/                    #   iOS 原生配置
+│   └── config/                 #   环境配置 (dev.json / prod.json)
+└── README.md
 ```
 
 ---
 
-## 🚀 开发者快速上手
+## 🚀 快速开始
 
-### 1. 克隆项目
-由于项目包含 Git 子模块，克隆时必须携带 `--recursive` 参数以完整拉取子项目源码：
+### 克隆项目
+
 ```bash
-git clone --recursive https://github.com/your-username/ownd.git
-```
-如果已经克隆了总仓库，但子项目文件夹为空，请运行以下命令进行初始化：
-```bash
-git submodule update --init --recursive
+git clone https://github.com/EF1874/ownd.git
+cd ownd
 ```
 
-### 2. 本地开发环境启动
+### 后端开发 (ownd-api)
 
-#### 后端开发环境 (ownd-api)
-1. 安装并进入依赖：
-   ```bash
-   cd ownd-api
-   pnpm install
-   ```
-2. 确保本地拥有 Docker 并运行基础设施（数据库、Redis、MinIO 等）：
-   ```bash
-   docker compose up -d
-   ```
-3. 复制本地开发环境变量配置：
-   ```bash
-   cp .env.example .env.development
-   ```
-4. 运行 Prisma 迁移以初始化数据库表结构：
-   ```bash
-   npx prisma migrate dev
-   ```
-5. 启动后端服务：
-   ```bash
-   pnpm run start:dev
-   ```
+```bash
+cd ownd-api
+pnpm install                       # 安装依赖
+cp .env.example .env.development   # 配置本地环境变量
+docker compose up -d               # 启动 PostgreSQL / Redis / MinIO
+npx prisma migrate dev             # 初始化数据库
+npx prisma generate                # 生成 Prisma Client
+pnpm run start:dev                 # 启动开发服务器
+```
 
-#### 移动端开发环境 (ownd-app)
-1. 确保已安装 Flutter SDK（版本 3.41+），并在 `ownd-app` 目录下运行：
-   ```bash
-   cd ownd-app
-   flutter pub get
-   ```
-2. 选择开发环境配置并运行：
-   ```bash
-   flutter run --dart-define=OWND_API_BASE_URL="http://localhost:3000/api/v1"
-   ```
+### 移动端开发 (ownd-app)
+
+```bash
+cd ownd-app
+flutter pub get
+flutter run --dart-define=OWND_API_BASE_URL="http://localhost:3000/api/v1"
+```
+
+连接线上 API 进行调试：
+```bash
+flutter run --dart-define=OWND_API_BASE_URL="https://api.ownd.cc/api/v1"
+```
 
 ---
 
-## 🌐 自动化部署 (CI/CD) 说明
+## 🌐 自动化部署 (CI/CD)
 
-项目的所有自动化构建与部署已完全托管在 GitHub Actions 中：
-- **后端自动更新**：任何提交到 `master` 分支且涉及 `ownd-api/` 目录的修改，将自动触发云服务器（Tencent Cloud）的拉取和 `docker-compose.prod.yaml` 重建，实现零停机热升级。
-- **App 自动发布**：在总仓库中推送版本号 Tag（如 `v1.1.0`）或修改了 `ownd-app/pubspec.yaml` 时，将自动使用 JDK 17 构建 Android 生产环境 APK，并在 GitHub 上创建一个新的 Release 供用户下载。
+| 流水线 | 触发条件 | 功能 |
+|--------|----------|------|
+| **Deploy Backend** | 推送 `ownd-api/**` 到 `master` | SSH 登录云服务器，`git pull` 并 `docker compose up --build` |
+| **Release App** | 修改 `ownd-app/pubspec.yaml` 版本号 | 编译 Android Release APK，自动创建 GitHub Release |
 
-详细的运维配置及网络隔离（Caddy 端口隐蔽）请参见 [docs/deployment-vps.md](file:///c:/code/project/ownd/docs/deployment-vps.md)。
+---
+
+## 📱 线上服务
+
+| 服务 | 地址 |
+|------|------|
+| API | `https://api.ownd.cc` |
+| MinIO 控制台 | `https://console.ownd.cc` |
+| 个人博客 | `https://blog.ownd.cc` |
+
+---
+
+## 📄 License
+
+MIT © [EF1874](https://github.com/EF1874)
