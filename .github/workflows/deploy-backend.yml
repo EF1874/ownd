@@ -32,9 +32,10 @@ jobs:
           cd ownd-api
           pnpm install --frozen-lockfile
 
-      - name: Lint and Test
+      - name: Generate Prisma Client and Build
         run: |
           cd ownd-api
+          pnpm run prisma:generate
           # If you have unit tests, you can run them here
           # pnpm test
           pnpm run build
