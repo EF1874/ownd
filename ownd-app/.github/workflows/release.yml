@@ -79,9 +79,18 @@ jobs:
               if: steps.check_tag.outputs.SHOULD_BUILD == 'true'
               run: flutter pub get
 
+            - name: Decode Keystore
+              if: steps.check_tag.outputs.SHOULD_BUILD == 'true'
+              run: |
+                  echo "${{ secrets.OWND_KEYSTORE_BASE64 }}" | base64 --decode > android/app/ownd-release-key.jks
+
             - name: Build APK
               if: steps.check_tag.outputs.SHOULD_BUILD == 'true'
               shell: bash
+              env:
+                  OWND_KEYSTORE_PASSWORD: ${{ secrets.OWND_KEYSTORE_PASSWORD }}
+                  OWND_KEY_ALIAS: ${{ secrets.OWND_KEY_ALIAS }}
+                  OWND_KEY_PASSWORD: ${{ secrets.OWND_KEY_PASSWORD }}
               run: |
                   API_BASE_URL=$(python -c "import json; print(json.load(open('config/prod.json'))['OWND_API_BASE_URL'])")
                   flutter build apk --split-per-abi --release --build-number=${{ github.run_number }} --dart-define=OWND_API_BASE_URL="$API_BASE_URL"
