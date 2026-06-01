@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -18,6 +20,16 @@ final dioProvider = Provider<Dio>((ref) {
       receiveTimeout: const Duration(seconds: 20),
     ),
   );
+
+  // 针对公网 IP 自签名 HTTPS，配置客户端允许自签名证书
+  if (dio.httpClientAdapter is IOHttpClientAdapter) {
+    (dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
+      final client = HttpClient();
+      client.badCertificateCallback =
+          (X509Certificate cert, String host, int port) => true;
+      return client;
+    };
+  }
 
   dio.interceptors.add(
     InterceptorsWrapper(

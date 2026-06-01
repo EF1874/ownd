@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:archive/archive_io.dart';
-import 'package:file_picker/file_picker.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' hide Category;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
@@ -16,6 +16,7 @@ final dataTransferServiceProvider = Provider<DataTransferService>((ref) {
 
 class DataTransferService {
   final ApiClient _apiClient;
+  static const _channel = MethodChannel('com.antigravity.ownd/saf');
 
   DataTransferService(this._apiClient);
 
@@ -24,7 +25,7 @@ class DataTransferService {
     await createBackup(fileName: 'user_backup_$timestamp.zip');
   }
 
-  Future<File> createBackup({required String fileName}) async {
+  Future<String> createBackup({required String fileName}) async {
     final categories = await _apiClient.get<List<dynamic>>('/categories');
     final devices = await _apiClient.get<List<dynamic>>('/items');
 
@@ -65,114 +66,131 @@ class DataTransferService {
     await zipFileEncoder.addDirectory(stagingDir);
     await zipFileEncoder.close();
 
-    // Move ZIP to Output Directory
-    Directory? outputDir;
-    if (Platform.isAndroid) {
-      outputDir = Directory('/storage/emulated/0/Download/Ownd');
-    } else {
-      final downloadDir = await getDownloadsDirectory();
-      if (downloadDir != null) {
-        outputDir = Directory('${downloadDir.path}/Ownd');
-      }
-    }
-
-    if (outputDir == null) {
-      final docDir = await getApplicationDocumentsDirectory();
-      outputDir = Directory('${docDir.path}/Ownd');
-    }
-
-    if (!outputDir.existsSync()) {
-      outputDir.createSync(recursive: true);
-    }
-
-    final finalZipFile = File(p.join(outputDir.path, fileName));
-    await File(zipPath).copy(finalZipFile.path);
-
-    // Cleanup
+    // Cleanup staging
     await stagingDir.delete(recursive: true);
+
+    // Save to user-chosen directory via SAF
+    final zipBytes = await File(zipPath).readAsBytes();
     await File(zipPath).delete();
 
-    return finalZipFile;
+    final savedUri = await _saveViaSaf(fileName, zipBytes);
+    return savedUri;
+  }
+
+  Future<String> _saveViaSaf(String fileName, List<int> bytes) async {
+    // Check if user has already chosen a backup directory
+    String? directoryUri = await _channel.invokeMethod<String>(
+      'getSavedDirectoryUri',
+    );
+
+    // If not set, prompt user to pick a directory
+    directoryUri ??= await _channel.invokeMethod<String>('pickDirectory');
+
+    if (directoryUri == null) {
+      throw '未选择保存位置';
+    }
+
+    final base64Data = base64Encode(bytes);
+    final result = await _channel.invokeMethod<String>(
+      'createFileInDirectory',
+      {
+        'directoryUri': directoryUri,
+        'fileName': fileName,
+        'mimeType': 'application/zip',
+        'data': base64Data,
+      },
+    );
+
+    if (result == null) {
+      // Directory may have been deleted, clear and retry once
+      await _channel.invokeMethod('clearSavedDirectoryUri');
+      final newDir = await _channel.invokeMethod<String>('pickDirectory');
+      if (newDir == null) throw '未选择保存位置';
+
+      final retryResult = await _channel.invokeMethod<String>(
+        'createFileInDirectory',
+        {
+          'directoryUri': newDir,
+          'fileName': fileName,
+          'mimeType': 'application/zip',
+          'data': base64Data,
+        },
+      );
+      if (retryResult == null) throw '文件保存失败';
+      return retryResult;
+    }
+
+    return result;
   }
 
   Future<void> importData() async {
     try {
-      final result = await FilePicker.platform.pickFiles(type: FileType.any);
+      // Use SAF to pick a file (bypasses scoped storage restrictions)
+      final base64Data = await _channel.invokeMethod<String>('openFile');
+      if (base64Data == null) return; // User cancelled
 
-      if (result != null && result.files.single.path != null) {
-        final path = result.files.single.path!;
-        final file = File(path);
+      final bytes = base64Decode(base64Data);
 
-        Map<String, dynamic> data;
-        String? stagingPath;
+      Map<String, dynamic> data;
+      String? stagingPath;
 
-        // Detect if ZIP or JSON (Legacy support)
-        if (path.toLowerCase().endsWith('.zip')) {
-          final bytes = await file.readAsBytes();
-          final archive = ZipDecoder().decodeBytes(bytes);
+      // Try to detect if it's a ZIP file by checking magic bytes
+      final isZip = bytes.length >= 4 &&
+          bytes[0] == 0x50 &&
+          bytes[1] == 0x4B &&
+          bytes[2] == 0x03 &&
+          bytes[3] == 0x04;
 
-          final tempDir = await getTemporaryDirectory();
-          stagingPath =
-              '${tempDir.path}/import_staging_${DateTime.now().millisecondsSinceEpoch}';
-          await Directory(stagingPath).create();
+      if (isZip) {
+        final archive = ZipDecoder().decodeBytes(bytes);
 
-          // Extract all files
-          for (final file in archive) {
-            final filename = file.name;
-            if (file.isFile) {
-              final data = file.content as List<int>;
-              File('$stagingPath/$filename')
-                ..createSync(recursive: true)
-                ..writeAsBytesSync(data);
-            } else {
-              await Directory('$stagingPath/$filename').create(recursive: true);
-            }
+        final tempDir = await getTemporaryDirectory();
+        stagingPath =
+            '${tempDir.path}/import_staging_${DateTime.now().millisecondsSinceEpoch}';
+        await Directory(stagingPath).create();
+
+        for (final file in archive) {
+          if (file.isFile) {
+            final data = file.content as List<int>;
+            File('$stagingPath/${file.name}')
+              ..createSync(recursive: true)
+              ..writeAsBytesSync(data);
+          } else {
+            await Directory('$stagingPath/${file.name}')
+                .create(recursive: true);
           }
-
-          // Find backup.json
-          // The structure inside zip might be "backup_staging_xxx/backup.json" or just "backup.json"
-          // depending on how zipEncoder.addDirectory works (it usually includes the dir name).
-          // Let's find any .json file recursively or check known structure.
-          final dir = Directory(stagingPath);
-          File? jsonFile;
-          await for (final entity in dir.list(recursive: true)) {
-            if (entity is File && entity.path.endsWith('.json')) {
-              jsonFile = entity;
-              break;
-            }
-          }
-
-          if (jsonFile == null) {
-            throw 'Invalid backup file: No JSON found in ZIP';
-          }
-
-          data = jsonDecode(await jsonFile.readAsString());
-        } else {
-          // Legacy JSON import
-          final jsonString = await file.readAsString();
-          data = jsonDecode(jsonString);
         }
 
-        await _restoreToApi(data);
-
-        // Cleanup staging
-        if (stagingPath != null) {
-          await Directory(stagingPath).delete(recursive: true);
+        // Find backup.json
+        final dir = Directory(stagingPath);
+        File? jsonFile;
+        await for (final entity in dir.list(recursive: true)) {
+          if (entity is File && entity.path.endsWith('.json')) {
+            jsonFile = entity;
+            break;
+          }
         }
+
+        if (jsonFile == null) {
+          throw '无效的备份文件：ZIP 中未找到 JSON';
+        }
+
+        data = jsonDecode(await jsonFile.readAsString());
+      } else {
+        // Legacy JSON import
+        data = jsonDecode(utf8.decode(bytes));
+      }
+
+      await _restoreToApi(data);
+
+      // Cleanup staging
+      if (stagingPath != null) {
+        await Directory(stagingPath).delete(recursive: true);
       }
     } catch (e) {
       debugPrint('Import failed: $e');
-      throw 'Import failed: $e';
+      throw '导入失败: $e';
     }
-  }
-
-  Future<String> getBackupDirectoryPath() async {
-    if (Platform.isAndroid) {
-      return '/storage/emulated/0/Download/Ownd';
-    }
-    final downloadDir = await getDownloadsDirectory();
-    final baseDir = downloadDir ?? await getApplicationDocumentsDirectory();
-    return '${baseDir.path}/Ownd';
   }
 
   Future<Map<String, dynamic>> _exportItem(Map<String, dynamic> item) async {
@@ -330,7 +348,8 @@ class DataTransferService {
           if (rawHistory['note'] != null) 'note': rawHistory['note'],
           if (rawHistory['startDate'] != null)
             'startDate': rawHistory['startDate'],
-          if (rawHistory['endDate'] != null) 'endDate': rawHistory['endDate'],
+          if (rawHistory['endDate'] != null)
+            'endDate': rawHistory['endDate'],
           if (_cycleTypeToApi(rawHistory['cycleType'] as String?) != null)
             'cycleType': _cycleTypeToApi(rawHistory['cycleType'] as String?),
           if (rawHistory['cycle'] != null) 'cycle': rawHistory['cycle'],
