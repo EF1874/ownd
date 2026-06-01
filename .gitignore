@@ -1,1 +1,5 @@
 .vscode/
+node_modules/
+**/node_modules/
+.pnpm-workspace-state-v1.json
+**/.pnpm-workspace-state-v1.json

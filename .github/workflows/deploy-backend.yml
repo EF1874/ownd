@@ -1,0 +1,63 @@
+name: Deploy Backend to Tencent Cloud
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'ownd-api/**'
+      - '.github/workflows/deploy-backend.yml'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 11.1.3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+          cache-dependency-path: 'ownd-api/pnpm-lock.yaml'
+
+      - name: Install dependencies
+        run: |
+          cd ownd-api
+          pnpm install --frozen-lockfile
+
+      - name: Lint and Test
+        run: |
+          cd ownd-api
+          # 如果有单元测试可以运行以下命令
+          # pnpm test
+          pnpm run build
+
+  deploy:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          script: |
+            cd /home/ownd/project/ownd/ownd-api
+            
+            # 拉取最新代码
+            git pull origin main
+            
+            # 重建并启动容器
+            docker compose -f docker-compose.prod.yaml up -d --build
+            
+            # 清理无用的旧镜像以节省磁盘空间 (2核4G服务器需注意清理磁盘)
+            docker image prune -f
