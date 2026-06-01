@@ -53,14 +53,22 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT || 22 }}
           script: |
-            cd ~/ownd-full-stack
+            if [ -d "$HOME/ownd-full-stack" ]; then
+              cd "$HOME/ownd-full-stack"
+            elif [ -d "$HOME/ownd" ]; then
+              cd "$HOME/ownd"
+            else
+              echo "Cloning repository..."
+              git clone https://github.com/EF1874/ownd.git "$HOME/ownd"
+              cd "$HOME/ownd"
+            fi
             
             # Pull latest code
             git pull origin master
             
             cd ownd-api
             # Rebuild and restart docker compose containers
-            docker compose -f docker-compose.prod.yaml up -d --build
+            sudo docker compose -f docker-compose.prod.yaml up -d --build
             
             # Clean unused images to save disk space
-            docker image prune -f
+            sudo docker image prune -f
