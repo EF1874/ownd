@@ -75,9 +75,20 @@ services:
     depends_on:
       - api
       - minio
+      - blog
+
+  blog:
+    image: halohub/halo:2.20
+    container_name: ownd-blog
+    restart: unless-stopped
+    expose:
+      - '8090'
+    volumes:
+      - ./blog_data:/root/.halo2
 
 volumes:
   postgres_data:
   minio_data:
   caddy_data:
   caddy_config:
+

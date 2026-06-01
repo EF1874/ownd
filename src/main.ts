@@ -26,15 +26,18 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api/v1');
 
-  // Swagger 配置
-  const config = new DocumentBuilder()
-    .setTitle('Ownd API')
-    .setDescription('Ownd 后端接口文档')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api-docs', app, document);
+  // Swagger 配置 (仅在非开发/测试环境以外或非 production 环境启用)
+  const nodeEnv = configService.get<string>('NODE_ENV', 'development');
+  if (nodeEnv !== 'production') {
+    const config = new DocumentBuilder()
+      .setTitle('Ownd API')
+      .setDescription('Ownd 后端接口文档')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .build();
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api-docs', app, document);
+  }
 
   // 全局校验管道
   app.useGlobalPipes(
