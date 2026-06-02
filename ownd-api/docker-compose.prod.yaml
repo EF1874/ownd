@@ -74,6 +74,9 @@ services:
     image: halohub/halo:2.20
     container_name: ownd-blog-prod
     restart: unless-stopped
+    env_file:
+      - path: .env.production
+        required: true
     expose:
       - '8090'
     environment:
