@@ -71,7 +71,7 @@ services:
       - blog
 
   blog:
-    image: halohub/halo:2.20
+    image: halohub/halo:2.24
     container_name: ownd-blog-prod
     restart: unless-stopped
     env_file:
