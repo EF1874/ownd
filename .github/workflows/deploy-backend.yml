@@ -67,8 +67,10 @@ jobs:
             git pull origin master
             
             cd ownd-api
+            # Load env vars for docker compose variable substitution
+            set -a && source .env.production && set +a
             # Rebuild and restart docker compose containers
-            sudo docker compose -f docker-compose.prod.yaml up -d --build
+            sudo -E docker compose -f docker-compose.prod.yaml up -d --build
             
             # Clean unused images to save disk space
             sudo docker image prune -f
