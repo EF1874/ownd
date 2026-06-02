@@ -76,6 +76,14 @@ services:
     restart: unless-stopped
     expose:
       - '8090'
+    environment:
+      SPRING_SQL_INIT_MODE: always
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/halo
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
     volumes:
       - ./blog_data_prod:/root/.halo2
 
