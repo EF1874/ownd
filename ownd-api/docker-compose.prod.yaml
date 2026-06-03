@@ -65,27 +65,11 @@ services:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data_prod:/data
       - caddy_config_prod:/config
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - api
       - minio
-      - blog
-
-  blog:
-    image: halohub/halo:2.24
-    container_name: ownd-blog-prod
-    restart: unless-stopped
-    env_file:
-      - path: .env.production
-        required: true
-    expose:
-      - '8090'
-    environment:
-      SPRING_SQL_INIT_MODE: always
-    depends_on:
-      postgres:
-        condition: service_healthy
-    volumes:
-      - ./blog_data_prod:/root/.halo2
 
 volumes:
   postgres_data_prod:

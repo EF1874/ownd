@@ -15,6 +15,6 @@ console.ownd.cc {
 
 # Halo 个人博客 (自动 HTTPS)
 blog.ownd.cc {
-	reverse_proxy blog:8090
+	reverse_proxy host.docker.internal:8090
 }
 
