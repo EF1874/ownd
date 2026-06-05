@@ -44,10 +44,11 @@ class AuthController extends StateNotifier<AsyncValue<AuthSession?>> {
     required String email,
     required String password,
     required String name,
+    required String code,
   }) async {
     state = const AsyncValue.loading();
     final result = await AsyncValue.guard<AuthSession?>(
-      () => _repository.signup(email: email, password: password, name: name),
+      () => _repository.signup(email: email, password: password, name: name, code: code),
     );
     if (result.hasValue) {
       _invalidateUserData();

@@ -3,6 +3,7 @@ import {
   Post,
   Body,
   UnauthorizedException,
+  BadRequestException,
   HttpCode,
   HttpStatus,
   Get,
@@ -37,7 +38,7 @@ export class AuthController {
     @Inject(CACHE_MANAGER) private cacheManager: cacheManager.Cache,
   ) {}
 
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Throttle({ default: { limit: 15, ttl: 60000 } })
   @Post('signup')
   @Audit('用户注册')
   @ApiResponse({
@@ -50,11 +51,12 @@ export class AuthController {
       signupDto.email,
       signupDto.password,
       signupDto.name,
+      signupDto.code,
     );
     return this.authService.login(user);
   }
 
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Throttle({ default: { limit: 15, ttl: 60000 } })
   @Post('login')
   @Audit('用户登录')
   @HttpCode(HttpStatus.OK)
@@ -74,7 +76,7 @@ export class AuthController {
     return this.authService.login(user);
   }
 
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Throttle({ default: { limit: 15, ttl: 60000 } })
   @Post('reset-password')
   @Audit('重置密码')
   @HttpCode(HttpStatus.OK)
@@ -82,10 +84,25 @@ export class AuthController {
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     await this.authService.resetPassword(
       resetPasswordDto.email,
-      resetPasswordDto.name,
       resetPasswordDto.newPassword,
+      resetPasswordDto.code,
     );
     return { success: true, message: '密码重置成功' };
+  }
+
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Post('send-code')
+  @HttpCode(HttpStatus.OK)
+  @ApiResponse({ status: 200, description: '验证码发送成功' })
+  async sendCode(
+    @Body('email') email: string,
+    @Body('type') type?: string,
+  ) {
+    if (!email) {
+      throw new BadRequestException('邮箱不能为空');
+    }
+    await this.authService.sendVerificationCode(email, type);
+    return { success: true, message: '验证码发送成功' };
   }
 
   @ApiBearerAuth()

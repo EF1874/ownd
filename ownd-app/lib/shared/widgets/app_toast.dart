@@ -131,7 +131,9 @@ class _ToastWidgetState extends State<_ToastWidget> with SingleTickerProviderSta
       child: Align(
         alignment: Alignment.bottomCenter,
         child: Padding(
-          padding: const EdgeInsets.only(bottom: 16),
+          padding: EdgeInsets.only(
+            bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
+          ),
           child: AnimatedBuilder(
             animation: _controller,
             builder: (context, child) {

@@ -46,10 +46,11 @@ class AuthRepository {
     required String email,
     required String password,
     required String name,
+    required String code,
   }) async {
     final data = await _apiClient.post<Map<String, dynamic>>(
       '/auth/signup',
-      data: {'email': email, 'password': password, 'name': name},
+      data: {'email': email, 'password': password, 'name': name, 'code': code},
     );
 
     return _persistLoginResult(data);
@@ -70,17 +71,27 @@ class AuthRepository {
     }
   }
 
+  Future<void> sendVerificationCode(String email, {String? type}) async {
+    await _apiClient.post<dynamic>(
+      '/auth/send-code',
+      data: {
+        'email': email,
+        if (type != null) 'type': type,
+      },
+    );
+  }
+
   Future<void> resetPassword({
     required String email,
-    required String name,
     required String newPassword,
+    required String code,
   }) async {
     await _apiClient.post<dynamic>(
       '/auth/reset-password',
       data: {
         'email': email,
-        'name': name,
         'newPassword': newPassword,
+        'code': code,
       },
     );
   }

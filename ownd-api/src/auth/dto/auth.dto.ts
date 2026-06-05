@@ -28,6 +28,15 @@ export class SignupDto {
   @IsString()
   @IsNotEmpty()
   name: string;
+
+  @ApiProperty({
+    description: '邮箱验证码',
+    example: '123456',
+    required: true,
+  })
+  @IsString()
+  @IsNotEmpty({ message: '验证码不能为空' })
+  code: string;
 }
 
 export class LoginDto {
@@ -56,15 +65,6 @@ export class ResetPasswordDto {
   email: string;
 
   @ApiProperty({
-    description: '用户名',
-    example: '张三',
-    required: true,
-  })
-  @IsString()
-  @IsNotEmpty({ message: '用户名不能为空' })
-  name: string;
-
-  @ApiProperty({
     description: '新密码',
     example: '123456',
     required: true,
@@ -73,4 +73,13 @@ export class ResetPasswordDto {
   @IsString()
   @MinLength(6, { message: '密码至少需要 6 位' })
   newPassword: string;
+
+  @ApiProperty({
+    description: '邮箱验证码',
+    example: '123456',
+    required: true,
+  })
+  @IsString()
+  @IsNotEmpty({ message: '验证码不能为空' })
+  code: string;
 }
