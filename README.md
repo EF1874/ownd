@@ -26,7 +26,6 @@
 - 🔒 **安全认证** — JWT 令牌 + Redis 黑名单机制
 - ☁️ **云端同步** — MinIO 对象存储，支持图片上传与备份
 - 🚀 **一键部署** — Docker Compose 生产环境一键启动
-- 📝 **个人博客** — 集成 Halo 博客系统，通过 `blog.ownd.cc` 访问
 
 ---
 
@@ -39,7 +38,6 @@
 | **数据库** | PostgreSQL 16 · Redis 7 |
 | **对象存储** | MinIO (S3 兼容) |
 | **反向代理** | Caddy 2 (自动 HTTPS) |
-| **博客** | Halo 2.20 |
 | **CI/CD** | GitHub Actions |
 
 ---
@@ -136,7 +134,6 @@ flutter run --dart-define=OWND_API_BASE_URL="https://api.ownd.cc/api/v1"
 |------|------|
 | API | `https://api.ownd.cc` |
 | MinIO 控制台 | `https://console.ownd.cc` |
-| 个人博客 | `https://blog.ownd.cc` |
 
 ---
 
