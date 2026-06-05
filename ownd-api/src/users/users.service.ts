@@ -12,7 +12,7 @@ export class UsersService {
   ) {}
 
   // 注册：创建新用户
-  async create(email: string, pass: string, name?: string) {
+  async create(email: string, pass: string, name: string) {
     // 关键：绝对不能在数据库存明文密码！使用 bcrypt 加密。
     const hashedPassword = await bcrypt.hash(pass, 10);
 
