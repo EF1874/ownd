@@ -34,12 +34,27 @@ android {
 
     signingConfigs {
         create("release") {
+            val keystorePropertiesFile = rootProject.projectDir.parentFile.resolve("key.properties")
+            val keystoreProperties = java.util.Properties()
+            val hasProperties = keystorePropertiesFile.exists()
+            if (hasProperties) {
+                keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
+            }
+
             val keystoreFile = file("ownd-release-key.jks")
-            if (keystoreFile.exists()) {
+            val keystorePassword = if (hasProperties) keystoreProperties.getProperty("storePassword") else System.getenv("OWND_KEYSTORE_PASSWORD")
+            val keyAliasName = if (hasProperties) keystoreProperties.getProperty("keyAlias") else System.getenv("OWND_KEY_ALIAS")
+            val keyPass = if (hasProperties) keystoreProperties.getProperty("keyPassword") else System.getenv("OWND_KEY_PASSWORD")
+            
+            val hasKeystoreEnv = keystorePassword != null && keystorePassword != "" &&
+                                 keyAliasName != null && keyAliasName != "" &&
+                                 keyPass != null && keyPass != ""
+
+            if (keystoreFile.exists() && hasKeystoreEnv) {
                 storeFile = keystoreFile
-                storePassword = System.getenv("OWND_KEYSTORE_PASSWORD") ?: ""
-                keyAlias = System.getenv("OWND_KEY_ALIAS") ?: ""
-                keyPassword = System.getenv("OWND_KEY_PASSWORD") ?: ""
+                storePassword = keystorePassword
+                keyAlias = keyAliasName
+                keyPassword = keyPass
             } else {
                 // Fallback to debug configuration for local building ease
                 val debugConfig = signingConfigs.getByName("debug")

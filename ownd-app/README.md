@@ -77,6 +77,18 @@
 pnpm run android:prod
 ```
 
+#### 🔑 签名配置 (Android Signing)
+* **CI/CD 自动化流水线**：GitHub Actions 在构建时会自动从 Repository Secrets 读取 `OWND_KEYSTORE_BASE64`、`OWND_KEYSTORE_PASSWORD`、`OWND_KEY_ALIAS`、`OWND_KEY_PASSWORD` 环境变量，自动还原并使用生产证书进行打包签名。
+* **本地开发打包**：
+  * **默认回退（Debug 证书）**：若本地未配置证书环境变量，构建系统会自动回退使用默认的 `debug` 证书进行签名。这能让您在本地直接运行 `pnpm run android:prod` 构建并安装 Release 包进行性能测试。
+  * **配置正式证书**：如需在本地使用与流水线相同的生产证书进行签名（以便能够覆盖安装已装有正式版应用的设备），可在 `ownd-app/android/` 目录下创建一个 `key.properties` 文件（已配置 `.gitignore`，不会被 Git 提交），内容配置如下：
+    ```properties
+    storePassword=您的Keystore密码
+    keyAlias=您的Key别名
+    keyPassword=您的Key密码
+    ```
+    并确保 `ownd-app/android/app/ownd-release-key.jks` 文件存在。
+
 如果本机安装了 `make`，也可以使用：
 
 ```bash

@@ -123,6 +123,11 @@ flutter run --dart-define=OWND_API_BASE_URL="https://api.ownd.cc/api/v1"
 | **Deploy Backend** | 推送 `ownd-api/**` 到 `master` | SSH 登录云服务器，`git pull` 并 `docker compose up --build` |
 | **Release App** | 修改 `ownd-app/pubspec.yaml` 版本号 | 编译 Android Release APK，自动创建 GitHub Release |
 
+### 🔑 App 签名与打包说明
+* **GitHub Release 正式包**：在 GitHub Actions 流水线中，系统会使用安全的 Secrets 自动解密并使用生产证书（Keystore）进行签名。当你想使用正式签名版时，只需**修改 `ownd-app/pubspec.yaml` 中的版本号**并推送到 `master` 分支，流水线将自动运行并将打包好的 APK 放到 GitHub Release 页，您可直接下载安装。
+* **本地打包回退**：如果在本地运行打包命令（如 `pnpm run android:prod`）且未配置签名密码，编译脚本会自动回退到默认的 `debug` 证书进行签名，以防编译报错。
+* **本地正式签名（可选）**：如果需要在本地进行与线上一致的正式签名打包，可在 `ownd-app/android/` 目录下创建 `key.properties`（该文件已加入 Git 忽略列表），并在其中配置证书密码（`storePassword`、`keyAlias`、`keyPassword`）。
+
 ---
 
 ## 📱 线上服务
