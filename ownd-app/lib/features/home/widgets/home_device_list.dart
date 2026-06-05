@@ -12,6 +12,7 @@ class HomeDeviceList extends StatelessWidget {
   final bool showExpiringList;
   final bool isGridView;
   final String? categoryName;
+  final OnDeleteComplete? onDeleteComplete;
 
   const HomeDeviceList({
     super.key,
@@ -20,6 +21,7 @@ class HomeDeviceList extends StatelessWidget {
     required this.showExpiringList,
     required this.isGridView,
     this.categoryName,
+    this.onDeleteComplete,
   });
 
   @override
@@ -86,7 +88,7 @@ class HomeDeviceList extends StatelessWidget {
                 ? SliverGrid(
                     delegate: SliverChildBuilderDelegate(
                       (context, index) =>
-                          DeviceGridItem(device: expiring[index], index: index),
+                          DeviceGridItem(device: expiring[index], index: index, key: ValueKey(expiring[index].id), onDeleteComplete: onDeleteComplete),
                       childCount: expiring.length,
                     ),
                     gridDelegate:
@@ -100,7 +102,7 @@ class HomeDeviceList extends StatelessWidget {
                 : SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (context, index) =>
-                          DeviceListItem(device: expiring[index], index: index),
+                          DeviceListItem(device: expiring[index], index: index, key: ValueKey(expiring[index].id), onDeleteComplete: onDeleteComplete),
                       childCount: expiring.length,
                     ),
                   ),
@@ -121,6 +123,8 @@ class HomeDeviceList extends StatelessWidget {
                       (context, index) => DeviceGridItem(
                         device: normal[index],
                         index: index + expiring.length,
+                        key: ValueKey(normal[index].id),
+                        onDeleteComplete: onDeleteComplete,
                       ),
                       childCount: normal.length,
                     ),
@@ -137,6 +141,8 @@ class HomeDeviceList extends StatelessWidget {
                       (context, index) => DeviceListItem(
                         device: normal[index],
                         index: index + expiring.length,
+                        key: ValueKey(normal[index].id),
+                        onDeleteComplete: onDeleteComplete,
                       ),
                       childCount: normal.length,
                     ),

@@ -11,8 +11,13 @@ import '../../shared/services/subscription_service.dart';
 import '../../features/navigation/navigation_provider.dart';
 import '../../features/auth/auth_controller.dart';
 import '../../core/theme/theme_provider.dart';
+import '../../data/repositories/category_repository.dart';
+import '../../data/repositories/platform_repository.dart';
+import '../home/home_screen.dart';
+import '../home/home_devices_provider.dart';
 
 import '../../shared/widgets/base_card.dart';
+import '../../shared/widgets/app_toast.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -88,10 +93,29 @@ class ProfileScreen extends ConsumerWidget {
                       try {
                         _showSnackBar(context, '请选择备份文件...');
 
-                        await transferService.importData();
+                        final result = await transferService.importData();
+
+                        ref.invalidate(categoryTreeProvider);
+                        ref.invalidate(platformsProvider);
+                        ref.invalidate(deviceListProvider);
+                        ref.invalidate(homeDevicesNotifierProvider);
 
                         if (context.mounted) {
-                          _showSnackBar(context, '导入成功');
+                          if (result != null) {
+                            final created = result['createdCount'] ?? 0;
+                            final updated = result['updatedCount'] ?? 0;
+                            final duplicates = (result['duplicates'] as List<dynamic>?)
+                                    ?.cast<String>() ??
+                                [];
+                            _showImportResultDialog(
+                              context,
+                              created: created as int,
+                              updated: updated as int,
+                              duplicates: duplicates,
+                            );
+                          } else {
+                            _showSnackBar(context, '导入成功');
+                          }
                         }
                       } catch (e) {
                         if (context.mounted) {
@@ -253,12 +277,54 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   void _showSnackBar(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
+    AppToast.show(
+      context,
+      message,
+      isError: message.contains('失败') || message.contains('错误'),
+    );
+  }
+
+  void _showImportResultDialog(
+    BuildContext context, {
+    required int created,
+    required int updated,
+    required List<String> duplicates,
+  }) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('导入完成'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('新增物品: $created 个'),
+              const SizedBox(height: 4),
+              Text('覆盖更新: $updated 个'),
+              if (duplicates.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                const Text(
+                  '以下物品因重名被合并覆盖:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                ...duplicates.map(
+                  (name) => Padding(
+                    padding: const EdgeInsets.only(left: 8, top: 2),
+                    child: Text('• $name'),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('确定'),
+          ),
+        ],
       ),
     );
   }

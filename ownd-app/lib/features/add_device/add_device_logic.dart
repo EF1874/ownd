@@ -229,7 +229,7 @@ extension AddDeviceLogic on _AddDeviceScreenState {
   }
 
   void _showSnack(String msg) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      AppToast.show(context, msg, isError: msg.contains('失败') || msg.contains('错误') || msg.contains('请选择'));
 
   Future<void> _showRenewDialog() async {
     if (_cycleType == null) return;

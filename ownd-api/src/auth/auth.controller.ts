@@ -11,7 +11,7 @@ import {
   Inject,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { SignupDto, LoginDto } from './dto/auth.dto';
+import { SignupDto, LoginDto, ResetPasswordDto } from './dto/auth.dto';
 import { JwtAuthGuard } from '../common/guard/jwt.guard';
 import { User } from '@prisma/client';
 import { ApiBearerAuth, ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -37,7 +37,7 @@ export class AuthController {
     @Inject(CACHE_MANAGER) private cacheManager: cacheManager.Cache,
   ) {}
 
-  @Throttle({ auth: { limit: 5, ttl: 60000 } })
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('signup')
   @Audit('用户注册')
   @ApiResponse({
@@ -54,7 +54,7 @@ export class AuthController {
     return this.authService.login(user);
   }
 
-  @Throttle({ auth: { limit: 5, ttl: 60000 } })
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('login')
   @Audit('用户登录')
   @HttpCode(HttpStatus.OK)
@@ -72,6 +72,20 @@ export class AuthController {
       throw new UnauthorizedException('邮箱或密码错误');
     }
     return this.authService.login(user);
+  }
+
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Post('reset-password')
+  @Audit('重置密码')
+  @HttpCode(HttpStatus.OK)
+  @ApiResponse({ status: 200, description: '重置成功' })
+  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+    await this.authService.resetPassword(
+      resetPasswordDto.email,
+      resetPasswordDto.name,
+      resetPasswordDto.newPassword,
+    );
+    return { success: true, message: '密码重置成功' };
   }
 
   @ApiBearerAuth()

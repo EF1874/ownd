@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../shared/widgets/draggable_add_button.dart';
+import '../../shared/widgets/app_toast.dart';
 import '../../core/theme/app_colors.dart';
 
 class ScaffoldWithNavBar extends ConsumerStatefulWidget {
@@ -42,13 +43,7 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
         if (_lastPressedAt == null ||
             now.difference(_lastPressedAt!) > const Duration(seconds: 2)) {
           _lastPressedAt = now;
-          ScaffoldMessenger.of(context).clearSnackBars();
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('再按一次退出应用', textAlign: TextAlign.center),
-              duration: Duration(seconds: 2),
-            ),
-          );
+          AppToast.show(context, '再按一次退出应用');
           return;
         }
 

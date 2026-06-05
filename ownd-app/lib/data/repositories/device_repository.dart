@@ -29,6 +29,28 @@ class DeviceRepository {
 
   Stream<List<Device>> watchAllDevices() => _dataSource.watchAll();
 
+  Future<List<Device>> getPaginatedDevices({
+    required int page,
+    required int limit,
+    String? search,
+    String? categoryId,
+    String? platformId,
+    String? tag,
+    String? sortBy,
+    String? sortOrder,
+  }) {
+    return _dataSource.getPaginated(
+      page: page,
+      limit: limit,
+      search: search,
+      categoryId: categoryId,
+      platformId: platformId,
+      tag: tag,
+      sortBy: sortBy,
+      sortOrder: sortOrder,
+    );
+  }
+
   Future<void> addDevice(Device device) => _dataSource.add(device);
 
   Future<void> updateDevice(Device device) => _dataSource.update(device);

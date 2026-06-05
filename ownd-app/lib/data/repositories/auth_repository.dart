@@ -60,7 +60,30 @@ class AuthRepository {
     return AuthUser.fromJson(data);
   }
 
-  Future<void> logout() => _tokenStorage.clearToken();
+  Future<void> logout() async {
+    try {
+      await _apiClient.post<dynamic>('/auth/logout');
+    } catch (_) {
+      // ignore
+    } finally {
+      await _tokenStorage.clearToken();
+    }
+  }
+
+  Future<void> resetPassword({
+    required String email,
+    required String name,
+    required String newPassword,
+  }) async {
+    await _apiClient.post<dynamic>(
+      '/auth/reset-password',
+      data: {
+        'email': email,
+        'name': name,
+        'newPassword': newPassword,
+      },
+    );
+  }
 
   Future<AuthSession> _persistLoginResult(Map<String, dynamic> data) async {
     final token = (data['access_token'] ?? data['accessToken']) as String;

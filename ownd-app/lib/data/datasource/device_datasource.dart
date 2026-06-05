@@ -10,6 +10,18 @@ abstract class DeviceDataSource {
   /// Watch all devices as a reactive stream.
   Stream<List<Device>> watchAll();
 
+  /// Get paginated and filtered devices.
+  Future<List<Device>> getPaginated({
+    required int page,
+    required int limit,
+    String? search,
+    String? categoryId,
+    String? platformId,
+    String? tag,
+    String? sortBy,
+    String? sortOrder,
+  });
+
   /// Add a new device.
   Future<void> add(Device device);
 

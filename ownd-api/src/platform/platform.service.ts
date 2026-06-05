@@ -140,9 +140,6 @@ export class PlatformService {
     if (!user) {
       throw new NotFoundException('用户不存在');
     }
-    if (user.platformDefaultsInitialized) {
-      return;
-    }
 
     const existingUserPlatforms = await this.prisma.platform.count({
       where: { userId },
@@ -152,10 +149,12 @@ export class PlatformService {
       await this.copySystemPlatformTemplates(userId);
     }
 
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { platformDefaultsInitialized: true },
-    });
+    if (!user.platformDefaultsInitialized) {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { platformDefaultsInitialized: true },
+      });
+    }
   }
 
   private async copySystemPlatformTemplates(userId: string) {

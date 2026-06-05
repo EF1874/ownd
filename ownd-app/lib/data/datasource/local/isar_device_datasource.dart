@@ -19,6 +19,20 @@ class IsarDeviceDataSource implements DeviceDataSource {
   }
 
   @override
+  Future<List<Device>> getPaginated({
+    required int page,
+    required int limit,
+    String? search,
+    String? categoryId,
+    String? platformId,
+    String? tag,
+    String? sortBy,
+    String? sortOrder,
+  }) {
+    throw UnimplementedError('getPaginated is not supported in local Isar datasource');
+  }
+
+  @override
   Future<void> add(Device device) async {
     await _isar.writeTxn(() async {
       await _isar.devices.put(device);

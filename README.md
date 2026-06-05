@@ -92,6 +92,17 @@ pnpm run start:dev                 # 启动开发服务器
 
 ### 移动端开发 (ownd-app)
 
+#### 1. 本地局域网联调 (推荐)
+后端服务启动时会自动生成含有电脑当前局域网 IP 的配置文件 `ownd-app/config/local.json`。
+* **命令行一键安装运行**：
+  ```bash
+  cd ownd-app
+  pnpm android:dev:install
+  ```
+* **VS Code 一键调试**：
+  直接按 **F5**，选择 `物记 (Local IP Debug)` 配置启动调试。
+
+#### 2. 手动指定 API 调试
 ```bash
 cd ownd-app
 flutter pub get

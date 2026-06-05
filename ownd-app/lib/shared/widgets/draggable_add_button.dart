@@ -33,6 +33,8 @@ class _DraggableAddButtonState extends ConsumerState<DraggableAddButton> {
       child: Draggable(
         feedback: FloatingActionButton(
           onPressed: () {},
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          foregroundColor: Theme.of(context).colorScheme.onPrimary,
           child: const Icon(Icons.add),
         ),
         childWhenDragging:
@@ -65,6 +67,8 @@ class _DraggableAddButtonState extends ConsumerState<DraggableAddButton> {
             // Use context.push because /add is a root route or we want it to stack
             context.push('/add');
           },
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          foregroundColor: Theme.of(context).colorScheme.onPrimary,
           child: const Icon(Icons.add),
         ),
       ),

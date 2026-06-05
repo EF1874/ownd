@@ -32,15 +32,45 @@ export class SignupDto {
 
 export class LoginDto {
   @ApiProperty({
-    description: '邮箱',
+    description: '用户名或邮箱',
     example: 'example@mail.com',
     required: true,
   })
-  @IsEmail()
+  @IsString()
+  @IsNotEmpty({ message: '用户名或邮箱不能为空' })
   email: string;
 
   @ApiProperty({ description: '密码', example: '123456', required: true })
   @IsString()
-  @IsNotEmpty()
+  @IsNotEmpty({ message: '密码不能为空' })
   password: string;
+}
+
+export class ResetPasswordDto {
+  @ApiProperty({
+    description: '邮箱',
+    example: 'example@mail.com',
+    required: true,
+  })
+  @IsEmail({}, { message: '邮箱格式不正确' })
+  email: string;
+
+  @ApiProperty({
+    description: '用户名',
+    example: '张三',
+    required: true,
+  })
+  @IsString()
+  @IsNotEmpty({ message: '用户名不能为空' })
+  name: string;
+
+  @ApiProperty({
+    description: '新密码',
+    example: '123456',
+    required: true,
+    minimum: 6,
+  })
+  @IsString()
+  @MinLength(6, { message: '密码至少需要 6 位' })
+  newPassword: string;
 }

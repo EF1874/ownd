@@ -51,13 +51,22 @@ if (!platform || !buildCommands[platform]?.[mode]) {
   process.exit(1);
 }
 
-const configPath = join(projectRoot, 'config', `${env}.json`);
+let configPath = join(projectRoot, 'config', `${env}.json`);
+if (env === 'dev') {
+  const localConfigPath = join(projectRoot, 'config', 'local.json');
+  if (existsSync(localConfigPath)) {
+    configPath = localConfigPath;
+    console.log(`[IP Injector] Using dynamically detected local config: config/local.json`);
+  }
+}
+
 if (!existsSync(configPath)) {
-  console.error(`Missing config file: config/${env}.json`);
+  console.error(`Missing config file: ${configPath}`);
   process.exit(1);
 }
 
 const config = JSON.parse(readFileSync(configPath, 'utf8'));
+
 const dartDefines = Object.entries(config).flatMap(([key, value]) => [
   '--dart-define',
   `${key}=${value}`,

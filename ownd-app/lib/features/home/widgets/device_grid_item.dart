@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import '../../../data/models/device.dart';
 import '../../../data/repositories/device_repository.dart';
 import '../../../shared/utils/icon_utils.dart';
@@ -13,325 +13,408 @@ import '../../../shared/utils/format_utils.dart';
 import 'dart:io';
 import '../../../shared/widgets/image_preview_dialog.dart';
 import '../../add_device/add_device_screen.dart';
+import '../home_devices_provider.dart';
 import 'package:go_router/go_router.dart';
+import 'device_list_item.dart';
 
-class DeviceGridItem extends ConsumerWidget {
+class DeviceGridItem extends ConsumerStatefulWidget {
   final Device device;
   final int index;
+  final OnDeleteComplete? onDeleteComplete;
 
-  const DeviceGridItem({super.key, required this.device, this.index = 0});
+  const DeviceGridItem({super.key, required this.device, this.index = 0, this.onDeleteComplete});
+
+  @override
+  ConsumerState<DeviceGridItem> createState() => _DeviceGridItemState();
+}
+
+class _DeviceGridItemState extends ConsumerState<DeviceGridItem>
+    with TickerProviderStateMixin {
+  late final AnimationController _deleteController;
+  late final Animation<double> _scaleAnimation;
+  late final Animation<double> _opacityAnimation;
+  late final AnimationController _entryController;
+  bool _isDeleting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _deleteController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 250),
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
+      CurvedAnimation(parent: _deleteController, curve: Curves.easeIn),
+    );
+    _opacityAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
+      CurvedAnimation(parent: _deleteController, curve: Curves.easeOut),
+    );
+    _entryController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    final delay = Duration(milliseconds: (widget.index > 5 ? 5 : widget.index) * 50);
+    if (delay == Duration.zero) {
+      _entryController.forward();
+    } else {
+      Future.delayed(delay, () {
+        if (mounted) _entryController.forward();
+      });
+    }
+  }
+
+
+
+  @override
+  void dispose() {
+    _deleteController.dispose();
+    _entryController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _startDeleteAnimation() async {
+    setState(() => _isDeleting = true);
+    await _deleteController.forward();
+  }
 
   IconData _getCategoryIcon(String? categoryName) {
     final item = CategoryConfig.getItem(categoryName);
     return IconUtils.getIconData(item.iconPath);
   }
 
-  void _navigateToEdit(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => AddDeviceScreen(device: device)),
+  Future<void> _navigateToEdit(BuildContext context, WidgetRef ref) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => AddDeviceScreen(device: widget.device)),
     );
+    await ref.read(homeDevicesNotifierProvider.notifier).refresh();
   }
 
   void _navigateToDetail(BuildContext context) {
-    context.push('/device/${device.id}');
+    context.push('/device/${widget.device.id}');
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final categoryColor = CategoryUtils.getCategoryColor(
-      device.category.value?.name,
+      widget.device.category.value?.name,
     );
-    final categoryIcon = _getCategoryIcon(device.category.value?.name);
-    final dailyCost = device.dailyCost;
+    final categoryIcon = _getCategoryIcon(widget.device.category.value?.name);
+    final dailyCost = widget.device.dailyCost;
     final costColor = CostConfig.getCostColor(dailyCost);
 
     // Handle adaptive color for null categoryColor
     final effectiveCategoryColor = categoryColor ?? theme.colorScheme.onSurface;
 
-    final hasBg = device.imagePath != null || device.customIconPath != null;
+    final hasBg = widget.device.imagePath != null || widget.device.customIconPath != null;
 
-    return BaseCard(
-          variant: CardVariant.glass,
-          backgroundImagePath: device.imagePath ?? device.customIconPath,
-          onTap: () => _navigateToDetail(context),
-          onLongPress: () {
-            showModalBottomSheet(
-              context: context,
-              builder: (ctx) => Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.edit),
-                    title: const Text('编辑'),
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      _navigateToEdit(context);
-                    },
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.delete, color: Colors.red),
-                    title: const Text(
-                      '删除',
-                      style: TextStyle(color: Colors.red),
-                    ),
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      ref
-                          .read(deviceRepositoryProvider)
-                          .deleteDevice(device.id);
-                    },
-                  ),
-                ],
-              ),
-            );
-          },
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            mainAxisAlignment: MainAxisAlignment.start,
+    final childWidget = BaseCard(
+      variant: CardVariant.glass,
+      backgroundImagePath: widget.device.imagePath ?? widget.device.customIconPath,
+      onTap: () => _navigateToDetail(context),
+      onLongPress: () async {
+        final confirmed = await showModalBottomSheet<bool>(
+          context: context,
+          builder: (ctx) => Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Hero(
-                tag: 'device_icon_${device.id}',
-                child: Container(
-                  height: 80,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: effectiveCategoryColor.withAlpha(25),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: effectiveCategoryColor.withAlpha(50),
-                      width: 1,
+              ListTile(
+                leading: const Icon(Icons.edit),
+                title: const Text('编辑'),
+                onTap: () {
+                  Navigator.pop(ctx, false);
+                  _navigateToEdit(context, ref);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete, color: Colors.red),
+                title: const Text(
+                  '删除',
+                  style: TextStyle(color: Colors.red),
+                ),
+                onTap: () => Navigator.pop(ctx, true),
+              ),
+            ],
+          ),
+        );
+
+        if (confirmed == true) {
+          debugPrint('[DELETE-GRID] Starting delete for device ${widget.device.id}');
+          await _startDeleteAnimation();
+          
+          try {
+            await ref.read(deviceRepositoryProvider).deleteDevice(widget.device.id);
+            widget.onDeleteComplete?.call(true, null);
+          } catch (e) {
+            debugPrint('[DELETE-GRID] API error: $e');
+            setState(() => _isDeleting = false);
+            await _deleteController.reverse();
+            widget.onDeleteComplete?.call(false, e.toString());
+          }
+        }
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          Hero(
+            tag: 'device_icon_${widget.device.id}',
+            child: Container(
+              height: 80,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: effectiveCategoryColor.withAlpha(25),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: effectiveCategoryColor.withAlpha(50),
+                  width: 1,
+                ),
+              ),
+              alignment: Alignment.center,
+              child: widget.device.customIconPath != null
+                  ? GestureDetector(
+                      onTap: () => ImagePreviewDialog.show(
+                        context,
+                        widget.device.customIconPath!,
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(11),
+                        child: Image.file(
+                          File(widget.device.customIconPath!),
+                          width: double.infinity,
+                          height: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    )
+                  : Icon(
+                      categoryIcon,
+                      size: 28,
+                      color: effectiveCategoryColor,
                     ),
-                  ),
-                  alignment: Alignment.center,
-                  child: device.customIconPath != null
-                      ? GestureDetector(
-                          onTap: () => ImagePreviewDialog.show(
-                            context,
-                            device.customIconPath!,
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(11),
-                            child: Image.file(
-                              File(device.customIconPath!),
-                              width: double.infinity,
-                              height: double.infinity,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        )
-                      : Icon(
-                          categoryIcon,
-                          size: 28,
-                          color: effectiveCategoryColor,
-                        ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                device.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: hasBg ? Colors.white : theme.colorScheme.onSurface,
-                ),
-              ),
-              const SizedBox(height: 6),
-              RichText(
-                textAlign: TextAlign.center,
-                text: TextSpan(
-                  children: [
-                    if (CategoryConfig.getMajorCategory(
-                          device.category.value?.name,
-                        ) ==
-                        '虚拟订阅') ...[
-                      TextSpan(
-                        text: '剩余',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: hasBg
-                              ? Colors.white
-                              : theme.colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                        ),
-                      ),
-                      TextSpan(
-                        text: () {
-                          if (device.nextBillingDate == null) return '0';
-                          final diff =
-                              device.nextBillingDate!
-                                  .difference(DateTime.now())
-                                  .inDays +
-                              1;
-                          return (diff < 0 ? 0 : diff).toString();
-                        }(),
-                        style: TextStyle(
-                          fontFamily: 'monospace',
-                          fontWeight: FontWeight.bold,
-                          color: hasBg
-                              ? Colors.white
-                              : theme.colorScheme.primary, // Cyber Mint
-                          fontSize: 20,
-                        ),
-                      ),
-                      TextSpan(
-                        text: '天',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: hasBg
-                              ? Colors.white
-                              : theme.colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ] else ...[
-                      TextSpan(
-                        text: '使用',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: hasBg
-                              ? Colors.white
-                              : theme.colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                        ),
-                      ),
-                      TextSpan(
-                        text: '${device.daysUsed}',
-                        style: TextStyle(
-                          fontFamily: 'monospace',
-                          fontWeight: FontWeight.bold,
-                          color: hasBg
-                              ? Colors.white
-                              : theme.colorScheme.primary, // Cyber Mint
-                          fontSize: 20,
-                        ),
-                      ),
-                      TextSpan(
-                        text: '天',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: hasBg
-                              ? Colors.white
-                              : theme.colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 4),
-              Column(
-                children: [
-                  Text(
-                    '¥${FormatUtils.formatCurrency(device.price)}',
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      color: hasBg ? Colors.white : theme.colorScheme.onSurface,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '¥${FormatUtils.formatCurrency(dailyCost)}/天',
-                    style: TextStyle(
-                      fontFamily: 'monospace',
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            widget.device.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: hasBg ? Colors.white : theme.colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 6),
+          RichText(
+            textAlign: TextAlign.center,
+            text: TextSpan(
+              children: [
+                if (CategoryConfig.getMajorCategory(
+                      widget.device.category.value?.name,
+                    ) ==
+                    '虚拟订阅') ...[
+                  TextSpan(
+                    text: '剩余',
+                    style: theme.textTheme.bodySmall?.copyWith(
                       color: hasBg
                           ? Colors.white
-                          : (costColor ?? theme.colorScheme.onSurfaceVariant),
+                          : theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                  TextSpan(
+                    text: () {
+                      if (widget.device.nextBillingDate == null) return '0';
+                      final diff = widget.device.nextBillingDate!
+                              .difference(DateTime.now())
+                              .inDays +
+                          1;
+                      return (diff < 0 ? 0 : diff).toString();
+                    }(),
+                    style: TextStyle(
+                      fontFamily: 'monospace',
                       fontWeight: FontWeight.bold,
-                      fontSize: 11,
+                      color: hasBg
+                          ? Colors.white
+                          : theme.colorScheme.primary,
+                      fontSize: 20,
+                    ),
+                  ),
+                  TextSpan(
+                    text: '天',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: hasBg
+                          ? Colors.white
+                          : theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                ] else ...[
+                  TextSpan(
+                    text: '使用',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: hasBg
+                          ? Colors.white
+                          : theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                  TextSpan(
+                    text: '${widget.device.daysUsed}',
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontWeight: FontWeight.bold,
+                      color: hasBg
+                          ? Colors.white
+                          : theme.colorScheme.primary,
+                      fontSize: 20,
+                    ),
+                  ),
+                  TextSpan(
+                    text: '天',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: hasBg
+                          ? Colors.white
+                          : theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
                     ),
                   ),
                 ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 4),
+          Column(
+            children: [
+              Text(
+                '¥${FormatUtils.formatCurrency(widget.device.price)}',
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  color: hasBg ? Colors.white : theme.colorScheme.onSurface,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
               ),
-              const SizedBox(height: 6),
-              SizedBox(
-                height: 20,
-                child: device.tags.isNotEmpty
-                    ? Wrap(
-                        alignment: WrapAlignment.center,
-                        spacing: 4,
-                        runSpacing: 4,
-                        children: device.tags
-                            .take(3)
-                            .map(
-                              (tag) => Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: theme.colorScheme.primaryContainer
-                                      .withAlpha(hasBg ? 100 : 50),
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(
-                                    color: theme.colorScheme.primary.withAlpha(
-                                      hasBg ? 200 : 100,
-                                    ),
-                                    width: 0.5,
-                                  ),
-                                ),
-                                child: Text(
-                                  '#$tag',
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: hasBg
-                                        ? Colors.white
-                                        : theme.colorScheme.primary,
-                                    fontSize: 9,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            )
-                            .toList(),
-                      )
-                    : null,
-              ),
-              const Spacer(),
-              SizedBox(
-                height: 24,
-                child: Center(
-                  child: Transform.scale(
-                    scale: 0.8,
-                    child: _buildStatusBadges(device),
-                  ),
+              const SizedBox(height: 2),
+              Text(
+                '¥${FormatUtils.formatCurrency(dailyCost)}/天',
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  color: hasBg
+                      ? Colors.white
+                      : (costColor ?? theme.colorScheme.onSurfaceVariant),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 11,
                 ),
               ),
             ],
           ),
-        )
-        .animate()
-        .fadeIn(delay: (index * 50).ms)
-        .slideY(
-          begin: 0.1,
-          delay: (index * 50).ms,
-          duration: 300.ms,
-          curve: Curves.easeOutQuad,
+          const SizedBox(height: 6),
+          SizedBox(
+            height: 20,
+            child: widget.device.tags.isNotEmpty
+                ? Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 4,
+                    runSpacing: 4,
+                    children: widget.device.tags
+                        .take(3)
+                        .map(
+                          (tag) => Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primaryContainer
+                                  .withAlpha(hasBg ? 100 : 50),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: theme.colorScheme.primary.withAlpha(
+                                  hasBg ? 200 : 100,
+                                ),
+                                width: 0.5,
+                              ),
+                            ),
+                            child: Text(
+                              '#$tag',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: hasBg
+                                    ? Colors.white
+                                    : theme.colorScheme.primary,
+                                fontSize: 9,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  )
+                : null,
+          ),
+          const Spacer(),
+          SizedBox(
+            height: 24,
+            child: Center(
+              child: Transform.scale(
+                scale: 0.8,
+                child: _buildStatusBadges(widget.device),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (_isDeleting) {
+      return AnimatedBuilder(
+        animation: _deleteController,
+        builder: (context, child) {
+          return Opacity(
+            opacity: _opacityAnimation.value,
+            child: Transform.scale(
+              scale: _scaleAnimation.value,
+              child: child,
+            ),
+          );
+        },
+        child: childWidget,
+      );
+    }
+
+    return AnimatedBuilder(
+      animation: _entryController,
+      builder: (context, child) {
+        return Opacity(
+          opacity: _entryController.value,
+          child: Transform.translate(
+            offset: Offset(0, (1 - _entryController.value) * 20),
+            child: child,
+          ),
         );
+      },
+      child: childWidget,
+    );
   }
 
   Widget _buildStatusBadges(Device device) {
     List<Widget> badges = [];
-
-    // Subscription Logic
     final isSubscription =
         CategoryConfig.getMajorCategory(device.category.value?.name) == '虚拟订阅';
-
     if (isSubscription) {
       if (device.status == 'scrap') {
         badges.add(const StatusBadge(text: '已停用', color: Colors.grey));
       } else {
         final now = DateTime.now();
         final nextDate = device.nextBillingDate;
-
         if (nextDate != null) {
           final diff = nextDate.difference(now).inDays;
-
           if (device.isAutoRenew) {
             if (diff <= (device.reminderDays > 0 ? device.reminderDays : 3) &&
                 diff >= 0) {
@@ -363,7 +446,6 @@ class DeviceGridItem extends ConsumerWidget {
         }
       }
     }
-
     return Wrap(
       spacing: 4,
       runSpacing: 4,

@@ -13,6 +13,7 @@ import {
   ParseFilePipe,
   MaxFileSizeValidator,
   FileTypeValidator,
+  Query,
 } from '@nestjs/common';
 import { ItemsService } from './items.service';
 import { CreateItemDto } from './dto/create-item.dto';
@@ -46,6 +47,17 @@ export class ItemsController {
     private readonly minioService: MinioService,
   ) {}
 
+  @Post('import')
+  @Audit('导入备份数据')
+  @ApiOperation({ summary: '批量导入/恢复备份数据' })
+  @ApiResponse({ status: 201, description: '导入成功' })
+  importBackup(
+    @Body() body: any,
+    @Request() req: RequestWithUser,
+  ) {
+    return this.itemsService.importBackup(req.user.id, body);
+  }
+
   @Post()
   @ApiOperation({ summary: '创建物品 (支持同时上传图片)' })
   @ApiConsumes('multipart/form-data')
@@ -77,10 +89,29 @@ export class ItemsController {
   }
 
   @Get()
-  @ApiOperation({ summary: '获取全部物品' })
+  @ApiOperation({ summary: '获取全部物品 (支持分页、搜索、筛选和排序)' })
   @ApiResponse({ status: 200, type: [ItemEntity] })
-  findAll(@Request() req: RequestWithUser) {
-    return this.itemsService.findAll(req.user.id);
+  findAll(
+    @Request() req: RequestWithUser,
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('categoryId') categoryId?: string,
+    @Query('platformId') platformId?: string,
+    @Query('tag') tag?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+  ) {
+    return this.itemsService.findAll(req.user.id, {
+      search,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+      categoryId,
+      platformId,
+      tag,
+      sortBy,
+      sortOrder,
+    });
   }
 
   @Get(':id')

@@ -38,6 +38,17 @@ export class UsersService {
     });
   }
 
+  async findByNameOrEmail(usernameOrEmail: string) {
+    return this.prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: usernameOrEmail },
+          { name: usernameOrEmail },
+        ],
+      },
+    });
+  }
+
   /**
    * @param userId 用户ID
    * @returns 用户对象
@@ -67,5 +78,13 @@ export class UsersService {
     }
 
     return user;
+  }
+
+  async updatePassword(userId: string, pass: string) {
+    const hashedPassword = await bcrypt.hash(pass, 10);
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword },
+    });
   }
 }

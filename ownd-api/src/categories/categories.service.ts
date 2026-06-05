@@ -144,9 +144,6 @@ export class CategoriesService {
     if (!user) {
       throw new NotFoundException('用户不存在');
     }
-    if (user.categoryDefaultsInitialized) {
-      return;
-    }
 
     const existingUserCategories = await this.prisma.category.count({
       where: { userId },
@@ -156,10 +153,12 @@ export class CategoriesService {
       await this.copySystemCategoryTemplates(userId);
     }
 
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { categoryDefaultsInitialized: true },
-    });
+    if (!user.categoryDefaultsInitialized) {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { categoryDefaultsInitialized: true },
+      });
+    }
   }
 
   private async copySystemCategoryTemplates(userId: string) {
