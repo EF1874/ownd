@@ -36,7 +36,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
   int _resetCountdown = 0;
   DateTime? _resetEndTime;
   Timer? _resetTimer;
-  StateSetter? _resetDialogStateSetter;
+  bool _isResetPassword = false;
+  bool _isResettingPassword = false;
+  bool _isSendingResetCode = false;
 
   // 密码显示隐藏控制
   bool _obscurePassword = true;
@@ -92,15 +94,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
     if (_resetEndTime == null) return;
     final remaining = _resetEndTime!.difference(DateTime.now()).inSeconds;
     if (remaining <= 0) {
-      _resetCountdown = 0;
-      _resetEndTime = null;
-      _resetTimer?.cancel();
-      _resetTimer = null;
+      setState(() {
+        _resetCountdown = 0;
+        _resetEndTime = null;
+        _resetTimer?.cancel();
+        _resetTimer = null;
+      });
     } else {
-      _resetCountdown = remaining;
-    }
-    if (_resetDialogStateSetter != null) {
-      _resetDialogStateSetter!(() {});
+      setState(() {
+        _resetCountdown = remaining;
+      });
     }
   }
 
@@ -172,11 +175,45 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
 
   Future<void> _submit() async {
     // 节流防抖：若正在提交，则直接返回
-    if (ref.read(authControllerProvider).isLoading) return;
+    if (ref.read(authControllerProvider).isLoading || _isResettingPassword) return;
     if (!_formKey.currentState!.validate()) return;
 
     final controller = ref.read(authControllerProvider.notifier);
     final inputVal = _emailController.text.trim();
+
+    if (_isResetPassword) {
+      setState(() => _isResettingPassword = true);
+      try {
+        final authRepo = ref.read(authRepositoryProvider);
+        await authRepo.resetPassword(
+          email: inputVal,
+          newPassword: _passwordController.text,
+          code: _codeController.text.trim(),
+        );
+        if (mounted) {
+          AppToast.show(context, '密码重置成功，请使用新密码登录');
+          setState(() {
+            _isResetPassword = false;
+            _isSignup = false;
+            _emailController.clear();
+            _passwordController.clear();
+            _confirmPasswordController.clear();
+            _nameController.clear();
+            _codeController.clear();
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          AppToast.show(context, '重置失败: ${e.toString().replaceAll('ApiException: ', '')}', isError: true);
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isResettingPassword = false);
+        }
+      }
+      return;
+    }
+
     if (_isSignup) {
       await controller.signup(
         email: inputVal,
@@ -207,237 +244,42 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
     );
   }
 
-  void _showResetPasswordDialog() {
-    final resetEmailController = TextEditingController();
-    final resetPasswordController = TextEditingController();
-    final resetConfirmPasswordController = TextEditingController();
-    final resetCodeController = TextEditingController();
-    final resetFormKey = GlobalKey<FormState>();
-    bool resetting = false;
-    bool isSendingResetCode = false;
-    bool obscureResetPassword = true;
-    bool obscureResetConfirmPassword = true;
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            _resetDialogStateSetter = setDialogState;
-            return AlertDialog(
-              title: const Text('重置密码'),
-              content: Form(
-                key: resetFormKey,
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TextFormField(
-                        controller: resetEmailController,
-                        onChanged: (value) => setDialogState(() {}),
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: InputDecoration(
-                          labelText: '注册邮箱',
-                          suffixIcon: resetEmailController.text.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear, size: 18),
-                                  onPressed: () {
-                                    setDialogState(() {
-                                      resetEmailController.clear();
-                                    });
-                                  },
-                                )
-                              : null,
-                        ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) return '请输入邮箱';
-                          if (!value.contains('@')) return '请输入有效邮箱';
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              controller: resetCodeController,
-                              onChanged: (value) => setDialogState(() {}),
-                              decoration: InputDecoration(
-                                labelText: '验证码',
-                                suffixIcon: resetCodeController.text.isNotEmpty
-                                    ? IconButton(
-                                        icon: const Icon(Icons.clear, size: 18),
-                                        onPressed: () {
-                                          setDialogState(() {
-                                            resetCodeController.clear();
-                                          });
-                                        },
-                                      )
-                                    : null,
-                              ),
-                              validator: (value) {
-                                if (value == null || value.trim().isEmpty) return '请输入验证码';
-                                return null;
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          SizedBox(
-                            width: 110,
-                            child: TextButton(
-                              onPressed: (_resetCountdown > 0 || isSendingResetCode)
-                                  ? null
-                                  : () async {
-                                      final email = resetEmailController.text.trim();
-                                      if (email.isEmpty || !email.contains('@')) {
-                                        AppToast.show(context, '请输入有效邮箱', isError: true);
-                                        return;
-                                      }
-                                      setDialogState(() => isSendingResetCode = true);
-                                      try {
-                                        await ref.read(authRepositoryProvider).sendVerificationCode(email, type: 'reset');
-                                        _resetEndTime = DateTime.now().add(const Duration(seconds: 60));
-                                        setDialogState(() {
-                                          _resetCountdown = 60;
-                                        });
-                                        _resetTimer?.cancel();
-                                        _resetTimer = Timer.periodic(const Duration(seconds: 1), (t) {
-                                          if (!context.mounted) {
-                                            t.cancel();
-                                            return;
-                                          }
-                                          _updateResetCountdown();
-                                        });
-                                        if (context.mounted) {
-                                          AppToast.show(context, '验证码已发送，请检查邮箱');
-                                        }
-                                      } catch (e) {
-                                        if (context.mounted) {
-                                          AppToast.show(context, '发送失败: ${e.toString().replaceAll('ApiException: ', '')}', isError: true);
-                                        }
-                                      } finally {
-                                        if (context.mounted) {
-                                          setDialogState(() => isSendingResetCode = false);
-                                        }
-                                      }
-                                    },
-                              child: isSendingResetCode
-                                  ? const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(strokeWidth: 2),
-                                    )
-                                  : Text(_resetCountdown > 0 ? '${_resetCountdown}s' : '获取验证码'),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: resetPasswordController,
-                        obscureText: obscureResetPassword,
-                        onChanged: (value) => setDialogState(() {}),
-                        decoration: InputDecoration(
-                          labelText: '新密码',
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              obscureResetPassword ? Icons.visibility_off : Icons.visibility,
-                              size: 18,
-                            ),
-                            onPressed: () {
-                              setDialogState(() {
-                                obscureResetPassword = !obscureResetPassword;
-                              });
-                            },
-                          ),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.length < 6) return '密码至少 6 位';
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: resetConfirmPasswordController,
-                        obscureText: obscureResetConfirmPassword,
-                        onChanged: (value) => setDialogState(() {}),
-                        decoration: InputDecoration(
-                          labelText: '确认新密码',
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              obscureResetConfirmPassword ? Icons.visibility_off : Icons.visibility,
-                              size: 18,
-                            ),
-                            onPressed: () {
-                              setDialogState(() {
-                                obscureResetConfirmPassword = !obscureResetConfirmPassword;
-                              });
-                            },
-                          ),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) return '请再次输入密码';
-                          if (value != resetPasswordController.text) return '两次输入的密码不一致';
-                          return null;
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: resetting ? null : () {
-                    Navigator.pop(context);
-                  },
-                  child: const Text('取消'),
-                ),
-                ElevatedButton(
-                  onPressed: resetting
-                      ? null
-                      : () async {
-                          if (resetting) return;
-                          if (!resetFormKey.currentState!.validate()) return;
-                          setDialogState(() => resetting = true);
-                          try {
-                            final authRepo = ref.read(authRepositoryProvider);
-                            await authRepo.resetPassword(
-                              email: resetEmailController.text.trim(),
-                              newPassword: resetPasswordController.text,
-                              code: resetCodeController.text.trim(),
-                            );
-                            if (context.mounted) {
-                              Navigator.pop(context);
-                              AppToast.show(context, '密码重置成功，请使用新密码登录');
-                            }
-                          } catch (e) {
-                            if (context.mounted) {
-                              setDialogState(() => resetting = false);
-                              AppToast.show(context, '重置失败: ${e.toString().replaceAll('ApiException: ', '')}', isError: true);
-                            }
-                          }
-                        },
-                  child: resetting
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('确认'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    ).then((_) {
-      _resetTimer?.cancel();
-      _resetTimer = null;
-      _resetEndTime = null;
-      _resetCountdown = 0;
-      _resetDialogStateSetter = null;
+  void _startResetCountdown() {
+    _resetEndTime = DateTime.now().add(const Duration(seconds: 60));
+    setState(() => _resetCountdown = 60);
+    _resetTimer?.cancel();
+    _resetTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      _updateResetCountdown();
     });
+  }
+
+  Future<void> _sendResetCode() async {
+    if (_isSendingResetCode || _resetCountdown > 0) return;
+    final email = _emailController.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      AppToast.show(context, '请输入有效邮箱', isError: true);
+      return;
+    }
+    setState(() => _isSendingResetCode = true);
+    try {
+      await ref.read(authRepositoryProvider).sendVerificationCode(email, type: 'reset');
+      _startResetCountdown();
+      if (mounted) {
+        AppToast.show(context, '验证码已发送，请检查邮箱');
+      }
+    } catch (e) {
+      if (mounted) {
+        AppToast.show(context, '发送失败: ${e.toString().replaceAll('ApiException: ', '')}', isError: true);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSendingResetCode = false);
+      }
+    }
   }
 
   @override
@@ -458,7 +300,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      _isSignup ? '创建物记账号' : '登录物记',
+                      _isResetPassword
+                          ? '重置密码'
+                          : (_isSignup ? '创建物记账号' : '登录物记'),
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.headlineMedium
                           ?.copyWith(fontWeight: FontWeight.bold),
@@ -493,7 +337,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
                     ],
                     Autocomplete<String>(
                       optionsBuilder: (TextEditingValue textEditingValue) {
-                        if (_isSignup) {
+                        if (_isSignup || _isResetPassword) {
                           return const Iterable<String>.empty();
                         }
                         if (textEditingValue.text.isEmpty) {
@@ -519,9 +363,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
                             child: Container(
                               margin: const EdgeInsets.only(top: 4),
                               constraints: const BoxConstraints(
-                                maxHeight: 200,
-                                maxWidth: 372,
-                              ),
+                                  maxHeight: 200,
+                                  maxWidth: 372,
+                                ),
                               decoration: BoxDecoration(
                                 color: isDark ? const Color(0xFF1E1E24) : Colors.white,
                                 borderRadius: BorderRadius.circular(12),
@@ -588,7 +432,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
                         onFieldSubmitted,
                       ) {
                         return TextFormField(
-                          key: ValueKey(_isSignup ? 'signup_email_field' : 'login_credential_field'),
+                          key: ValueKey(_isResetPassword
+                              ? 'reset_email_field'
+                              : (_isSignup ? 'signup_email_field' : 'login_credential_field')),
                           controller: textEditingController,
                           focusNode: focusNode,
                           onFieldSubmitted: (value) => onFieldSubmitted(),
@@ -597,7 +443,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
                           },
                           keyboardType: TextInputType.emailAddress,
                           decoration: InputDecoration(
-                            labelText: _isSignup ? '邮箱' : '用户名或邮箱',
+                            labelText: (_isSignup || _isResetPassword) ? '邮箱' : '用户名或邮箱',
                             suffixIcon: textEditingController.text.isNotEmpty
                                 ? IconButton(
                                     icon: const Icon(Icons.clear, size: 18),
@@ -607,7 +453,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
                                       });
                                     },
                                   )
-                                : (_savedAccounts.isNotEmpty && !_isSignup
+                                : (_savedAccounts.isNotEmpty && !_isSignup && !_isResetPassword
                                     ? IconButton(
                                         icon: const Icon(Icons.arrow_drop_down),
                                         onPressed: () {
@@ -626,9 +472,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
                           ),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
-                              return _isSignup ? '请输入邮箱' : '请输入用户名或邮箱';
+                              return (_isSignup || _isResetPassword) ? '请输入邮箱' : '请输入用户名或邮箱';
                             }
-                            if (_isSignup && !value.contains('@')) {
+                            if ((_isSignup || _isResetPassword) && !value.contains('@')) {
                               return '请输入有效邮箱';
                             }
                             return null;
@@ -638,14 +484,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
                       textEditingController: _emailController,
                       focusNode: _emailFocusNode,
                     ),
-                    if (_isSignup) ...[
+                    if (_isSignup || _isResetPassword) ...[
                       const SizedBox(height: 16),
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Expanded(
                             child: TextFormField(
-                              key: const ValueKey('signup_code_field'),
+                              key: ValueKey(_isResetPassword ? 'reset_code_field' : 'signup_code_field'),
                               controller: _codeController,
                               onChanged: (value) => setState(() {}),
                               decoration: InputDecoration(
@@ -662,7 +508,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
                                     : null,
                               ),
                               validator: (value) {
-                                if (!_isSignup) return null;
+                                if (!_isSignup && !_isResetPassword) return null;
                                 return (value == null || value.trim().isEmpty)
                                     ? '请输入验证码'
                                     : null;
@@ -673,14 +519,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
                           SizedBox(
                             width: 120,
                             child: TextButton(
-                              onPressed: (_signupCountdown > 0 || _isSendingCode) ? null : _sendSignupCode,
-                              child: _isSendingCode
+                              onPressed: _isResetPassword
+                                  ? ((_resetCountdown > 0 || _isSendingResetCode) ? null : _sendResetCode)
+                                  : ((_signupCountdown > 0 || _isSendingCode) ? null : _sendSignupCode),
+                              child: (_isResetPassword ? _isSendingResetCode : _isSendingCode)
                                   ? const SizedBox(
                                       width: 16,
                                       height: 16,
                                       child: CircularProgressIndicator(strokeWidth: 2),
                                     )
-                                  : Text(_signupCountdown > 0 ? '${_signupCountdown}s' : '获取验证码'),
+                                  : Text(_isResetPassword
+                                      ? (_resetCountdown > 0 ? '${_resetCountdown}s' : '获取验证码')
+                                      : (_signupCountdown > 0 ? '${_signupCountdown}s' : '获取验证码')),
                             ),
                           ),
                         ],
@@ -692,7 +542,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
                       controller: _passwordController,
                       obscureText: _obscurePassword,
                       decoration: InputDecoration(
-                        labelText: _isSignup ? '设置密码' : '密码',
+                        labelText: _isResetPassword
+                            ? '新密码'
+                            : (_isSignup ? '设置密码' : '密码'),
                         suffixIcon: IconButton(
                           icon: Icon(
                             _obscurePassword ? Icons.visibility_off : Icons.visibility,
@@ -712,14 +564,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
                         return null;
                       },
                     ),
-                    if (_isSignup) ...[
+                    if (_isSignup || _isResetPassword) ...[
                       const SizedBox(height: 16),
                       TextFormField(
-                        key: const ValueKey('signup_confirm_password_field'),
+                        key: ValueKey(_isResetPassword ? 'reset_confirm_password_field' : 'signup_confirm_password_field'),
                         controller: _confirmPasswordController,
                         obscureText: _obscureConfirmPassword,
                         decoration: InputDecoration(
-                          labelText: '确认密码',
+                          labelText: _isResetPassword ? '确认新密码' : '确认密码',
                           suffixIcon: IconButton(
                             icon: Icon(
                               _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
@@ -733,7 +585,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
                           ),
                         ),
                         validator: (value) {
-                          if (!_isSignup) return null;
+                          if (!_isSignup && !_isResetPassword) return null;
                           if (value == null || value.isEmpty) {
                             return '请再次输入密码';
                           }
@@ -744,40 +596,70 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
                         },
                       ),
                     ],
-                    if (!_isSignup)
+                    if (!_isSignup && !_isResetPassword)
                       Align(
                         alignment: Alignment.centerRight,
                         child: TextButton(
-                          onPressed: _showResetPasswordDialog,
+                          onPressed: () {
+                            setState(() {
+                              _isResetPassword = true;
+                              _isSignup = false;
+                              _emailController.clear();
+                              _passwordController.clear();
+                              _confirmPasswordController.clear();
+                              _nameController.clear();
+                              _codeController.clear();
+                            });
+                          },
                           child: const Text('忘记密码？'),
                         ),
                       ),
                     const SizedBox(height: 24),
                     FilledButton(
-                      onPressed: isLoading ? null : _submit,
-                      child: isLoading
+                      onPressed: (isLoading || _isResettingPassword) ? null : _submit,
+                      child: (isLoading || _isResettingPassword)
                           ? const SizedBox(
                               width: 20,
                               height: 20,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : Text(_isSignup ? '注册并登录' : '登录'),
+                          : Text(_isResetPassword
+                              ? '重置密码'
+                              : (_isSignup ? '注册并登录' : '登录')),
                     ),
-                    TextButton(
-                      onPressed: isLoading
-                          ? null
-                          : () {
-                              setState(() {
-                                _isSignup = !_isSignup;
-                                _emailController.clear();
-                                _passwordController.clear();
-                                _confirmPasswordController.clear();
-                                _nameController.clear();
-                                _codeController.clear();
-                              });
-                            },
-                      child: Text(_isSignup ? '已有账号？去登录' : '没有账号？去注册'),
-                    ),
+                    if (_isResetPassword)
+                      TextButton(
+                        onPressed: (isLoading || _isResettingPassword)
+                            ? null
+                            : () {
+                                setState(() {
+                                  _isResetPassword = false;
+                                  _isSignup = false;
+                                  _emailController.clear();
+                                  _passwordController.clear();
+                                  _confirmPasswordController.clear();
+                                  _nameController.clear();
+                                  _codeController.clear();
+                                });
+                              },
+                        child: const Text('返回登录'),
+                      )
+                    else
+                      TextButton(
+                        onPressed: isLoading
+                            ? null
+                            : () {
+                                setState(() {
+                                  _isSignup = !_isSignup;
+                                  _emailController.clear();
+                                  _passwordController.clear();
+                                  _confirmPasswordController.clear();
+                                  _nameController.clear();
+                                  _codeController.clear();
+                                });
+                              },
+                        child: Text(_isSignup ? '已有账号？去登录' : '没有账号？去注册'),
+                      ),
                   ],
                 ),
               ),
