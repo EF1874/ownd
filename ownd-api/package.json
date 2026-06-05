@@ -48,6 +48,7 @@
     "minio": "^8.0.7",
     "nest-winston": "^1.10.2",
     "nestjs-throttler-storage-redis": "^0.5.1",
+    "nodemailer": "^8.0.10",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.20.0",
