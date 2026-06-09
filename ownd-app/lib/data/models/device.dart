@@ -104,10 +104,10 @@ class Device {
   }
 
   String get status {
-    if (scrapDate != null && scrapDate!.isBefore(DateTime.now())) {
+    if (scrapDate != null) {
       return 'scrap';
     }
-    if (backupDate != null && backupDate!.isBefore(DateTime.now())) {
+    if (backupDate != null) {
       return 'backup';
     }
     return 'active';

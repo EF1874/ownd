@@ -337,7 +337,7 @@ class _DeviceListItemState extends ConsumerState<DeviceListItem>
       if (device.status == 'scrap') {
         badges.add(const StatusBadge(text: '报废', color: Colors.grey));
       } else {
-        if (device.backupDate != null) {
+        if (device.status == 'backup') {
           badges.add(const StatusBadge(text: '备用', color: Colors.blue));
         } else if (device.warrantyEndDate != null && device.warrantyEndDate!.isBefore(DateTime.now())) {
           badges.add(const StatusBadge(text: '过保', color: Colors.orange));
