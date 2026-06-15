@@ -120,7 +120,7 @@ class DeviceDetailScreen extends ConsumerWidget {
                       if (isSub) ...[
                         _buildSubscriptionInfoCard(device, theme, context, ref),
                         const SizedBox(height: 16),
-                        _buildSubscriptionHistory(device, theme),
+                        _buildSubscriptionHistory(device, theme, context, ref),
                       ] else
                         _buildBasicInfoCard(device, theme),
                       if (device.notes != null && device.notes!.isNotEmpty) ...[
@@ -386,16 +386,25 @@ class DeviceDetailScreen extends ConsumerWidget {
           ],
           const Divider(height: 24),
           _InfoRow(
-            label: device.isAutoRenew ? '到期/续费时间' : '到期时间',
+            label: '到期日期',
             value: dueDate == null ? '未设置' : dateFormat.format(dueDate),
           ),
           const Divider(height: 24),
           _InfoRow(
-            label: '当前订阅模式',
-            value: SubscriptionUtils.cycleLabel(device.cycleType),
+            label: '本期订阅模式',
+            value: _subscriptionModeLabel(
+              device.cycleType,
+              device.cycleCalculationMode,
+              device.cycleDays,
+            ),
           ),
           const Divider(height: 24),
-          _InfoRow(label: '续费方式', value: device.isAutoRenew ? '自动续费' : '手动续费'),
+          _SwitchInfoRow(
+            label: '自动续费',
+            value: device.isAutoRenew,
+            onChanged: (enabled) =>
+                _toggleAutoRenew(context, ref, device, enabled),
+          ),
           const Divider(height: 24),
           _SwitchInfoRow(
             label: '到期提醒',
@@ -412,7 +421,7 @@ class DeviceDetailScreen extends ConsumerWidget {
             child: OutlinedButton.icon(
               onPressed: () => _showRenewDialog(context, ref, device),
               icon: const Icon(Icons.event_repeat),
-              label: const Text('手动续费'),
+              label: const Text('新增订阅记录'),
               style: OutlinedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
@@ -429,7 +438,7 @@ class DeviceDetailScreen extends ConsumerWidget {
     Device device,
   ) async {
     if (device.cycleType == null || device.cycleType == CycleType.oneTime) {
-      AppToast.show(context, '当前订阅无法续费', isError: true);
+      AppToast.show(context, '当前订阅无法新增记录', isError: true);
       return;
     }
 
@@ -445,28 +454,35 @@ class DeviceDetailScreen extends ConsumerWidget {
     final initialEndDate = SubscriptionUtils.calculateNextBillingDate(
       initialStartDate,
       device.cycleType!,
+      calculationMode: device.cycleCalculationMode,
+      cycleDays: device.cycleDays,
     );
 
     final result = await showDialog<RenewDialogResult>(
       context: context,
       builder: (dialogContext) => RenewDialog(
         initialCycleType: device.cycleType!,
+        initialCycleCalculationMode: device.cycleCalculationMode,
+        initialCycleDays: device.cycleDays,
         initialPrice: device.periodPrice ?? device.price,
         initialRecordDate: today,
         initialStartDate: initialStartDate,
         initialEndDate: initialEndDate,
-        previousEndDate: dueDate,
+        previousEndDate: null,
+        dateRangeValidator: (startDate, endDate) =>
+            _subscriptionOverlapMessage(device.history, startDate, endDate),
       ),
     );
     if (result == null || !context.mounted) return;
 
-    if (dueDate != null &&
-        !SubscriptionUtils.dateOnly(
-          result.startDate,
-        ).isAfter(SubscriptionUtils.dateOnly(dueDate))) {
-      AppToast.show(context, '续费开始日期不能和上一期重复', isError: true);
-      return;
-    }
+    final oldDeviceHistory = device.history.toList();
+    final oldNextBillingDate = device.nextBillingDate;
+    final oldTotal = device.totalAccumulatedPrice;
+    final oldPeriodPrice = device.periodPrice;
+    final oldDevicePrice = device.price;
+    final oldCycleType = device.cycleType;
+    final oldCycleCalculationMode = device.cycleCalculationMode;
+    final oldCycleDays = device.cycleDays;
 
     try {
       final historyEntry = SubscriptionHistory()
@@ -475,28 +491,57 @@ class DeviceDetailScreen extends ConsumerWidget {
         ..price = result.price
         ..isAutoRenew = false
         ..cycleType = result.cycleType
+        ..cycleCalculationMode = result.cycleCalculationMode
+        ..cycleDays = result.cycleDays
         ..recordDate = result.recordDate
-        ..note = '手动续费';
-      final previousTotal = _subscriptionTotal(device);
+        ..note = result.note;
       final histories = device.history.toList()..add(historyEntry);
 
-      device
-        ..history = histories
-        ..cycleType = result.cycleType
-        ..price = result.price
-        ..periodPrice = result.price
-        ..nextBillingDate = result.endDate
-        ..totalAccumulatedPrice = previousTotal + result.price;
+      device.history = histories;
+      _recalculateSubscription(device);
 
       await ref.read(deviceRepositoryProvider).updateDevice(device);
       await _syncSubscriptionNotification(ref, device);
       ref.invalidate(deviceDetailProvider(id));
       await ref.read(homeDevicesNotifierProvider.notifier).silentRefresh();
       if (!context.mounted) return;
-      AppToast.show(context, '续费成功');
+      AppToast.show(context, '订阅记录已新增');
     } catch (e) {
+      device
+        ..history = oldDeviceHistory
+        ..nextBillingDate = oldNextBillingDate
+        ..totalAccumulatedPrice = oldTotal
+        ..periodPrice = oldPeriodPrice
+        ..price = oldDevicePrice
+        ..cycleType = oldCycleType
+        ..cycleCalculationMode = oldCycleCalculationMode
+        ..cycleDays = oldCycleDays;
       if (!context.mounted) return;
-      AppToast.show(context, '续费失败: ${userErrorMessage(e)}', isError: true);
+      AppToast.show(context, '新增失败: ${userErrorMessage(e)}', isError: true);
+    }
+  }
+
+  Future<void> _toggleAutoRenew(
+    BuildContext context,
+    WidgetRef ref,
+    Device device,
+    bool enabled,
+  ) async {
+    final previousAutoRenew = device.isAutoRenew;
+
+    try {
+      device.isAutoRenew = enabled;
+
+      await ref.read(deviceRepositoryProvider).updateDevice(device);
+      await _syncSubscriptionNotification(ref, device);
+      ref.invalidate(deviceDetailProvider(id));
+      await ref.read(homeDevicesNotifierProvider.notifier).silentRefresh();
+      if (!context.mounted) return;
+      AppToast.show(context, enabled ? '已开启自动续费' : '已关闭自动续费');
+    } catch (e) {
+      device.isAutoRenew = previousAutoRenew;
+      if (!context.mounted) return;
+      AppToast.show(context, '自动续费设置失败: ${userErrorMessage(e)}', isError: true);
     }
   }
 
@@ -607,7 +652,12 @@ class DeviceDetailScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildSubscriptionHistory(Device device, ThemeData theme) {
+  Widget _buildSubscriptionHistory(
+    Device device,
+    ThemeData theme,
+    BuildContext context,
+    WidgetRef ref,
+  ) {
     final dateFormat = DateFormat('yyyy-MM-dd');
     final periods = _subscriptionPeriods(device);
 
@@ -652,6 +702,19 @@ class DeviceDetailScreen extends ConsumerWidget {
                   period: period,
                   dateFormat: dateFormat,
                   theme: theme,
+                  onEdit: period.canEdit
+                      ? () => _showEditHistoryDialog(
+                          context,
+                          ref,
+                          device,
+                          periods,
+                          period,
+                        )
+                      : null,
+                  onDelete: period.canEdit
+                      ? () =>
+                            _confirmDeleteHistory(context, ref, device, period)
+                      : null,
                 ),
               );
             }),
@@ -664,13 +727,9 @@ class DeviceDetailScreen extends ConsumerWidget {
     final histories = [...device.history]
       ..sort((a, b) {
         final aDate =
-            a.startDate ??
-            a.recordDate ??
-            DateTime.fromMillisecondsSinceEpoch(0);
+            a.startDate ?? a.endDate ?? DateTime.fromMillisecondsSinceEpoch(0);
         final bDate =
-            b.startDate ??
-            b.recordDate ??
-            DateTime.fromMillisecondsSinceEpoch(0);
+            b.startDate ?? b.endDate ?? DateTime.fromMillisecondsSinceEpoch(0);
         return aDate.compareTo(bDate);
       });
 
@@ -681,16 +740,20 @@ class DeviceDetailScreen extends ConsumerWidget {
               ..endDate = device.subscriptionDueDate
               ..price = device.price
               ..cycleType = device.cycleType ?? CycleType.monthly
+              ..cycleCalculationMode = device.cycleCalculationMode
+              ..cycleDays = device.cycleDays
               ..recordDate = device.purchaseDate,
           ]
         : histories;
 
+    final usingFallback = histories.isEmpty;
     return source.asMap().entries.map((entry) {
       final history = entry.value;
       return _SubscriptionPeriod(
         index: entry.key + 1,
         history: history,
         status: _periodStatus(history),
+        canEdit: !usingFallback,
       );
     }).toList();
   }
@@ -734,6 +797,226 @@ class DeviceDetailScreen extends ConsumerWidget {
     if (today.isAfter(endDay)) return _SubscriptionPeriodStatus.ended;
     return _SubscriptionPeriodStatus.active;
   }
+
+  Future<void> _showEditHistoryDialog(
+    BuildContext context,
+    WidgetRef ref,
+    Device device,
+    List<_SubscriptionPeriod> periods,
+    _SubscriptionPeriod period,
+  ) async {
+    final history = period.history;
+    final startDate = history.startDate;
+    final endDate = history.endDate;
+    if (startDate == null || endDate == null) {
+      AppToast.show(context, '这条记录缺少日期，暂时无法编辑', isError: true);
+      return;
+    }
+
+    final result = await showDialog<RenewDialogResult>(
+      context: context,
+      builder: (dialogContext) => RenewDialog(
+        title: '编辑订阅记录',
+        initialCycleType: history.cycleType,
+        initialCycleCalculationMode: history.cycleCalculationMode,
+        initialCycleDays: history.cycleDays,
+        initialPrice: history.price,
+        initialRecordDate: history.recordDate ?? DateTime.now(),
+        initialStartDate: startDate,
+        initialEndDate: endDate,
+        initialNote: history.note,
+        previousEndDate: null,
+        dateRangeValidator: (startDate, endDate) => _subscriptionOverlapMessage(
+          device.history,
+          startDate,
+          endDate,
+          ignoredHistory: history,
+        ),
+      ),
+    );
+    if (result == null || !context.mounted) return;
+
+    final oldHistory = SubscriptionHistory()
+      ..uuid = history.uuid
+      ..cycleType = history.cycleType
+      ..cycleCalculationMode = history.cycleCalculationMode
+      ..cycleDays = history.cycleDays
+      ..price = history.price
+      ..recordDate = history.recordDate
+      ..startDate = history.startDate
+      ..endDate = history.endDate
+      ..note = history.note;
+    final oldDeviceHistory = device.history.toList();
+    final oldNextBillingDate = device.nextBillingDate;
+    final oldTotal = device.totalAccumulatedPrice;
+    final oldPeriodPrice = device.periodPrice;
+    final oldDevicePrice = device.price;
+    final oldCycleType = device.cycleType;
+    final oldCycleCalculationMode = device.cycleCalculationMode;
+    final oldCycleDays = device.cycleDays;
+    history
+      ..cycleType = result.cycleType
+      ..cycleCalculationMode = result.cycleCalculationMode
+      ..cycleDays = result.cycleDays
+      ..price = result.price
+      ..recordDate = result.recordDate
+      ..startDate = result.startDate
+      ..endDate = result.endDate
+      ..note = result.note;
+    _recalculateSubscription(device);
+
+    try {
+      await ref.read(deviceRepositoryProvider).updateHistory(device, history);
+      await _syncSubscriptionNotification(ref, device);
+      ref.invalidate(deviceDetailProvider(id));
+      await ref.read(homeDevicesNotifierProvider.notifier).silentRefresh();
+      if (!context.mounted) return;
+      AppToast.show(context, '订阅记录已更新');
+    } catch (e) {
+      history
+        ..uuid = oldHistory.uuid
+        ..cycleType = oldHistory.cycleType
+        ..cycleCalculationMode = oldHistory.cycleCalculationMode
+        ..cycleDays = oldHistory.cycleDays
+        ..price = oldHistory.price
+        ..recordDate = oldHistory.recordDate
+        ..startDate = oldHistory.startDate
+        ..endDate = oldHistory.endDate
+        ..note = oldHistory.note;
+      device
+        ..history = oldDeviceHistory
+        ..nextBillingDate = oldNextBillingDate
+        ..totalAccumulatedPrice = oldTotal
+        ..periodPrice = oldPeriodPrice
+        ..price = oldDevicePrice
+        ..cycleType = oldCycleType
+        ..cycleCalculationMode = oldCycleCalculationMode
+        ..cycleDays = oldCycleDays;
+      if (!context.mounted) return;
+      AppToast.show(context, '保存失败: ${userErrorMessage(e)}', isError: true);
+    }
+  }
+
+  Future<void> _confirmDeleteHistory(
+    BuildContext context,
+    WidgetRef ref,
+    Device device,
+    _SubscriptionPeriod period,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('删除这条订阅记录？'),
+        content: const Text('删除后会重新计算累计支出和当前到期日。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    final history = period.history;
+    final oldDeviceHistory = device.history.toList();
+    final oldNextBillingDate = device.nextBillingDate;
+    final oldTotal = device.totalAccumulatedPrice;
+    final oldPeriodPrice = device.periodPrice;
+    final oldDevicePrice = device.price;
+    final oldCycleType = device.cycleType;
+    final oldCycleCalculationMode = device.cycleCalculationMode;
+    final oldCycleDays = device.cycleDays;
+    final histories = device.history.toList()..remove(history);
+    device.history = histories;
+    _recalculateSubscription(device);
+
+    try {
+      await ref.read(deviceRepositoryProvider).deleteHistory(device, history);
+      await _syncSubscriptionNotification(ref, device);
+      ref.invalidate(deviceDetailProvider(id));
+      await ref.read(homeDevicesNotifierProvider.notifier).silentRefresh();
+      if (!context.mounted) return;
+      AppToast.show(context, '订阅记录已删除');
+    } catch (e) {
+      device
+        ..history = oldDeviceHistory
+        ..nextBillingDate = oldNextBillingDate
+        ..totalAccumulatedPrice = oldTotal
+        ..periodPrice = oldPeriodPrice
+        ..price = oldDevicePrice
+        ..cycleType = oldCycleType
+        ..cycleCalculationMode = oldCycleCalculationMode
+        ..cycleDays = oldCycleDays;
+      if (!context.mounted) return;
+      AppToast.show(context, '删除失败: ${userErrorMessage(e)}', isError: true);
+    }
+  }
+
+  void _recalculateSubscription(Device device) {
+    final sorted = device.history.toList()
+      ..sort((a, b) {
+        final aDate = a.startDate ?? a.endDate ?? DateTime(0);
+        final bDate = b.startDate ?? b.endDate ?? DateTime(0);
+        return aDate.compareTo(bDate);
+      });
+    final latest = sorted.isEmpty ? null : sorted.last;
+    final total = sorted.fold<double>(0, (sum, item) => sum + item.price);
+
+    device
+      ..history = sorted
+      ..nextBillingDate = latest?.endDate
+      ..totalAccumulatedPrice = total
+      ..periodPrice = latest?.price ?? device.periodPrice
+      ..price = latest?.price ?? device.price
+      ..cycleType = latest?.cycleType ?? device.cycleType
+      ..cycleCalculationMode =
+          latest?.cycleCalculationMode ?? device.cycleCalculationMode
+      ..cycleDays = latest?.cycleDays ?? device.cycleDays;
+  }
+
+  String _subscriptionModeLabel(
+    CycleType? cycleType,
+    CycleCalculationMode calculationMode,
+    int? cycleDays,
+  ) {
+    if (cycleType == null) return '未设置';
+    return '${SubscriptionUtils.cycleLabel(cycleType)} · ${SubscriptionUtils.calculationModeLabel(calculationMode, cycleDays: cycleDays)}';
+  }
+
+  String? _subscriptionOverlapMessage(
+    List<SubscriptionHistory> histories,
+    DateTime startDate,
+    DateTime endDate, {
+    SubscriptionHistory? ignoredHistory,
+  }) {
+    final startDay = SubscriptionUtils.dateOnly(startDate);
+    final endDay = SubscriptionUtils.dateOnly(endDate);
+    if (endDay.isBefore(startDay)) return '到期日期不能早于开始日期';
+
+    for (final history in histories) {
+      if (identical(history, ignoredHistory)) continue;
+      final existingStart = history.startDate;
+      final existingEnd = history.endDate;
+      if (existingStart == null || existingEnd == null) continue;
+
+      final existingStartDay = SubscriptionUtils.dateOnly(existingStart);
+      final existingEndDay = SubscriptionUtils.dateOnly(existingEnd);
+      final overlaps =
+          !startDay.isAfter(existingEndDay) &&
+          !endDay.isBefore(existingStartDay);
+      if (overlaps) return '订阅日期不能和已有记录重叠';
+    }
+    return null;
+  }
 }
 
 enum _SubscriptionPeriodStatus { active, upcoming, ended, unknown }
@@ -742,11 +1025,13 @@ class _SubscriptionPeriod {
   final int index;
   final SubscriptionHistory history;
   final _SubscriptionPeriodStatus status;
+  final bool canEdit;
 
   const _SubscriptionPeriod({
     required this.index,
     required this.history,
     required this.status,
+    required this.canEdit,
   });
 }
 
@@ -754,37 +1039,38 @@ class _SubscriptionPeriodTile extends StatelessWidget {
   final _SubscriptionPeriod period;
   final DateFormat dateFormat;
   final ThemeData theme;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   const _SubscriptionPeriodTile({
     required this.period,
     required this.dateFormat,
     required this.theme,
+    this.onEdit,
+    this.onDelete,
   });
 
   @override
   Widget build(BuildContext context) {
     final history = period.history;
-    final statusColor = _statusColor(context, period.status);
-    final isActive = period.status == _SubscriptionPeriodStatus.active;
+    final statusStyle = _statusStyle(context, period.status);
     final durationDays = history.startDate != null && history.endDate != null
         ? SubscriptionUtils.dateOnly(history.endDate!)
                   .difference(SubscriptionUtils.dateOnly(history.startDate!))
                   .inDays +
               1
         : null;
+    final isAutoRenewal = _isAutoRenewalHistory(history);
+    final displayNote = _displayNote(history);
 
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isActive
-            ? statusColor.withValues(alpha: 0.08)
-            : theme.colorScheme.surface,
+        color: statusStyle.background,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: isActive
-              ? statusColor.withValues(alpha: 0.65)
-              : theme.dividerColor.withValues(alpha: 0.6),
-          width: isActive ? 1.4 : 1,
+          color: statusStyle.border,
+          width: statusStyle.borderWidth,
         ),
       ),
       child: Column(
@@ -809,7 +1095,7 @@ class _SubscriptionPeriodTile extends StatelessWidget {
                     const SizedBox(width: 8),
                     _StatusBadge(
                       label: _statusLabel(period.status),
-                      color: statusColor,
+                      color: statusStyle.accent,
                     ),
                   ],
                 ),
@@ -824,6 +1110,49 @@ class _SubscriptionPeriodTile extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                 ),
               ),
+              if (onEdit != null || onDelete != null) ...[
+                const SizedBox(width: 4),
+                PopupMenuButton<_HistoryAction>(
+                  tooltip: '记录操作',
+                  icon: const Icon(Icons.more_vert, size: 20),
+                  onSelected: (action) {
+                    switch (action) {
+                      case _HistoryAction.edit:
+                        onEdit?.call();
+                        break;
+                      case _HistoryAction.delete:
+                        onDelete?.call();
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: _HistoryAction.edit,
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(Icons.edit_outlined),
+                        title: Text('编辑记录'),
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: _HistoryAction.delete,
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          Icons.delete_outline,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                        title: Text(
+                          '删除记录',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 10),
@@ -831,20 +1160,29 @@ class _SubscriptionPeriodTile extends StatelessWidget {
           const SizedBox(height: 6),
           _PeriodInfoRow(label: '到期日期', value: _formatDate(history.endDate)),
           const SizedBox(height: 6),
-          _PeriodInfoRow(label: '记录日期', value: _formatDate(history.recordDate)),
-          const SizedBox(height: 6),
-          _PeriodInfoRow(
-            label: '订阅模式',
+          _PeriodModeRow(
             value:
-                '${SubscriptionUtils.cycleLabel(history.cycleType)}${durationDays == null ? '' : ' · $durationDays天'}',
+                '${SubscriptionUtils.cycleLabel(history.cycleType)} · ${SubscriptionUtils.calculationModeLabel(history.cycleCalculationMode, cycleDays: history.cycleDays)}${durationDays == null ? '' : ' · $durationDays天'}',
+            showAutoRenewBadge: isAutoRenewal,
           ),
-          if (history.note != null && history.note!.isNotEmpty) ...[
+          if (displayNote != null) ...[
             const SizedBox(height: 6),
-            _PeriodInfoRow(label: '备注', value: history.note!),
+            _PeriodInfoRow(label: '备注', value: displayNote),
           ],
         ],
       ),
     );
+  }
+
+  bool _isAutoRenewalHistory(SubscriptionHistory history) {
+    if (history.isAutoRenew) return true;
+    return history.note?.trim().startsWith('自动续费') ?? false;
+  }
+
+  String? _displayNote(SubscriptionHistory history) {
+    final note = history.note?.trim();
+    if (note == null || note.isEmpty) return null;
+    return note.startsWith('自动续费') ? null : note;
   }
 
   String _formatDate(DateTime? date) {
@@ -861,14 +1199,54 @@ class _SubscriptionPeriodTile extends StatelessWidget {
     };
   }
 
-  Color _statusColor(BuildContext context, _SubscriptionPeriodStatus status) {
+  _PeriodStatusStyle _statusStyle(
+    BuildContext context,
+    _SubscriptionPeriodStatus status,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
     return switch (status) {
-      _SubscriptionPeriodStatus.active => Theme.of(context).colorScheme.primary,
-      _SubscriptionPeriodStatus.upcoming => Colors.blueGrey,
-      _SubscriptionPeriodStatus.ended => AppColors.ash,
-      _SubscriptionPeriodStatus.unknown => AppColors.ash,
+      _SubscriptionPeriodStatus.active => _PeriodStatusStyle(
+        accent: colorScheme.primary,
+        background: colorScheme.primary.withValues(alpha: 0.10),
+        border: colorScheme.primary.withValues(alpha: 0.72),
+        borderWidth: 1.6,
+      ),
+      _SubscriptionPeriodStatus.upcoming => _PeriodStatusStyle(
+        accent: Colors.teal.shade700,
+        background: Colors.teal.withValues(alpha: 0.08),
+        border: Colors.teal.withValues(alpha: 0.48),
+        borderWidth: 1.2,
+      ),
+      _SubscriptionPeriodStatus.ended => _PeriodStatusStyle(
+        accent: Colors.blueGrey.shade600,
+        background: Colors.blueGrey.withValues(alpha: 0.055),
+        border: Colors.blueGrey.withValues(alpha: 0.24),
+        borderWidth: 1,
+      ),
+      _SubscriptionPeriodStatus.unknown => _PeriodStatusStyle(
+        accent: AppColors.ash,
+        background: theme.colorScheme.surface,
+        border: theme.dividerColor.withValues(alpha: 0.6),
+        borderWidth: 1,
+      ),
     };
   }
+}
+
+enum _HistoryAction { edit, delete }
+
+class _PeriodStatusStyle {
+  final Color accent;
+  final Color background;
+  final Color border;
+  final double borderWidth;
+
+  const _PeriodStatusStyle({
+    required this.accent,
+    required this.background,
+    required this.border,
+    required this.borderWidth,
+  });
 }
 
 class _StatusBadge extends StatelessWidget {
@@ -930,15 +1308,84 @@ class _PeriodInfoRow extends StatelessWidget {
   }
 }
 
+class _PeriodModeRow extends StatelessWidget {
+  final String value;
+  final bool showAutoRenewBadge;
+
+  const _PeriodModeRow({required this.value, required this.showAutoRenewBadge});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 64,
+          child: Text(
+            '订阅模式',
+            style: theme.textTheme.bodySmall?.copyWith(color: AppColors.ash),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                value,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurface,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              if (showAutoRenewBadge)
+                _InlineTag(label: '系统续期', color: theme.colorScheme.primary),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _InlineTag extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _InlineTag({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
 class _SwitchInfoRow extends StatelessWidget {
   final String label;
-  final String subtitle;
+  final String? subtitle;
   final bool value;
   final ValueChanged<bool> onChanged;
 
   const _SwitchInfoRow({
     required this.label,
-    required this.subtitle,
+    this.subtitle,
     required this.value,
     required this.onChanged,
   });
@@ -958,14 +1405,16 @@ class _SwitchInfoRow extends StatelessWidget {
                   color: AppColors.ash,
                 ),
               ),
-              const SizedBox(height: 3),
-              Text(
-                subtitle,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurface,
-                  fontWeight: FontWeight.w500,
+              if (subtitle != null) ...[
+                const SizedBox(height: 3),
+                Text(
+                  subtitle!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),

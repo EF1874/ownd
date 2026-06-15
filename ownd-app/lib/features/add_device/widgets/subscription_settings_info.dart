@@ -1,31 +1,34 @@
 import 'package:flutter/material.dart';
 import '../../../../data/models/device.dart';
 import '../../../../shared/widgets/app_text_field.dart';
+import '../../../../shared/widgets/subscription_cycle_mode_selector.dart';
 import '../../../../shared/widgets/subscription_cycle_dropdown.dart';
 
 class SubscriptionSettingsInfo extends StatelessWidget {
   final CycleType? cycleType;
+  final CycleCalculationMode cycleCalculationMode;
+  final int? cycleDays;
   final bool isAutoRenew;
   final int reminderDays;
-  final bool hasFirstPeriodDiscount;
-  final TextEditingController firstPeriodPriceController;
+  final TextEditingController renewalPriceController;
 
   final Function(CycleType?) onCycleTypeChanged;
+  final Function(CycleCalculationMode, int?) onCycleCalculationChanged;
   final Function(bool) onAutoRenewChanged;
   final Function(int) onReminderDaysChanged;
-  final Function(bool) onDiscountChanged;
 
   const SubscriptionSettingsInfo({
     super.key,
     required this.cycleType,
+    required this.cycleCalculationMode,
+    required this.cycleDays,
     required this.isAutoRenew,
     required this.reminderDays,
-    required this.hasFirstPeriodDiscount,
-    required this.firstPeriodPriceController,
+    required this.renewalPriceController,
     required this.onCycleTypeChanged,
+    required this.onCycleCalculationChanged,
     required this.onAutoRenewChanged,
     required this.onReminderDaysChanged,
-    required this.onDiscountChanged,
   });
 
   @override
@@ -63,44 +66,20 @@ class SubscriptionSettingsInfo extends StatelessWidget {
         ),
         const SizedBox(height: 16),
 
-        if (isAutoRenew) ...[
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  height: 58,
-                  alignment: Alignment.centerLeft,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('首期优惠'),
-                      Switch(
-                        value: hasFirstPeriodDiscount,
-                        onChanged: onDiscountChanged,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: AppTextField(
-                  controller: firstPeriodPriceController,
-                  label: '首期价格',
-                  enabled: hasFirstPeriodDiscount,
-                  keyboardType: TextInputType.number,
-                  labelStyle: TextStyle(
-                    color: hasFirstPeriodDiscount
-                        ? Theme.of(context).hintColor
-                        : Theme.of(context).disabledColor,
-                  ),
-                ),
-              ),
-            ],
+        if (isAutoRenew &&
+            cycleType != null &&
+            cycleType != CycleType.oneTime) ...[
+          AppTextField(
+            controller: renewalPriceController,
+            label: '续费价格',
+            keyboardType: TextInputType.number,
+          ),
+          const SizedBox(height: 16),
+          SubscriptionCycleModeSelector(
+            cycleType: cycleType!,
+            calculationMode: cycleCalculationMode,
+            cycleDays: cycleDays,
+            onChanged: onCycleCalculationChanged,
           ),
           const SizedBox(height: 16),
         ],
@@ -163,31 +142,34 @@ class _ReminderControl extends StatelessWidget {
         ),
         const SizedBox(width: 16),
         Expanded(
-          child: InputDecorator(
-            decoration: const InputDecoration(
-              labelText: '提前提醒',
-              border: OutlineInputBorder(),
-              contentPadding: EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 16,
+          child: SizedBox(
+            height: 56,
+            child: InputDecorator(
+              decoration: const InputDecoration(
+                labelText: '提前提醒',
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 16,
+                ),
               ),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<int>(
-                value: _enabled ? _selectedDays : null,
-                hint: Text('不提醒', style: textStyle),
-                isExpanded: true,
-                isDense: true,
-                style: textStyle,
-                items: SubscriptionSettingsInfo._reminderOptions.map((days) {
-                  return DropdownMenuItem(
-                    value: days,
-                    child: Text('$days天', style: textStyle),
-                  );
-                }).toList(),
-                onChanged: _enabled
-                    ? (v) => onReminderDaysChanged(v ?? _selectedDays)
-                    : null,
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<int>(
+                  value: _enabled ? _selectedDays : null,
+                  hint: Text('不提醒', style: textStyle),
+                  isExpanded: true,
+                  isDense: true,
+                  style: textStyle,
+                  items: SubscriptionSettingsInfo._reminderOptions.map((days) {
+                    return DropdownMenuItem(
+                      value: days,
+                      child: Text('$days天', style: textStyle),
+                    );
+                  }).toList(),
+                  onChanged: _enabled
+                      ? (v) => onReminderDaysChanged(v ?? _selectedDays)
+                      : null,
+                ),
               ),
             ),
           ),

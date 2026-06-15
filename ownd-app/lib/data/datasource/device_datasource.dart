@@ -32,6 +32,10 @@ abstract class DeviceDataSource {
   /// Update an existing device.
   Future<void> update(Device device);
 
+  Future<Device> updateHistory(Device device, SubscriptionHistory history);
+
+  Future<Device> deleteHistory(Device device, SubscriptionHistory history);
+
   /// Delete a device by its ID.
   Future<void> delete(int id);
 }

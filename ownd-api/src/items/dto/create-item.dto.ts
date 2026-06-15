@@ -14,7 +14,7 @@ import {
   Max,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ItemCycleType } from '@prisma/client';
+import { ItemCycleCalculationMode, ItemCycleType } from '@prisma/client';
 
 export class CreateItemDto {
   @ApiProperty({ description: '图片路径', required: false })
@@ -31,6 +31,13 @@ export class CreateItemDto {
   @IsNumber()
   @IsNotEmpty()
   price: number;
+
+  @ApiProperty({ description: '续费价格', example: 20, required: false })
+  @IsNumber()
+  @Type(() => Number)
+  @IsOptional()
+  @Min(0, { message: '续费价格不能小于0' })
+  renewalPrice?: number;
 
   @ApiProperty({ description: '购买日期', example: '2023-01-01' })
   @IsOptional()
@@ -88,6 +95,22 @@ export class CreateItemDto {
   @IsOptional()
   @Min(1, { message: '当前周期数值必须大于0' })
   currentCycle?: number;
+
+  @ApiProperty({
+    description: '周期计算方式',
+    enum: ItemCycleCalculationMode,
+    required: false,
+  })
+  @IsEnum(ItemCycleCalculationMode)
+  @IsOptional()
+  currentCycleMode?: ItemCycleCalculationMode;
+
+  @ApiProperty({ description: '固定天数周期', example: 30, required: false })
+  @IsNumber()
+  @Type(() => Number)
+  @IsOptional()
+  @Min(1, { message: '固定天数必须大于0' })
+  currentCycleDays?: number;
 
   @ApiProperty({
     description: '本期到期日',

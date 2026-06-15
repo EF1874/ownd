@@ -206,6 +206,7 @@ class DataTransferService {
       'categoryName': (detail['category'] as Map<String, dynamic>?)?['name'],
       'categoryUuid': (detail['category'] as Map<String, dynamic>?)?['id'],
       'price': detail['price'],
+      'renewalPrice': detail['renewalPrice'],
       'purchaseDate': detail['purchaseDate'],
       'platform': (detail['platform'] as Map<String, dynamic>?)?['name'],
       'warrantyEndDate': detail['warrantyEndDate'],
@@ -216,6 +217,8 @@ class DataTransferService {
       'tags': detail['tags'] ?? const [],
       'cycleType': _cycleTypeFromApi(detail['currentCycleType'] as String?),
       'currentCycle': detail['currentCycle'],
+      'cycleMode': detail['currentCycleMode'] ?? 'CALENDAR',
+      'cycleDays': detail['currentCycleDays'],
       'isAutoRenew': detail['isAutoRenew'] ?? false,
       'nextBillingDate': detail['nextBillingDate'],
       'reminderDays': detail['reminderDays'] ?? 0,
@@ -243,8 +246,14 @@ class DataTransferService {
       'price': history['price'],
       'cycleType': _cycleTypeFromApi(history['cycleType'] as String?),
       'cycle': history['cycle'],
+      'cycleMode': history['cycleMode'] ?? 'CALENDAR',
+      'cycleDays': history['cycleDays'],
       'recordDate': history['recordDate'],
       'note': history['note'],
+      'isAutoRenew':
+          history['isAutoRenew'] == true ||
+          (history['note'] is String &&
+              (history['note'] as String).startsWith('自动续费')),
     };
   }
 
@@ -271,6 +280,7 @@ class DataTransferService {
       'WEEK' => 'weekly',
       'MONTH' => 'monthly',
       'QUARTER' => 'quarterly',
+      'HALF_YEAR' => 'halfYearly',
       'YEAR' => 'yearly',
       _ => value,
     };

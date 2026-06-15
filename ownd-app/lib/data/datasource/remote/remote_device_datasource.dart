@@ -149,6 +149,61 @@ class RemoteDeviceDataSource implements DeviceDataSource {
     }
   }
 
+  @override
+  Future<Device> updateHistory(
+    Device device,
+    SubscriptionHistory history,
+  ) async {
+    final historyId = history.uuid;
+    if (historyId == null || historyId.isEmpty) {
+      throw StateError('这条订阅记录暂时无法编辑，请刷新后再试');
+    }
+
+    await _apiClient.patch<Map<String, dynamic>>(
+      '/items/${device.uuid}/histories/$historyId',
+      data: historyToApi(history, includeNullNote: true),
+    );
+    return _refreshDevice(device);
+  }
+
+  @override
+  Future<Device> deleteHistory(
+    Device device,
+    SubscriptionHistory history,
+  ) async {
+    final historyId = history.uuid;
+    if (historyId == null || historyId.isEmpty) {
+      throw StateError('这条订阅记录暂时无法删除，请刷新后再试');
+    }
+
+    await _apiClient.delete<dynamic>(
+      '/items/${device.uuid}/histories/$historyId',
+    );
+    return _refreshDevice(device);
+  }
+
+  Future<Device> _refreshDevice(Device device) async {
+    final data = await _apiClient.get<Map<String, dynamic>>(
+      '/items/${device.uuid}',
+    );
+    final refreshed = deviceFromApi(data);
+    device
+      ..id = refreshed.id
+      ..uuid = refreshed.uuid
+      ..history = refreshed.history
+      ..nextBillingDate = refreshed.nextBillingDate
+      ..cycleType = refreshed.cycleType
+      ..price = refreshed.price
+      ..periodPrice = refreshed.periodPrice;
+    _uuidMap[device.id] = device.uuid;
+    try {
+      await getAll();
+    } catch (_) {
+      // Cache refresh failure should not block the success result
+    }
+    return device;
+  }
+
   Future<int> _getRemoteHistoryCount(String itemUuid) async {
     final data = await _apiClient.get<Map<String, dynamic>>('/items/$itemUuid');
     final histories = data['itemHistories'];

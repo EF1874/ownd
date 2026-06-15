@@ -39,7 +39,13 @@ enum ItemCycleType {
   WEEK
   MONTH
   QUARTER
+  HALF_YEAR
   YEAR
+}
+
+enum ItemCycleCalculationMode {
+  CALENDAR
+  FIXED_DAYS
 }
 
 model ItemHistory {
@@ -55,8 +61,11 @@ model ItemHistory {
   endDate   DateTime?
   cycleType ItemCycleType?
   cycle     Int?
+  cycleMode ItemCycleCalculationMode @default(CALENDAR)
+  cycleDays Int?
 
-  note String?
+  note        String?
+  isAutoRenew Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -82,6 +91,7 @@ model Item {
   id           String   @id @default(uuid())
   name         String
   price        Float    @default(0.0)
+  renewalPrice Float?
   purchaseDate DateTime @default(now())
 
   // 核心业务字段
@@ -101,6 +111,8 @@ model Item {
 
   currentCycleType ItemCycleType?
   currentCycle     Int?
+  currentCycleMode ItemCycleCalculationMode @default(CALENDAR)
+  currentCycleDays Int?
   nextBillingDate  DateTime?
   isAutoRenew      Boolean        @default(false)
   reminderDays     Int            @default(0)

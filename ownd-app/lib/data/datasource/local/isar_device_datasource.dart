@@ -61,6 +61,24 @@ class IsarDeviceDataSource implements DeviceDataSource {
   }
 
   @override
+  Future<Device> updateHistory(
+    Device device,
+    SubscriptionHistory history,
+  ) async {
+    await update(device);
+    return device;
+  }
+
+  @override
+  Future<Device> deleteHistory(
+    Device device,
+    SubscriptionHistory history,
+  ) async {
+    await update(device);
+    return device;
+  }
+
+  @override
   Future<void> delete(int id) async {
     await _isar.writeTxn(() async {
       await _isar.devices.delete(id);

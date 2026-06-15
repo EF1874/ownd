@@ -8,6 +8,12 @@ import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { WinstonModule } from 'nest-winston';
 import { winstonConfig } from './common/logger/logger.config';
+import {
+  appendProcessCrashLog,
+  registerProcessCrashLogger,
+} from './common/logger/process-crash-logger';
+
+registerProcessCrashLogger();
 
 async function bootstrap() {
   // 使用 Winston 替换默认日志器
@@ -63,4 +69,7 @@ async function bootstrap() {
   const port = Number(configService.get<string>('PORT') ?? 3000);
   await app.listen(port);
 }
-void bootstrap();
+void bootstrap().catch((error) => {
+  appendProcessCrashLog('bootstrap failed', error);
+  process.exit(1);
+});

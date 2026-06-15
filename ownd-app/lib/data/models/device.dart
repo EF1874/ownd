@@ -5,7 +5,17 @@ import '../../shared/utils/subscription_utils.dart';
 
 part 'device.g.dart';
 
-enum CycleType { daily, weekly, monthly, quarterly, yearly, oneTime }
+enum CycleType {
+  daily,
+  weekly,
+  monthly,
+  quarterly,
+  halfYearly,
+  yearly,
+  oneTime,
+}
+
+enum CycleCalculationMode { calendar, fixedDays }
 
 @Collection()
 class Device {
@@ -17,7 +27,7 @@ class Device {
 
   double price = 0.0;
 
-  double? firstPeriodPrice;
+  double? renewalPrice;
   double? periodPrice;
   double _totalAccumulatedPrice = 0.0;
 
@@ -37,6 +47,10 @@ class Device {
 
   @Enumerated(EnumType.name)
   CycleType? cycleType;
+
+  @Enumerated(EnumType.name)
+  CycleCalculationMode cycleCalculationMode = CycleCalculationMode.calendar;
+  int? cycleDays;
 
   bool isAutoRenew = false;
   DateTime? nextBillingDate;
@@ -216,18 +230,25 @@ class Device {
       ..price = price
       ..isAutoRenew = false
       ..cycleType = cycleType!
+      ..cycleCalculationMode = cycleCalculationMode
+      ..cycleDays = cycleDays
       ..recordDate = recordDate;
 
-    DateTime calculatedStart = endDate
-        .subtract(SubscriptionUtils.getDuration(cycleType!))
-        .add(const Duration(days: 1));
+    DateTime calculatedStart;
+    if (cycleCalculationMode == CycleCalculationMode.fixedDays) {
+      final days =
+          cycleDays ?? SubscriptionUtils.defaultFixedCycleDays(cycleType!);
+      calculatedStart = endDate.subtract(Duration(days: days - 1));
+    } else {
+      calculatedStart = endDate
+          .subtract(SubscriptionUtils.getDuration(cycleType!))
+          .add(const Duration(days: 1));
+    }
 
     // If history is not empty, we assume the calculated start is correct based on the duration.
     // We do NOT force it to match legacy end date to preserve gaps.
     if (history.isEmpty) {
-      if (calculatedStart.isBefore(purchaseDate)) {
-        calculatedStart = purchaseDate;
-      }
+      calculatedStart = purchaseDate;
     }
 
     // Ensure list is growable
@@ -239,12 +260,19 @@ class Device {
 
 @Embedded()
 class SubscriptionHistory {
+  @ignore
+  String? uuid;
+
   DateTime? startDate;
   DateTime? endDate;
   double price = 0.0;
 
   @Enumerated(EnumType.name)
   CycleType cycleType = CycleType.monthly;
+
+  @Enumerated(EnumType.name)
+  CycleCalculationMode cycleCalculationMode = CycleCalculationMode.calendar;
+  int? cycleDays;
 
   bool isAutoRenew = false;
 

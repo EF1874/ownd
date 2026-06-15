@@ -229,14 +229,22 @@ class SubscriptionService {
       final start = SubscriptionUtils.dateOnly(
         next,
       ).add(const Duration(days: 1));
-      final end = SubscriptionUtils.advanceDueDate(next, device.cycleType!);
+      final end = SubscriptionUtils.advanceDueDate(
+        next,
+        device.cycleType!,
+        calculationMode: device.cycleCalculationMode,
+        cycleDays: device.cycleDays,
+      );
+      final renewalPrice = device.renewalPrice ?? device.price;
 
       final historyEntry = SubscriptionHistory()
         ..startDate = start
         ..endDate = end
-        ..price = device.price
+        ..price = renewalPrice
         ..isAutoRenew = true
         ..cycleType = device.cycleType!
+        ..cycleCalculationMode = device.cycleCalculationMode
+        ..cycleDays = device.cycleDays
         ..recordDate = targetDate
         ..note = '自动续费';
 
@@ -245,7 +253,7 @@ class SubscriptionService {
       device.history = newHistory;
 
       // Accumulate price
-      device.totalAccumulatedPrice += device.price;
+      device.totalAccumulatedPrice += renewalPrice;
 
       // Calculate next date
       next = end;
@@ -270,7 +278,12 @@ class SubscriptionService {
       final start = SubscriptionUtils.dateOnly(
         next,
       ).add(const Duration(days: 1));
-      final end = SubscriptionUtils.advanceDueDate(next, device.cycleType!);
+      final end = SubscriptionUtils.advanceDueDate(
+        next,
+        device.cycleType!,
+        calculationMode: device.cycleCalculationMode,
+        cycleDays: device.cycleDays,
+      );
 
       final historyEntry = SubscriptionHistory()
         ..startDate = start
@@ -280,8 +293,9 @@ class SubscriptionService {
         ..isAutoRenew =
             false // Manual renewal
         ..cycleType = device.cycleType!
-        ..recordDate = DateTime.now()
-        ..note = '手动续费';
+        ..cycleCalculationMode = device.cycleCalculationMode
+        ..cycleDays = device.cycleDays
+        ..recordDate = DateTime.now();
 
       List<SubscriptionHistory> newHistory = List.from(device.history);
       newHistory.add(historyEntry);

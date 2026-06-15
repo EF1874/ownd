@@ -59,5 +59,11 @@ class DeviceRepository {
 
   Future<void> updateDevice(Device device) => _dataSource.update(device);
 
+  Future<Device> updateHistory(Device device, SubscriptionHistory history) =>
+      _dataSource.updateHistory(device, history);
+
+  Future<Device> deleteHistory(Device device, SubscriptionHistory history) =>
+      _dataSource.deleteHistory(device, history);
+
   Future<void> deleteDevice(int id) => _dataSource.delete(id);
 }

@@ -3,40 +3,58 @@ import 'package:intl/intl.dart';
 
 import '../../../data/models/device.dart';
 import '../../../shared/utils/subscription_utils.dart';
+import '../../../shared/widgets/subscription_cycle_mode_selector.dart';
 import '../../../shared/widgets/subscription_cycle_dropdown.dart';
 
 class RenewDialogResult {
   final CycleType cycleType;
+  final CycleCalculationMode cycleCalculationMode;
+  final int? cycleDays;
   final double price;
   final DateTime recordDate;
   final DateTime startDate;
   final DateTime endDate;
+  final String? note;
 
   const RenewDialogResult({
     required this.cycleType,
+    required this.cycleCalculationMode,
+    this.cycleDays,
     required this.price,
     required this.recordDate,
     required this.startDate,
     required this.endDate,
+    this.note,
   });
 }
 
 class RenewDialog extends StatefulWidget {
+  final String title;
   final CycleType initialCycleType;
+  final CycleCalculationMode initialCycleCalculationMode;
+  final int? initialCycleDays;
   final double initialPrice;
   final DateTime initialRecordDate;
   final DateTime initialStartDate;
   final DateTime initialEndDate;
+  final String? initialNote;
   final DateTime? previousEndDate;
+  final String? Function(DateTime startDate, DateTime endDate)?
+  dateRangeValidator;
 
   const RenewDialog({
     super.key,
+    this.title = '新增订阅记录',
     required this.initialCycleType,
+    this.initialCycleCalculationMode = CycleCalculationMode.calendar,
+    this.initialCycleDays,
     required this.initialPrice,
     required this.initialRecordDate,
     required this.initialStartDate,
     required this.initialEndDate,
+    this.initialNote,
     required this.previousEndDate,
+    this.dateRangeValidator,
   });
 
   @override
@@ -46,7 +64,10 @@ class RenewDialog extends StatefulWidget {
 class _RenewDialogState extends State<RenewDialog> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _priceController;
+  late final TextEditingController _noteController;
   late CycleType _selectedCycle;
+  late CycleCalculationMode _selectedCalculationMode;
+  int? _cycleDays;
   late DateTime _recordDate;
   late DateTime _startDate;
   late DateTime _endDate;
@@ -57,6 +78,8 @@ class _RenewDialogState extends State<RenewDialog> {
   void initState() {
     super.initState();
     _selectedCycle = widget.initialCycleType;
+    _selectedCalculationMode = widget.initialCycleCalculationMode;
+    _cycleDays = widget.initialCycleDays;
     _recordDate = widget.initialRecordDate;
     _startDate = widget.initialStartDate;
     _endDate = widget.initialEndDate;
@@ -65,16 +88,25 @@ class _RenewDialogState extends State<RenewDialog> {
           ? widget.initialPrice.toInt().toString()
           : widget.initialPrice.toString(),
     );
+    _noteController = TextEditingController(text: widget.initialNote ?? '');
+    _noteController.addListener(_handleNoteChanged);
   }
 
   @override
   void dispose() {
+    _noteController.removeListener(_handleNoteChanged);
     _priceController.dispose();
+    _noteController.dispose();
     super.dispose();
+  }
+
+  void _handleNoteChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final textTheme = Theme.of(context).textTheme;
     final minStartDate = widget.previousEndDate == null
         ? null
@@ -83,7 +115,7 @@ class _RenewDialogState extends State<RenewDialog> {
           ).add(const Duration(days: 1));
 
     return AlertDialog(
-      title: const Text('手动续费'),
+      title: Text(widget.title),
       content: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -96,6 +128,20 @@ class _RenewDialogState extends State<RenewDialog> {
                   if (value == null) return;
                   setState(() {
                     _selectedCycle = value;
+                    _normalizeCycleDays();
+                    _updateEndDateIfNeeded();
+                  });
+                },
+              ),
+              const SizedBox(height: 14),
+              SubscriptionCycleModeSelector(
+                cycleType: _selectedCycle,
+                calculationMode: _selectedCalculationMode,
+                cycleDays: _cycleDays,
+                onChanged: (mode, days) {
+                  setState(() {
+                    _selectedCalculationMode = mode;
+                    _cycleDays = days;
                     _updateEndDateIfNeeded();
                   });
                 },
@@ -119,16 +165,6 @@ class _RenewDialogState extends State<RenewDialog> {
               ),
               const SizedBox(height: 14),
               _DatePickerField(
-                label: '续费日期',
-                date: _recordDate,
-                textStyle: textTheme.bodyMedium,
-                onPick: () => _pickDate(
-                  initialDate: _recordDate,
-                  onPicked: (date) => setState(() => _recordDate = date),
-                ),
-              ),
-              const SizedBox(height: 14),
-              _DatePickerField(
                 label: '开始日期',
                 date: _startDate,
                 textStyle: textTheme.bodyMedium,
@@ -137,9 +173,9 @@ class _RenewDialogState extends State<RenewDialog> {
                   firstDate: minStartDate,
                   onPicked: (date) {
                     setState(() {
-                      _dateError = null;
                       _startDate = date;
                       _updateEndDateIfNeeded();
+                      _dateError = _validateCurrentDates();
                     });
                   },
                 ),
@@ -154,9 +190,9 @@ class _RenewDialogState extends State<RenewDialog> {
                   firstDate: _startDate,
                   onPicked: (date) {
                     setState(() {
-                      _dateError = null;
                       _endDate = date;
                       _endDateEdited = true;
+                      _dateError = _validateCurrentDates();
                     });
                   },
                 ),
@@ -174,6 +210,27 @@ class _RenewDialogState extends State<RenewDialog> {
                   ),
                 ),
               ],
+              const SizedBox(height: 14),
+              TextFormField(
+                controller: _noteController,
+                decoration: InputDecoration(
+                  hintText: '备注',
+                  hintStyle: TextStyle(
+                    color: theme.colorScheme.onSurfaceVariant.withValues(
+                      alpha: 0.48,
+                    ),
+                  ),
+                  border: const OutlineInputBorder(),
+                  suffixIcon: _noteController.text.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: '清空备注',
+                          icon: const Icon(Icons.clear_rounded),
+                          onPressed: _noteController.clear,
+                        ),
+                ),
+                textInputAction: TextInputAction.done,
+              ),
             ],
           ),
         ),
@@ -212,25 +269,21 @@ class _RenewDialogState extends State<RenewDialog> {
     _endDate = SubscriptionUtils.calculateNextBillingDate(
       _startDate,
       _selectedCycle,
+      calculationMode: _selectedCalculationMode,
+      cycleDays: _cycleDays,
     );
+  }
+
+  void _normalizeCycleDays() {
+    _selectedCalculationMode = CycleCalculationMode.calendar;
+    _cycleDays = null;
   }
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
-    final previousEndDate = widget.previousEndDate;
-    if (previousEndDate != null) {
-      final previousEndDay = SubscriptionUtils.dateOnly(previousEndDate);
-      if (!SubscriptionUtils.dateOnly(_startDate).isAfter(previousEndDay)) {
-        setState(() => _dateError = '开始日期需晚于上一期到期日');
-        return;
-      }
-      if (!SubscriptionUtils.dateOnly(_endDate).isAfter(previousEndDay)) {
-        setState(() => _dateError = '到期日期需晚于上一期到期日');
-        return;
-      }
-    }
-    if (_endDate.isBefore(_startDate)) {
-      setState(() => _dateError = '到期日期不能早于开始日期');
+    final dateError = _validateCurrentDates();
+    if (dateError != null) {
+      setState(() => _dateError = dateError);
       return;
     }
 
@@ -238,12 +291,47 @@ class _RenewDialogState extends State<RenewDialog> {
       context,
       RenewDialogResult(
         cycleType: _selectedCycle,
+        cycleCalculationMode: _selectedCalculationMode,
+        cycleDays: _selectedCalculationMode == CycleCalculationMode.fixedDays
+            ? _cycleDays ??
+                  SubscriptionUtils.defaultFixedCycleDays(_selectedCycle)
+            : null,
         price: double.parse(_priceController.text.trim()),
-        recordDate: _recordDate,
+        recordDate: _effectiveRecordDate(),
         startDate: _startDate,
         endDate: _endDate,
+        note: _normalizedNote(),
       ),
     );
+  }
+
+  String? _normalizedNote() {
+    final note = _noteController.text.trim();
+    return note.isEmpty ? null : note;
+  }
+
+  DateTime _effectiveRecordDate() {
+    final recordDay = SubscriptionUtils.dateOnly(_recordDate);
+    final startDay = SubscriptionUtils.dateOnly(_startDate);
+    return recordDay.isAfter(startDay) ? startDay : recordDay;
+  }
+
+  String? _validateCurrentDates() {
+    final previousEndDate = widget.previousEndDate;
+    if (previousEndDate != null) {
+      final previousEndDay = SubscriptionUtils.dateOnly(previousEndDate);
+      if (!SubscriptionUtils.dateOnly(_startDate).isAfter(previousEndDay)) {
+        return '开始日期需晚于上一期到期日';
+      }
+      if (!SubscriptionUtils.dateOnly(_endDate).isAfter(previousEndDay)) {
+        return '到期日期需晚于上一期到期日';
+      }
+    }
+    if (_endDate.isBefore(_startDate)) {
+      return '到期日期不能早于开始日期';
+    }
+
+    return widget.dateRangeValidator?.call(_startDate, _endDate);
   }
 }
 

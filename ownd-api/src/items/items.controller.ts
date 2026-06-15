@@ -18,6 +18,7 @@ import {
 import { ItemsService } from './items.service';
 import { CreateItemDto } from './dto/create-item.dto';
 import { CreateItemHistoryDto } from './dto/create-item-history.dto';
+import { UpdateItemHistoryDto } from './dto/update-item-history.dto';
 import { JwtAuthGuard } from '../common/guard/jwt.guard';
 import { Audit } from '../common/decorators/audit.decorator';
 import { User } from '@prisma/client';
@@ -203,6 +204,24 @@ export class ItemsController {
   @ApiResponse({ status: 200, description: '获取成功' })
   findAllHistories(@Param('id') id: string, @Request() req: RequestWithUser) {
     return this.itemsService.findHistories(req.user.id, id);
+  }
+
+  @Patch(':id/histories/:historyId')
+  @Audit('更新物品历史记录')
+  @ApiOperation({ summary: '更新物品的某条历史记录' })
+  @ApiResponse({ status: 200, description: '更新成功' })
+  updateHistory(
+    @Param('id') id: string,
+    @Param('historyId') historyId: string,
+    @Body() updateItemHistoryDto: UpdateItemHistoryDto,
+    @Request() req: RequestWithUser,
+  ) {
+    return this.itemsService.updateHistory(
+      req.user.id,
+      id,
+      historyId,
+      updateItemHistoryDto,
+    );
   }
 
   @Delete(':id/histories/:historyId')

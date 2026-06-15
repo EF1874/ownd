@@ -4,11 +4,6 @@ part of 'add_device_screen.dart';
 extension AddDeviceLogic on _AddDeviceScreenState {
   double _getCurrentFirstCost() {
     double? price = double.tryParse(_priceCtr.text);
-    double? first = double.tryParse(_firstPriceCtr.text);
-
-    if (_discount && first != null) {
-      return first;
-    }
     return price ?? 0.0;
   }
 
@@ -19,7 +14,6 @@ extension AddDeviceLogic on _AddDeviceScreenState {
     String newText =
         newTotal == 0.0 &&
             _priceCtr.text.isEmpty &&
-            _firstPriceCtr.text.isEmpty &&
             _baseAccumulatedPrice == 0.0
         ? ''
         : newTotal % 1 == 0
@@ -58,8 +52,17 @@ extension AddDeviceLogic on _AddDeviceScreenState {
       () => _nextBillingDate = SubscriptionUtils.calculateNextBillingDate(
         _purchaseDate,
         _cycleType!,
+        calculationMode: _isAutoRenew
+            ? _cycleCalculationMode
+            : CycleCalculationMode.calendar,
+        cycleDays: _isAutoRenew ? _cycleDays : null,
       ),
     );
+  }
+
+  void _normalizeCycleCalculation() {
+    _cycleCalculationMode = CycleCalculationMode.calendar;
+    _cycleDays = null;
   }
 
   Future<void> _pickDate({
@@ -160,12 +163,16 @@ extension AddDeviceLogic on _AddDeviceScreenState {
                   .toList()
         ..category.value = finalCat
         ..cycleType = _isSub ? _cycleType : null
+        ..cycleCalculationMode = _isSub && _isAutoRenew
+            ? _cycleCalculationMode
+            : CycleCalculationMode.calendar
+        ..cycleDays = _isSub && _isAutoRenew ? _cycleDays : null
         ..isAutoRenew = _isSub ? _isAutoRenew : true
         ..nextBillingDate = _isSub ? _nextBillingDate : null
         ..reminderDays = normalizedReminderDays
         ..hasReminder = normalizedReminderDays > 0
-        ..firstPeriodPrice = (_isSub && _discount)
-            ? double.tryParse(_firstPriceCtr.text)
+        ..renewalPrice = (_isSub && _isAutoRenew)
+            ? double.tryParse(_renewalPriceCtr.text)
             : null
         ..periodPrice = _isSub ? double.parse(_priceCtr.text) : null
         ..totalAccumulatedPrice =
@@ -188,8 +195,7 @@ extension AddDeviceLogic on _AddDeviceScreenState {
         if (inputTotal != null) {
           device.totalAccumulatedPrice = inputTotal;
         } else {
-          device.totalAccumulatedPrice =
-              device.firstPeriodPrice ?? device.price;
+          device.totalAccumulatedPrice = device.price;
         }
       }
 

@@ -6,37 +6,39 @@ import 'subscription_settings_info.dart';
 
 class SubscriptionSection extends StatelessWidget {
   final TextEditingController priceController;
-  final TextEditingController firstPeriodPriceController;
+  final TextEditingController renewalPriceController;
   final TextEditingController totalAccumulatedPriceController;
   final DateTime purchaseDate;
   final DateTime? nextBillingDate;
   final CycleType? cycleType;
+  final CycleCalculationMode cycleCalculationMode;
+  final int? cycleDays;
   final bool isAutoRenew;
   final int reminderDays;
-  final bool hasFirstPeriodDiscount;
 
   final Function(CycleType?) onCycleTypeChanged;
+  final Function(CycleCalculationMode, int?) onCycleCalculationChanged;
   final Function(bool) onAutoRenewChanged;
   final Function(int) onReminderDaysChanged;
-  final Function(bool) onDiscountChanged;
   final VoidCallback onPickDate;
   final VoidCallback onPickBillingDate;
 
   const SubscriptionSection({
     super.key,
     required this.priceController,
-    required this.firstPeriodPriceController,
+    required this.renewalPriceController,
     required this.totalAccumulatedPriceController,
     required this.purchaseDate,
     required this.nextBillingDate,
     required this.cycleType,
+    required this.cycleCalculationMode,
+    required this.cycleDays,
     required this.isAutoRenew,
     required this.reminderDays,
-    required this.hasFirstPeriodDiscount,
     required this.onCycleTypeChanged,
+    required this.onCycleCalculationChanged,
     required this.onAutoRenewChanged,
     required this.onReminderDaysChanged,
-    required this.onDiscountChanged,
     required this.onPickDate,
     required this.onPickBillingDate,
   });
@@ -60,14 +62,15 @@ class SubscriptionSection extends StatelessWidget {
         const SizedBox(height: 16),
         SubscriptionSettingsInfo(
           cycleType: cycleType,
+          cycleCalculationMode: cycleCalculationMode,
+          cycleDays: cycleDays,
           isAutoRenew: isAutoRenew,
           reminderDays: reminderDays,
-          hasFirstPeriodDiscount: hasFirstPeriodDiscount,
-          firstPeriodPriceController: firstPeriodPriceController,
+          renewalPriceController: renewalPriceController,
           onCycleTypeChanged: onCycleTypeChanged,
+          onCycleCalculationChanged: onCycleCalculationChanged,
           onAutoRenewChanged: onAutoRenewChanged,
           onReminderDaysChanged: onReminderDaysChanged,
-          onDiscountChanged: onDiscountChanged,
         ),
       ],
     );

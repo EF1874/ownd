@@ -42,7 +42,7 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
   final _priceCtr = TextEditingController();
   final _platformCtr = TextEditingController();
   final _catCtr = TextEditingController();
-  final _firstPriceCtr = TextEditingController();
+  final _renewalPriceCtr = TextEditingController();
   final _totalAccumulatedPriceCtr = TextEditingController();
   final _notesCtr = TextEditingController();
   final _tagsCtr = TextEditingController();
@@ -59,10 +59,11 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
   DateTime? _scrapDate;
 
   CycleType? _cycleType;
+  CycleCalculationMode _cycleCalculationMode = CycleCalculationMode.calendar;
+  int? _cycleDays;
   bool _isAutoRenew = false;
   DateTime? _nextBillingDate;
   int _reminderDays = 0;
-  bool _discount = false;
   double _totalAccumulatedPrice = 0.0;
 
   double _baseAccumulatedPrice = 0.0;
@@ -89,19 +90,22 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
       _notesCtr.text = d.notes ?? '';
       _tagsCtr.text = d.tags.join(', ');
       _cycleType = d.cycleType;
+      _cycleCalculationMode = d.cycleCalculationMode;
+      _cycleDays = d.cycleDays;
       _isAutoRenew = d.isAutoRenew;
       _nextBillingDate = d.nextBillingDate;
       _reminderDays = d.hasReminder
           ? _normalizeReminderDays(d.reminderDays)
           : 0;
-      _firstPriceCtr.text = d.firstPeriodPrice?.toString() ?? '';
-      _discount = d.firstPeriodPrice != null;
+      _renewalPriceCtr.text =
+          d.renewalPrice?.toString() ??
+          (d.isAutoRenew ? d.price.toString() : '');
       _totalAccumulatedPrice = d.totalAccumulatedPrice;
       _totalAccumulatedPriceCtr.text = d.totalAccumulatedPrice % 1 == 0
           ? d.totalAccumulatedPrice.toInt().toString()
           : d.totalAccumulatedPrice.toString();
       // Calculate base price from existing total
-      double currentCost = d.firstPeriodPrice ?? d.price;
+      double currentCost = d.price;
       _baseAccumulatedPrice = d.totalAccumulatedPrice - currentCost;
       _uuid = d.uuid;
     } else {
@@ -110,7 +114,6 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
     }
 
     _priceCtr.addListener(_updateTotalStr);
-    _firstPriceCtr.addListener(_updateTotalStr);
     _totalAccumulatedPriceCtr.addListener(_updateBase);
   }
 
@@ -130,7 +133,7 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
     _priceCtr.dispose();
     _platformCtr.dispose();
     _catCtr.dispose();
-    _firstPriceCtr.dispose();
+    _renewalPriceCtr.dispose();
     _totalAccumulatedPriceCtr.dispose();
     _notesCtr.dispose();
     _tagsCtr.dispose();
@@ -240,29 +243,37 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
                     if (_isSub)
                       SubscriptionSection(
                         priceController: _priceCtr,
-                        firstPeriodPriceController: _firstPriceCtr,
+                        renewalPriceController: _renewalPriceCtr,
                         totalAccumulatedPriceController:
                             _totalAccumulatedPriceCtr,
                         purchaseDate: _purchaseDate,
                         nextBillingDate: _nextBillingDate,
                         cycleType: _cycleType,
+                        cycleCalculationMode: _cycleCalculationMode,
+                        cycleDays: _cycleDays,
                         isAutoRenew: _isAutoRenew,
                         reminderDays: _reminderDays,
-                        hasFirstPeriodDiscount: _discount,
                         onCycleTypeChanged: (v) => setState(() {
                           _cycleType = v;
+                          _normalizeCycleCalculation();
                           _calculateNextBilling(force: true);
                         }),
-                        onAutoRenewChanged: (v) => setState(() {
-                          _isAutoRenew = v;
-                          if (!v) _discount = false;
+                        onCycleCalculationChanged: (mode, days) => setState(() {
+                          _cycleCalculationMode = mode;
+                          _cycleDays = days;
+                          _calculateNextBilling(force: true);
                         }),
+                        onAutoRenewChanged: (v) {
+                          setState(() {
+                            _isAutoRenew = v;
+                            if (v && _renewalPriceCtr.text.trim().isEmpty) {
+                              _renewalPriceCtr.text = _priceCtr.text;
+                            }
+                          });
+                          _calculateNextBilling(force: true);
+                        },
                         onReminderDaysChanged: (v) => setState(() {
                           _reminderDays = v;
-                        }),
-                        onDiscountChanged: (v) => updateState(() {
-                          _discount = v;
-                          _updateTotalStr();
                         }),
                         onPickDate: () => _pickDate(),
                         onPickBillingDate: () => _pickDate(isBilling: true),

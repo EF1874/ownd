@@ -368,7 +368,9 @@ describe('ItemsService', () => {
         startDate: new Date('2026-07-12T00:00:00.000Z'),
         endDate: new Date('2026-08-11T00:00:00.000Z'),
       };
-      prisma.itemHistory.findFirst.mockResolvedValue(latestHistory);
+      prisma.itemHistory.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(newHistory);
       prisma.itemHistory.create.mockResolvedValue(newHistory);
       prisma.item.update.mockResolvedValue(
         createMockItem({ id: itemId, nextBillingDate: newHistory.endDate }),
@@ -398,6 +400,115 @@ describe('ItemsService', () => {
         data: { nextBillingDate: newHistory.endDate },
       });
       expect(result).toEqual(newHistory);
+    });
+  });
+
+  describe('updateHistory', () => {
+    const userId = 'user-1';
+    const itemId = 'item-1';
+    const historyId = 'history-1';
+    const history = {
+      id: historyId,
+      itemId,
+      type: ItemRecordType.RENEWAL,
+      price: 30,
+      recordDate: new Date('2026-06-12T00:00:00.000Z'),
+      startDate: new Date('2026-06-12T00:00:00.000Z'),
+      endDate: new Date('2026-07-11T00:00:00.000Z'),
+      cycleType: ItemCycleType.MONTH,
+      cycle: 1,
+      note: null,
+      createdAt: new Date('2026-06-12T00:00:00.000Z'),
+      updatedAt: new Date('2026-06-12T00:00:00.000Z'),
+    };
+
+    beforeEach(() => {
+      prisma.item.findFirst.mockResolvedValue(createMockItem({ id: itemId }));
+      prisma.itemHistory.findUnique.mockResolvedValue(history);
+      prisma.$transaction.mockImplementation(async (callback) =>
+        callback(prisma),
+      );
+    });
+
+    it('应该更新订阅记录并按最新记录重算到期日', async () => {
+      const updatedHistory = {
+        ...history,
+        price: 35,
+        endDate: new Date('2026-07-15T00:00:00.000Z'),
+      };
+      prisma.itemHistory.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(updatedHistory);
+      prisma.itemHistory.update.mockResolvedValue(updatedHistory);
+
+      const result = await service.updateHistory(userId, itemId, historyId, {
+        type: ItemRecordType.RENEWAL,
+        price: 35,
+        endDate: updatedHistory.endDate,
+      });
+
+      expect(prisma.itemHistory.update).toHaveBeenCalledWith({
+        where: { id: historyId },
+        data: expect.objectContaining({
+          price: 35,
+          endDate: updatedHistory.endDate,
+        }),
+      });
+      expect(prisma.item.update).toHaveBeenCalledWith({
+        where: { id: itemId },
+        data: { nextBillingDate: updatedHistory.endDate },
+      });
+      expect(result).toEqual(updatedHistory);
+    });
+  });
+
+  describe('removeHistory', () => {
+    const userId = 'user-1';
+    const itemId = 'item-1';
+    const historyId = 'history-2';
+    const deletedHistory = {
+      id: historyId,
+      itemId,
+      type: ItemRecordType.RENEWAL,
+      price: 30,
+      recordDate: new Date('2026-07-12T00:00:00.000Z'),
+      startDate: new Date('2026-07-12T00:00:00.000Z'),
+      endDate: new Date('2026-08-11T00:00:00.000Z'),
+      cycleType: ItemCycleType.MONTH,
+      cycle: 1,
+      note: null,
+      createdAt: new Date('2026-07-12T00:00:00.000Z'),
+      updatedAt: new Date('2026-07-12T00:00:00.000Z'),
+    };
+    const previousHistory = {
+      ...deletedHistory,
+      id: 'history-1',
+      startDate: new Date('2026-06-12T00:00:00.000Z'),
+      endDate: new Date('2026-07-11T00:00:00.000Z'),
+    };
+
+    beforeEach(() => {
+      prisma.item.findFirst.mockResolvedValue(createMockItem({ id: itemId }));
+      prisma.itemHistory.findUnique.mockResolvedValue(deletedHistory);
+      prisma.itemHistory.delete.mockResolvedValue(deletedHistory);
+      prisma.$transaction.mockImplementation(async (callback) =>
+        callback(prisma),
+      );
+    });
+
+    it('应该删除订阅记录并把到期日回退到剩余记录的最后一期', async () => {
+      prisma.itemHistory.findFirst.mockResolvedValue(previousHistory);
+
+      const result = await service.removeHistory(userId, itemId, historyId);
+
+      expect(prisma.itemHistory.delete).toHaveBeenCalledWith({
+        where: { id: historyId },
+      });
+      expect(prisma.item.update).toHaveBeenCalledWith({
+        where: { id: itemId },
+        data: { nextBillingDate: previousHistory.endDate },
+      });
+      expect(result).toEqual(deletedHistory);
     });
   });
 });

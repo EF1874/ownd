@@ -6,9 +6,14 @@ import {
   IsString,
   IsDate,
   Min,
+  IsBoolean,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ItemCycleType, ItemRecordType } from '@prisma/client';
+import {
+  ItemCycleCalculationMode,
+  ItemCycleType,
+  ItemRecordType,
+} from '@prisma/client';
 
 export class CreateItemHistoryDto {
   @ApiProperty({ description: '记录类型', enum: ItemRecordType })
@@ -29,7 +34,12 @@ export class CreateItemHistoryDto {
   @ApiProperty({ description: '备注', required: false })
   @IsString()
   @IsOptional()
-  note?: string;
+  note?: string | null;
+
+  @ApiProperty({ description: '是否由系统自动续费生成', required: false })
+  @IsOptional()
+  @IsBoolean()
+  isAutoRenew?: boolean;
 
   // 以下为 RENEWAL 类型专属字段
   @ApiProperty({ description: '周期开始日期 (续费专用)', required: false })
@@ -58,4 +68,19 @@ export class CreateItemHistoryDto {
   @IsNumber()
   @Min(1)
   cycle?: number;
+
+  @ApiProperty({
+    description: '周期计算方式',
+    enum: ItemCycleCalculationMode,
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(ItemCycleCalculationMode)
+  cycleMode?: ItemCycleCalculationMode;
+
+  @ApiProperty({ description: '固定天数周期', required: false })
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  cycleDays?: number;
 }

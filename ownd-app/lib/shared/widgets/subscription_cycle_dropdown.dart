@@ -9,6 +9,7 @@ class SubscriptionCycleDropdown extends StatelessWidget {
     CycleType.weekly,
     CycleType.monthly,
     CycleType.quarterly,
+    CycleType.halfYearly,
     CycleType.yearly,
   ];
 
@@ -38,30 +39,33 @@ class SubscriptionCycleDropdown extends StatelessWidget {
     ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.normal);
     final items = _effectiveCycles();
 
-    return DropdownButtonFormField<CycleType>(
-      initialValue: value,
-      isExpanded: true,
-      style: textStyle,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        border: const OutlineInputBorder(),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 16,
-        ),
-      ),
-      items: items.map((cycleType) {
-        return DropdownMenuItem(
-          value: cycleType,
-          child: Text(
-            SubscriptionUtils.cycleLabel(cycleType),
-            style: textStyle,
+    return SizedBox(
+      height: 56,
+      child: DropdownButtonFormField<CycleType>(
+        initialValue: value,
+        isExpanded: true,
+        style: textStyle,
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: hint,
+          border: const OutlineInputBorder(),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 16,
           ),
-        );
-      }).toList(),
-      onChanged: enabled ? onChanged : null,
-      validator: validator,
+        ),
+        items: items.map((cycleType) {
+          return DropdownMenuItem(
+            value: cycleType,
+            child: Text(
+              SubscriptionUtils.cycleLabel(cycleType),
+              style: textStyle,
+            ),
+          );
+        }).toList(),
+        onChanged: enabled ? onChanged : null,
+        validator: validator,
+      ),
     );
   }
 

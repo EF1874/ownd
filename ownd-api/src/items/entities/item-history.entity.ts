@@ -1,5 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ItemHistory, ItemRecordType, ItemCycleType } from '@prisma/client';
+import {
+  ItemHistory,
+  ItemRecordType,
+  ItemCycleType,
+  ItemCycleCalculationMode,
+} from '@prisma/client';
 
 export class ItemHistoryEntity implements ItemHistory {
   @ApiProperty({ description: '记录ID', example: 'uuid' })
@@ -34,8 +39,17 @@ export class ItemHistoryEntity implements ItemHistory {
   @ApiProperty({ description: '周期数值', required: false, nullable: true })
   cycle: number | null;
 
+  @ApiProperty({ description: '周期计算方式', enum: ItemCycleCalculationMode })
+  cycleMode: ItemCycleCalculationMode;
+
+  @ApiProperty({ description: '固定天数周期', required: false, nullable: true })
+  cycleDays: number | null;
+
   @ApiProperty({ description: '备注', required: false, nullable: true })
   note: string | null;
+
+  @ApiProperty({ description: '是否由系统自动续费生成' })
+  isAutoRenew: boolean;
 
   @ApiProperty({ description: '创建时间' })
   createdAt: Date;

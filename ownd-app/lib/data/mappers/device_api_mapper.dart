@@ -1,4 +1,5 @@
 import '../../shared/utils/category_tree_utils.dart';
+import '../../shared/utils/subscription_utils.dart';
 import '../models/device.dart';
 import 'api_id_mapper.dart';
 import 'category_api_mapper.dart';
@@ -9,6 +10,7 @@ Device deviceFromApi(Map<String, dynamic> json) {
     ..uuid = json['id'] as String
     ..name = json['name'] as String
     ..price = (json['price'] as num?)?.toDouble() ?? 0
+    ..renewalPrice = (json['renewalPrice'] as num?)?.toDouble()
     ..purchaseDate = _date(json['purchaseDate']) ?? DateTime.now()
     ..warrantyEndDate = _date(json['warrantyEndDate'])
     ..backupDate = _date(json['backupDate'])
@@ -22,6 +24,10 @@ Device deviceFromApi(Map<String, dynamic> json) {
         .whereType<String>()
         .toList()
     ..cycleType = _cycleTypeFromApi(json['currentCycleType'] as String?)
+    ..cycleCalculationMode =
+        _cycleCalculationModeFromApi(json['currentCycleMode'] as String?) ??
+        CycleCalculationMode.calendar
+    ..cycleDays = (json['currentCycleDays'] as num?)?.toInt()
     ..isAutoRenew = json['isAutoRenew'] as bool? ?? false
     ..nextBillingDate = _date(json['nextBillingDate'])
     ..periodPrice = (json['isVirtual'] as bool? ?? false)
@@ -43,28 +49,46 @@ Device deviceFromApi(Map<String, dynamic> json) {
 }
 
 SubscriptionHistory historyFromApi(Map<String, dynamic> json) {
+  final note = json['note'] as String?;
   return SubscriptionHistory()
+    ..uuid = json['id'] as String?
     ..startDate = _date(json['startDate'])
     ..endDate = _date(json['endDate'])
     ..price = (json['price'] as num?)?.toDouble() ?? 0
     ..cycleType =
         _cycleTypeFromApi(json['cycleType'] as String?) ?? CycleType.monthly
+    ..cycleCalculationMode =
+        _cycleCalculationModeFromApi(json['cycleMode'] as String?) ??
+        CycleCalculationMode.calendar
+    ..cycleDays = (json['cycleDays'] as num?)?.toInt()
     ..recordDate = _date(json['recordDate'])
-    ..note = json['note'] as String?;
+    ..isAutoRenew =
+        json['isAutoRenew'] as bool? ?? note?.trim().startsWith('自动续费') == true
+    ..note = note;
 }
 
-Map<String, dynamic> historyToApi(SubscriptionHistory history) {
+Map<String, dynamic> historyToApi(
+  SubscriptionHistory history, {
+  bool includeNullNote = false,
+}) {
   return {
     'type': 'RENEWAL',
     'price': history.price,
     if (history.recordDate != null)
       'recordDate': _dateOnlyToApi(history.recordDate!),
-    if (history.note != null && history.note!.isNotEmpty) 'note': history.note,
+    if (includeNullNote || (history.note != null && history.note!.isNotEmpty))
+      'note': history.note,
     if (history.startDate != null)
       'startDate': _dateOnlyToApi(history.startDate!),
     if (history.endDate != null) 'endDate': _dateOnlyToApi(history.endDate!),
     'cycleType': _cycleTypeToApi(history.cycleType),
     'cycle': 1,
+    'cycleMode': _cycleCalculationModeToApi(history.cycleCalculationMode),
+    if (history.cycleCalculationMode == CycleCalculationMode.fixedDays)
+      'cycleDays':
+          history.cycleDays ??
+          SubscriptionUtils.defaultFixedCycleDays(history.cycleType),
+    'isAutoRenew': history.isAutoRenew,
   };
 }
 
@@ -77,6 +101,7 @@ Map<String, dynamic> deviceToApi(Device device) {
   return {
     'name': device.name,
     'price': device.price,
+    'renewalPrice': device.renewalPrice,
     'purchaseDate': _dateOnlyToApi(device.purchaseDate),
     if (category?.uuid != null) 'categoryId': category!.uuid,
     if (device.platformUuid != null) 'platformId': device.platformUuid,
@@ -86,6 +111,15 @@ Map<String, dynamic> deviceToApi(Device device) {
     if (device.cycleType != null)
       'currentCycleType': _cycleTypeToApi(device.cycleType!),
     if (device.cycleType != null) 'currentCycle': 1,
+    if (device.cycleType != null)
+      'currentCycleMode': _cycleCalculationModeToApi(
+        device.cycleCalculationMode,
+      ),
+    if (device.cycleType != null &&
+        device.cycleCalculationMode == CycleCalculationMode.fixedDays)
+      'currentCycleDays':
+          device.cycleDays ??
+          SubscriptionUtils.defaultFixedCycleDays(device.cycleType!),
     if (device.nextBillingDate != null)
       'nextBillingDate': _dateOnlyToApi(device.nextBillingDate!),
     'isAutoRenew': device.isAutoRenew,
@@ -125,6 +159,7 @@ CycleType? _cycleTypeFromApi(String? value) {
     'WEEK' => CycleType.weekly,
     'MONTH' => CycleType.monthly,
     'QUARTER' => CycleType.quarterly,
+    'HALF_YEAR' => CycleType.halfYearly,
     'YEAR' => CycleType.yearly,
     _ => null,
   };
@@ -136,7 +171,23 @@ String _cycleTypeToApi(CycleType cycleType) {
     CycleType.weekly => 'WEEK',
     CycleType.monthly => 'MONTH',
     CycleType.quarterly => 'QUARTER',
+    CycleType.halfYearly => 'HALF_YEAR',
     CycleType.yearly => 'YEAR',
     CycleType.oneTime => 'YEAR',
+  };
+}
+
+CycleCalculationMode? _cycleCalculationModeFromApi(String? value) {
+  return switch (value) {
+    'CALENDAR' => CycleCalculationMode.calendar,
+    'FIXED_DAYS' => CycleCalculationMode.fixedDays,
+    _ => null,
+  };
+}
+
+String _cycleCalculationModeToApi(CycleCalculationMode mode) {
+  return switch (mode) {
+    CycleCalculationMode.calendar => 'CALENDAR',
+    CycleCalculationMode.fixedDays => 'FIXED_DAYS',
   };
 }

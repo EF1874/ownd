@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Item, ItemCycleType } from '@prisma/client';
+import { Item, ItemCycleCalculationMode, ItemCycleType } from '@prisma/client';
 import { CategoryEntity } from '../../categories/entities/category.entity';
 import { PlatformEntity } from '../../platform/entities/platform.entity';
 import { ItemHistoryEntity } from './item-history.entity';
@@ -14,6 +14,9 @@ export class ItemEntity implements Item {
 
   @ApiProperty({ description: '物品价格', example: 1000 })
   price: number;
+
+  @ApiProperty({ description: '续费价格', example: 20, nullable: true })
+  renewalPrice: number | null;
 
   @ApiProperty({ description: '购买日期' })
   purchaseDate: Date;
@@ -73,6 +76,15 @@ export class ItemEntity implements Item {
 
   @ApiProperty({ description: '当前周期', nullable: true })
   currentCycle: number | null;
+
+  @ApiProperty({
+    description: '周期计算方式',
+    enum: ItemCycleCalculationMode,
+  })
+  currentCycleMode: ItemCycleCalculationMode;
+
+  @ApiProperty({ description: '固定天数周期', nullable: true })
+  currentCycleDays: number | null;
 
   @ApiProperty({ description: '下一个账单日期', nullable: true })
   nextBillingDate: Date | null;

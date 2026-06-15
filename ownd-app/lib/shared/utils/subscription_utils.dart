@@ -8,13 +8,29 @@ class SubscriptionUtils {
 
   static DateTime calculateNextBillingDate(
     DateTime currentBillingDate,
-    CycleType cycleType,
-  ) {
-    return calculateDueDate(currentBillingDate, cycleType);
+    CycleType cycleType, {
+    CycleCalculationMode calculationMode = CycleCalculationMode.calendar,
+    int? cycleDays,
+  }) {
+    return calculateDueDate(
+      currentBillingDate,
+      cycleType,
+      calculationMode: calculationMode,
+      cycleDays: cycleDays,
+    );
   }
 
-  static DateTime calculateDueDate(DateTime startDate, CycleType cycleType) {
+  static DateTime calculateDueDate(
+    DateTime startDate,
+    CycleType cycleType, {
+    CycleCalculationMode calculationMode = CycleCalculationMode.calendar,
+    int? cycleDays,
+  }) {
     final start = dateOnly(startDate);
+    if (calculationMode == CycleCalculationMode.fixedDays) {
+      final days = cycleDays ?? defaultFixedCycleDays(cycleType);
+      return start.add(Duration(days: days - 1));
+    }
     switch (cycleType) {
       case CycleType.daily:
         return start;
@@ -50,6 +66,21 @@ class SubscriptionUtils {
           newMonth,
           day,
         ).subtract(const Duration(days: 1));
+      case CycleType.halfYearly:
+        int newMonth = start.month + 6;
+        int newYear = start.year;
+        while (newMonth > 12) {
+          newMonth -= 12;
+          newYear++;
+        }
+        int daysInNewMonth = DateUtils.getDaysInMonth(newYear, newMonth);
+        int day = start.day;
+        if (day > daysInNewMonth) day = daysInNewMonth;
+        return DateTime(
+          newYear,
+          newMonth,
+          day,
+        ).subtract(const Duration(days: 1));
       case CycleType.yearly:
         int newYear = start.year + 1;
         int newMonth = start.month;
@@ -66,10 +97,17 @@ class SubscriptionUtils {
     }
   }
 
-  static DateTime advanceDueDate(DateTime dueDate, CycleType cycleType) {
+  static DateTime advanceDueDate(
+    DateTime dueDate,
+    CycleType cycleType, {
+    CycleCalculationMode calculationMode = CycleCalculationMode.calendar,
+    int? cycleDays,
+  }) {
     return calculateDueDate(
       dateOnly(dueDate).add(const Duration(days: 1)),
       cycleType,
+      calculationMode: calculationMode,
+      cycleDays: cycleDays,
     );
   }
 
@@ -97,6 +135,8 @@ class SubscriptionUtils {
         return '天';
       case CycleType.quarterly:
         return '季';
+      case CycleType.halfYearly:
+        return '半年';
       case CycleType.oneTime:
         return '一次性';
       case null:
@@ -114,10 +154,41 @@ class SubscriptionUtils {
         return const Duration(days: 30); // Approx
       case CycleType.quarterly:
         return const Duration(days: 90); // Approx
+      case CycleType.halfYearly:
+        return const Duration(days: 180); // Approx
       case CycleType.yearly:
         return const Duration(days: 365); // Approx
       case CycleType.oneTime:
         return Duration.zero;
     }
+  }
+
+  static int defaultFixedCycleDays(CycleType type) {
+    switch (type) {
+      case CycleType.daily:
+        return 1;
+      case CycleType.weekly:
+        return 7;
+      case CycleType.monthly:
+        return 30;
+      case CycleType.quarterly:
+        return 90;
+      case CycleType.halfYearly:
+        return 180;
+      case CycleType.yearly:
+        return 365;
+      case CycleType.oneTime:
+        return 1;
+    }
+  }
+
+  static String calculationModeLabel(
+    CycleCalculationMode mode, {
+    int? cycleDays,
+  }) {
+    return switch (mode) {
+      CycleCalculationMode.calendar => '按日历周期',
+      CycleCalculationMode.fixedDays => '固定${cycleDays ?? 30}天',
+    };
   }
 }

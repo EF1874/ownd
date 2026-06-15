@@ -70,16 +70,21 @@ export class ItemsCronService {
         startDate,
         item.currentCycleType,
         item.currentCycle,
+        item.currentCycleMode,
+        item.currentCycleDays,
       );
 
       histories.push({
         itemId: item.id,
         type: ItemRecordType.RENEWAL,
-        price: item.price,
+        price: item.renewalPrice ?? item.price,
         startDate,
         endDate,
         cycleType: item.currentCycleType,
         cycle: item.currentCycle,
+        cycleMode: item.currentCycleMode,
+        cycleDays: item.currentCycleDays,
+        isAutoRenew: true,
         note: `自动续费 (原定于 ${dayjs(startDate).format('YYYY-MM-DD')})`,
       });
 

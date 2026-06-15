@@ -9,7 +9,13 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateItemDto } from './dto/create-item.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
 import { CreateItemHistoryDto } from './dto/create-item-history.dto';
-import { ItemCycleType, ItemRecordType, Prisma } from '@prisma/client';
+import { UpdateItemHistoryDto } from './dto/update-item-history.dto';
+import {
+  ItemCycleCalculationMode,
+  ItemCycleType,
+  ItemRecordType,
+  Prisma,
+} from '@prisma/client';
 import dayjs from 'dayjs';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import * as cacheManager from 'cache-manager';
@@ -25,6 +31,12 @@ type ItemWithRelations = Prisma.ItemGetPayload<{
     };
   };
 }>;
+
+type RenewalHistoryDateInput = {
+  type?: ItemRecordType | null;
+  startDate?: Date | null;
+  endDate?: Date | null;
+};
 
 @Injectable()
 export class ItemsService {
@@ -53,16 +65,25 @@ export class ItemsService {
     if (data.isVirtual) {
       const currentCycleType = data.currentCycleType ?? ItemCycleType.MONTH;
       const currentCycle = data.currentCycle ?? 1;
+      const currentCycleMode =
+        data.currentCycleMode ?? ItemCycleCalculationMode.CALENDAR;
       const startDate = data.purchaseDate || new Date();
 
       // 本期到期日 = 开通日按周期推进后的前一天。
       const endDate =
         data.nextBillingDate ??
-        this.calculatePeriodEndDate(startDate, currentCycleType, currentCycle);
+        this.calculatePeriodEndDate(
+          startDate,
+          currentCycleType,
+          currentCycle,
+          currentCycleMode,
+          data.currentCycleDays,
+        );
 
       nextBillingDate = endDate;
       data.currentCycleType = currentCycleType;
       data.currentCycle = currentCycle;
+      data.currentCycleMode = currentCycleMode;
 
       // 准备首期历史记录
       itemHistoriesCreate.push({
@@ -72,7 +93,8 @@ export class ItemsService {
         endDate: endDate,
         cycleType: currentCycleType,
         cycle: currentCycle,
-        note: '系统初始创建',
+        cycleMode: currentCycleMode,
+        cycleDays: data.currentCycleDays,
       });
     }
 
@@ -103,8 +125,14 @@ export class ItemsService {
     start: Date,
     type: ItemCycleType,
     value: number,
+    mode: ItemCycleCalculationMode = ItemCycleCalculationMode.CALENDAR,
+    fixedDays?: number | null,
   ): Date {
     const d = dayjs(start);
+    if (mode === ItemCycleCalculationMode.FIXED_DAYS) {
+      const days = fixedDays ?? this.defaultFixedCycleDays(type, value);
+      return d.add(days, 'day').subtract(1, 'day').toDate();
+    }
     switch (type) {
       case ItemCycleType.DAY:
         return d.add(value, 'day').subtract(1, 'day').toDate();
@@ -117,10 +145,32 @@ export class ItemsService {
           .add(value * 3, 'month')
           .subtract(1, 'day')
           .toDate();
+      case ItemCycleType.HALF_YEAR:
+        return d
+          .add(value * 6, 'month')
+          .subtract(1, 'day')
+          .toDate();
       case ItemCycleType.YEAR:
         return d.add(value, 'year').subtract(1, 'day').toDate();
       default:
         return start;
+    }
+  }
+
+  private defaultFixedCycleDays(type: ItemCycleType, value: number): number {
+    switch (type) {
+      case ItemCycleType.DAY:
+        return value;
+      case ItemCycleType.WEEK:
+        return value * 7;
+      case ItemCycleType.MONTH:
+        return value * 30;
+      case ItemCycleType.QUARTER:
+        return value * 90;
+      case ItemCycleType.HALF_YEAR:
+        return value * 180;
+      case ItemCycleType.YEAR:
+        return value * 365;
     }
   }
 
@@ -373,7 +423,9 @@ export class ItemsService {
       if (dto.type === ItemRecordType.RENEWAL && dto.endDate) {
         await tx.item.update({
           where: { id: itemId },
-          data: { nextBillingDate: dto.endDate },
+          data: {
+            nextBillingDate: await this.latestRenewalEndDate(itemId, tx),
+          },
         });
       }
 
@@ -385,7 +437,8 @@ export class ItemsService {
 
   private async validateRenewalHistoryDates(
     itemId: string,
-    dto: CreateItemHistoryDto,
+    dto: RenewalHistoryDateInput,
+    ignoredHistoryId?: string,
   ) {
     if (dto.type !== ItemRecordType.RENEWAL) return;
 
@@ -398,23 +451,20 @@ export class ItemsService {
       throw new BadRequestException('到期日期不能早于开始日期');
     }
 
-    const latestHistory = await this.prisma.itemHistory.findFirst({
-      where: {
-        itemId,
-        type: ItemRecordType.RENEWAL,
-        endDate: { not: null },
-      },
-      orderBy: { endDate: 'desc' },
-    });
-
-    if (!latestHistory?.endDate) return;
-
-    const latestEndDate = dayjs(latestHistory.endDate).startOf('day');
-    if (startDate && !startDate.isAfter(latestEndDate)) {
-      throw new BadRequestException('续费开始日期不能和上一期重复');
-    }
-    if (endDate && !endDate.isAfter(latestEndDate)) {
-      throw new BadRequestException('续费到期日期不能和上一期重复');
+    if (startDate && endDate) {
+      const overlappingHistory = await this.prisma.itemHistory.findFirst({
+        where: {
+          itemId,
+          type: ItemRecordType.RENEWAL,
+          id: ignoredHistoryId ? { not: ignoredHistoryId } : undefined,
+          startDate: { not: null, lte: endDate.toDate() },
+          endDate: { not: null, gte: startDate.toDate() },
+        },
+      });
+      if (overlappingHistory) {
+        throw new BadRequestException('订阅日期不能和其他记录重叠');
+      }
+      return;
     }
   }
 
@@ -426,6 +476,46 @@ export class ItemsService {
       where: { itemId },
       orderBy: { recordDate: 'desc' },
     });
+  }
+
+  async updateHistory(
+    userId: string,
+    itemId: string,
+    historyId: string,
+    dto: UpdateItemHistoryDto,
+  ) {
+    await this.findOne(userId, itemId);
+    const history = await this.prisma.itemHistory.findUnique({
+      where: { id: historyId },
+    });
+
+    if (!history || history.itemId !== itemId) {
+      throw new NotFoundException('历史记录不存在或不属于该物品');
+    }
+
+    const nextHistory = {
+      ...history,
+      ...dto,
+      type: dto.type ?? history.type,
+      price: dto.price ?? history.price,
+    };
+    await this.validateRenewalHistoryDates(itemId, nextHistory, historyId);
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const saved = await tx.itemHistory.update({
+        where: { id: historyId },
+        data: dto,
+      });
+      await tx.item.update({
+        where: { id: itemId },
+        data: {
+          nextBillingDate: await this.latestRenewalEndDate(itemId, tx),
+        },
+      });
+      return saved;
+    });
+    await this.clearCache(userId);
+    return updated;
   }
 
   async removeHistory(userId: string, itemId: string, historyId: string) {
@@ -441,11 +531,35 @@ export class ItemsService {
       throw new NotFoundException('历史记录不存在或不属于该物品');
     }
 
-    const deleted = await this.prisma.itemHistory.delete({
-      where: { id: historyId },
+    const deleted = await this.prisma.$transaction(async (tx) => {
+      const removed = await tx.itemHistory.delete({
+        where: { id: historyId },
+      });
+      await tx.item.update({
+        where: { id: itemId },
+        data: {
+          nextBillingDate: await this.latestRenewalEndDate(itemId, tx),
+        },
+      });
+      return removed;
     });
     await this.clearCache(userId);
     return deleted;
+  }
+
+  private async latestRenewalEndDate(
+    itemId: string,
+    tx: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    const latest = await tx.itemHistory.findFirst({
+      where: {
+        itemId,
+        type: ItemRecordType.RENEWAL,
+        endDate: { not: null },
+      },
+      orderBy: { endDate: 'desc' },
+    });
+    return latest?.endDate ?? null;
   }
 
   async importBackup(userId: string, data: any) {
@@ -847,6 +961,7 @@ export class ItemsService {
         const itemData = {
           name: dev.name,
           price: dev.price || 0,
+          renewalPrice: dev.renewalPrice ?? null,
           purchaseDate,
           notes: dev.notes,
           tags: dev.tags || [],
@@ -854,6 +969,8 @@ export class ItemsService {
           isVirtual,
           currentCycleType: dev.cycleType || null,
           currentCycle: dev.currentCycle || null,
+          currentCycleMode: dev.cycleMode || 'CALENDAR',
+          currentCycleDays: dev.cycleDays || null,
           nextBillingDate,
           isAutoRenew: dev.isAutoRenew || false,
           reminderDays: dev.reminderDays || 0,
@@ -899,8 +1016,13 @@ export class ItemsService {
               endDate: h.endDate ? new Date(h.endDate) : null,
               cycleType: h.cycleType || null,
               cycle: h.cycle || null,
+              cycleMode: h.cycleMode || dev.cycleMode || 'CALENDAR',
+              cycleDays: h.cycleDays || dev.cycleDays || null,
               recordDate: h.recordDate ? new Date(h.recordDate) : new Date(),
               note: h.note,
+              isAutoRenew:
+                h.isAutoRenew === true ||
+                (typeof h.note === 'string' && h.note.startsWith('自动续费')),
               itemId: itemUuid,
             })),
           });

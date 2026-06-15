@@ -1,0 +1,2 @@
+ALTER TABLE "Item"
+ADD COLUMN "renewalPrice" DOUBLE PRECISION;
