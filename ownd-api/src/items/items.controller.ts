@@ -51,10 +51,7 @@ export class ItemsController {
   @Audit('导入备份数据')
   @ApiOperation({ summary: '批量导入/恢复备份数据' })
   @ApiResponse({ status: 201, description: '导入成功' })
-  importBackup(
-    @Body() body: any,
-    @Request() req: RequestWithUser,
-  ) {
+  importBackup(@Body() body: any, @Request() req: RequestWithUser) {
     return this.itemsService.importBackup(req.user.id, body);
   }
 
@@ -99,6 +96,7 @@ export class ItemsController {
     @Query('categoryId') categoryId?: string,
     @Query('platformId') platformId?: string,
     @Query('tag') tag?: string,
+    @Query('expiringSoon') expiringSoon?: string,
     @Query('sortBy') sortBy?: string,
     @Query('sortOrder') sortOrder?: 'asc' | 'desc',
   ) {
@@ -109,6 +107,7 @@ export class ItemsController {
       categoryId,
       platformId,
       tag,
+      expiringSoon: expiringSoon === 'true',
       sortBy,
       sortOrder,
     });

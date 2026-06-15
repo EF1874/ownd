@@ -68,7 +68,17 @@ describe('ItemsController', () => {
     it('应该调用 service.findAll 并传入正确的 userId', async () => {
       await controller.findAll(mockRequest);
 
-      expect(service.findAll).toHaveBeenCalledWith(mockUser.id);
+      expect(service.findAll).toHaveBeenCalledWith(mockUser.id, {
+        search: undefined,
+        page: undefined,
+        limit: undefined,
+        categoryId: undefined,
+        platformId: undefined,
+        expiringSoon: false,
+        tag: undefined,
+        sortBy: undefined,
+        sortOrder: undefined,
+      });
     });
   });
 

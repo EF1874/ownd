@@ -14,6 +14,15 @@ class IsarDeviceDataSource implements DeviceDataSource {
   }
 
   @override
+  Future<Device> getById(int id) async {
+    final device = await _isar.devices.get(id);
+    if (device == null) {
+      throw StateError('Device with id $id not found.');
+    }
+    return device;
+  }
+
+  @override
   Stream<List<Device>> watchAll() {
     return _isar.devices.where().watch(fireImmediately: true);
   }
@@ -26,10 +35,13 @@ class IsarDeviceDataSource implements DeviceDataSource {
     String? categoryId,
     String? platformId,
     String? tag,
+    bool expiringSoon = false,
     String? sortBy,
     String? sortOrder,
   }) {
-    throw UnimplementedError('getPaginated is not supported in local Isar datasource');
+    throw UnimplementedError(
+      'getPaginated is not supported in local Isar datasource',
+    );
   }
 
   @override

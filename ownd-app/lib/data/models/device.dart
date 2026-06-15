@@ -40,7 +40,7 @@ class Device {
 
   bool isAutoRenew = false;
   DateTime? nextBillingDate;
-  int reminderDays = 1;
+  int reminderDays = 0;
   bool hasReminder = false;
 
   // --- New fields for v1.2 ---
@@ -69,33 +69,96 @@ class Device {
       return price / days;
     }
 
-    // 2. Subscription Device: Calculate Historical Average Daily Cost
-    double totalCost = 0.0;
-    int totalDays = 0;
+    final totalCost = history.isEmpty
+        ? totalAccumulatedPrice
+        : history.fold<double>(0, (total, h) => total + h.price);
+    final totalDays = subscriptionDaysUsed();
+    if (totalDays <= 0) return 0.0;
+    return totalCost / totalDays;
+  }
 
-    // A. Sum History
-    for (var h in history) {
-      if (h.startDate != null && h.endDate != null) {
-        totalCost += h.price;
-        // Ensure we count at least 1 day
-        final days = h.endDate!.difference(h.startDate!).inDays;
-        totalDays += days > 0 ? days : 1;
+  int subscriptionDaysUsed({DateTime? asOf}) {
+    if (cycleType == null) return daysUsed;
+
+    final today = SubscriptionUtils.dateOnly(asOf ?? DateTime.now());
+    final intervals = <({DateTime start, DateTime end})>[];
+
+    if (history.isEmpty && nextBillingDate != null) {
+      intervals.add((
+        start: SubscriptionUtils.dateOnly(purchaseDate),
+        end: SubscriptionUtils.dateOnly(nextBillingDate!),
+      ));
+    } else {
+      for (final item in history) {
+        final start = item.startDate;
+        final end = item.endDate;
+        if (start == null || end == null) continue;
+        intervals.add((
+          start: SubscriptionUtils.dateOnly(start),
+          end: SubscriptionUtils.dateOnly(end),
+        ));
       }
     }
 
-    // B. Add Current Active Period
-    final currentCost = periodPrice ?? price;
-    totalCost += currentCost;
+    if (intervals.isEmpty) return 0;
 
-    // Use SubscriptionUtils.getDuration to match snapshot logic exactly
-    final currentDuration = SubscriptionUtils.getDuration(cycleType!);
-    // If oneTime, duration might be 0.
-    if (cycleType != CycleType.oneTime) {
-      totalDays += currentDuration.inDays > 0 ? currentDuration.inDays : 1;
+    intervals.sort((a, b) => a.start.compareTo(b.start));
+    var totalDays = 0;
+    DateTime? mergedStart;
+    DateTime? mergedEnd;
+
+    void flushMerged() {
+      final start = mergedStart;
+      final end = mergedEnd;
+      if (start == null || end == null) return;
+      final clippedEnd = end.isAfter(today) ? today : end;
+      if (clippedEnd.isBefore(start)) return;
+      totalDays += clippedEnd.difference(start).inDays + 1;
     }
 
-    if (totalDays <= 0) return 0.0;
-    return totalCost / totalDays;
+    for (final interval in intervals) {
+      if (interval.start.isAfter(today)) continue;
+      final intervalEnd = interval.end.isAfter(today) ? today : interval.end;
+      if (intervalEnd.isBefore(interval.start)) continue;
+
+      if (mergedStart == null || mergedEnd == null) {
+        mergedStart = interval.start;
+        mergedEnd = intervalEnd;
+        continue;
+      }
+
+      final currentEnd = mergedEnd;
+      final nextDay = currentEnd.add(const Duration(days: 1));
+      if (!interval.start.isAfter(nextDay)) {
+        if (intervalEnd.isAfter(currentEnd)) mergedEnd = intervalEnd;
+      } else {
+        flushMerged();
+        mergedStart = interval.start;
+        mergedEnd = intervalEnd;
+      }
+    }
+
+    flushMerged();
+    return totalDays;
+  }
+
+  DateTime? get subscriptionDueDate {
+    final endDates =
+        history
+            .map((item) => item.endDate)
+            .whereType<DateTime>()
+            .map(SubscriptionUtils.dateOnly)
+            .toList()
+          ..sort((a, b) => a.compareTo(b));
+
+    final historyDueDate = endDates.isEmpty ? null : endDates.last;
+    final savedDueDate = nextBillingDate == null
+        ? null
+        : SubscriptionUtils.dateOnly(nextBillingDate!);
+
+    if (historyDueDate == null) return savedDueDate;
+    if (savedDueDate == null) return historyDueDate;
+    return savedDueDate.isAfter(historyDueDate) ? savedDueDate : historyDueDate;
   }
 
   int get daysUsed {
@@ -155,9 +218,9 @@ class Device {
       ..cycleType = cycleType!
       ..recordDate = recordDate;
 
-    DateTime calculatedStart = endDate.subtract(
-      SubscriptionUtils.getDuration(cycleType!),
-    );
+    DateTime calculatedStart = endDate
+        .subtract(SubscriptionUtils.getDuration(cycleType!))
+        .add(const Duration(days: 1));
 
     // If history is not empty, we assume the calculated start is correct based on the duration.
     // We do NOT force it to match legacy end date to preserve gaps.

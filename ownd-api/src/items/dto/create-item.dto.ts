@@ -9,7 +9,9 @@ import {
   IsBoolean,
   IsArray,
   IsEnum,
+  IsInt,
   Min,
+  Max,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ItemCycleType } from '@prisma/client';
@@ -87,10 +89,33 @@ export class CreateItemDto {
   @Min(1, { message: '当前周期数值必须大于0' })
   currentCycle?: number;
 
+  @ApiProperty({
+    description: '本期到期日',
+    example: '2026-07-11',
+    required: false,
+  })
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  nextBillingDate?: Date;
+
   @ApiProperty({ description: '是否自动续订', default: false })
   @IsBoolean()
   @IsOptional()
   isAutoRenew?: boolean;
+
+  @ApiProperty({
+    description: '提前提醒天数，0 表示不提醒',
+    example: 7,
+    required: false,
+    default: 0,
+  })
+  @IsInt()
+  @Type(() => Number)
+  @IsOptional()
+  @Min(0, { message: '提醒天数不能小于0' })
+  @Max(365, { message: '提醒天数不能超过365' })
+  reminderDays?: number;
 
   @ApiProperty({ description: '保修截止日期', example: '2025-12-31' })
   @IsOptional()

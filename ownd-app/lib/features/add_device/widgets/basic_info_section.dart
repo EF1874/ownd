@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../data/models/category.dart';
-import '../../../shared/config/category_config.dart';
+import '../../../shared/utils/category_tree_utils.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import 'category_picker.dart';
 import 'platform_picker.dart';
@@ -70,9 +70,7 @@ class BasicInfoSection extends StatelessWidget {
             labelStyle: TextStyle(color: Theme.of(context).hintColor),
           ),
         ],
-        if ((selectedCategory?.parentName ??
-                CategoryConfig.getMajorCategory(selectedCategory?.name)) !=
-            '虚拟订阅') ...[
+        if (!CategoryTreeUtils.isVirtualSubscription(selectedCategory)) ...[
           const SizedBox(height: 16),
           Row(
             children: [

@@ -27,7 +27,7 @@ export class ItemsCronService {
         isVirtual: true,
         isAutoRenew: true,
         nextBillingDate: {
-          lte: new Date(),
+          lt: dayjs().startOf('day').toDate(),
         },
       },
       include: {
@@ -56,31 +56,45 @@ export class ItemsCronService {
       throw new Error('缺失周期配置或账单日，无法自动续费');
     }
 
-    const startDate = item.nextBillingDate;
-    const endDate = this.itemsService.calculateNextDate(
-      startDate,
-      item.currentCycleType,
-      item.currentCycle,
-    );
-    const nextDate = dayjs(endDate).add(1, 'day').toDate();
+    let nextBillingDate = item.nextBillingDate;
+    const targetDay = dayjs().startOf('day');
+    const histories: Prisma.ItemHistoryCreateManyInput[] = [];
+    let safetyCounter = 0;
+
+    while (
+      dayjs(nextBillingDate).startOf('day').isBefore(targetDay) &&
+      safetyCounter < 1000
+    ) {
+      const startDate = dayjs(nextBillingDate).add(1, 'day').toDate();
+      const endDate = this.itemsService.calculatePeriodEndDate(
+        startDate,
+        item.currentCycleType,
+        item.currentCycle,
+      );
+
+      histories.push({
+        itemId: item.id,
+        type: ItemRecordType.RENEWAL,
+        price: item.price,
+        startDate,
+        endDate,
+        cycleType: item.currentCycleType,
+        cycle: item.currentCycle,
+        note: `自动续费 (原定于 ${dayjs(startDate).format('YYYY-MM-DD')})`,
+      });
+
+      nextBillingDate = endDate;
+      safetyCounter++;
+    }
+
+    if (histories.length === 0) return;
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.itemHistory.create({
-        data: {
-          itemId: item.id,
-          type: ItemRecordType.RENEWAL,
-          price: item.price,
-          startDate,
-          endDate,
-          cycleType: item.currentCycleType,
-          cycle: item.currentCycle,
-          note: `自动续费 (原定于 ${dayjs(startDate).format('YYYY-MM-DD')})`,
-        },
-      });
+      await tx.itemHistory.createMany({ data: histories });
 
       await tx.item.update({
         where: { id: item.id },
-        data: { nextBillingDate: nextDate },
+        data: { nextBillingDate },
       });
     });
   }

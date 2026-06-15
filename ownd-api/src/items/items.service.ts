@@ -2,6 +2,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  BadRequestException,
   Inject,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -48,20 +49,20 @@ export class ItemsService {
     let nextBillingDate: Date | null = null;
     const itemHistoriesCreate: Prisma.ItemHistoryCreateWithoutItemInput[] = [];
 
-    // 2. 如果是虚拟物品/订阅，计算下一期并准备首期记录
-    if (data.isVirtual && data.currentCycleType && data.currentCycle) {
+    // 2. 如果是虚拟物品/订阅，计算本期到期日并准备首期记录
+    if (data.isVirtual) {
+      const currentCycleType = data.currentCycleType ?? ItemCycleType.MONTH;
+      const currentCycle = data.currentCycle ?? 1;
       const startDate = data.purchaseDate || new Date();
 
-      // 计算结束日期（当前期的最后一天）
-      const endDate = this.calculateNextDate(
-        startDate,
-        data.currentCycleType,
-        data.currentCycle,
-      );
+      // 本期到期日 = 开通日按周期推进后的前一天。
+      const endDate =
+        data.nextBillingDate ??
+        this.calculatePeriodEndDate(startDate, currentCycleType, currentCycle);
 
-      // 下一期账单日 = 结束日期 + 1天
-      const nextDate = dayjs(endDate).add(1, 'day');
-      nextBillingDate = nextDate.toDate();
+      nextBillingDate = endDate;
+      data.currentCycleType = currentCycleType;
+      data.currentCycle = currentCycle;
 
       // 准备首期历史记录
       itemHistoriesCreate.push({
@@ -69,8 +70,8 @@ export class ItemsService {
         price: data.price,
         startDate: startDate,
         endDate: endDate,
-        cycleType: data.currentCycleType,
-        cycle: data.currentCycle,
+        cycleType: currentCycleType,
+        cycle: currentCycle,
         note: '系统初始创建',
       });
     }
@@ -98,7 +99,7 @@ export class ItemsService {
   /**
    * 计算周期的结束日期
    */
-  public calculateNextDate(
+  public calculatePeriodEndDate(
     start: Date,
     type: ItemCycleType,
     value: number,
@@ -106,21 +107,29 @@ export class ItemsService {
     const d = dayjs(start);
     switch (type) {
       case ItemCycleType.DAY:
-        return d.add(value, 'day').subtract(1, 'ms').toDate();
+        return d.add(value, 'day').subtract(1, 'day').toDate();
       case ItemCycleType.WEEK:
-        return d.add(value, 'week').subtract(1, 'ms').toDate();
+        return d.add(value, 'week').subtract(1, 'day').toDate();
       case ItemCycleType.MONTH:
-        return d.add(value, 'month').subtract(1, 'ms').toDate();
+        return d.add(value, 'month').subtract(1, 'day').toDate();
       case ItemCycleType.QUARTER:
         return d
           .add(value * 3, 'month')
-          .subtract(1, 'ms')
+          .subtract(1, 'day')
           .toDate();
       case ItemCycleType.YEAR:
-        return d.add(value, 'year').subtract(1, 'ms').toDate();
+        return d.add(value, 'year').subtract(1, 'day').toDate();
       default:
         return start;
     }
+  }
+
+  public calculateNextDate(
+    start: Date,
+    type: ItemCycleType,
+    value: number,
+  ): Date {
+    return this.calculatePeriodEndDate(start, type, value);
   }
 
   async findAll(
@@ -132,16 +141,19 @@ export class ItemsService {
       categoryId?: string;
       platformId?: string;
       tag?: string;
+      expiringSoon?: boolean;
       sortBy?: string;
       sortOrder?: 'asc' | 'desc';
     },
   ) {
-    const isFiltered = query && Object.keys(query).some(k => query[k] !== undefined);
+    const isFiltered =
+      query && Object.keys(query).some((k) => query[k] !== undefined);
     const cacheKey = `user:${userId}:items`;
 
     if (!isFiltered) {
       try {
-        const cached = await this.cacheManager.get<ItemWithRelations[]>(cacheKey);
+        const cached =
+          await this.cacheManager.get<ItemWithRelations[]>(cacheKey);
         if (cached) {
           return cached;
         }
@@ -179,6 +191,18 @@ export class ItemsService {
     if (query?.tag) {
       const tags = query.tag.split(',');
       andConditions.push({ tags: { hasEvery: tags } });
+    }
+
+    if (query?.expiringSoon) {
+      const today = dayjs().startOf('day').toDate();
+      const sevenDaysLater = dayjs().add(7, 'day').endOf('day').toDate();
+      andConditions.push({
+        isVirtual: true,
+        nextBillingDate: {
+          gte: today,
+          lte: sevenDaysLater,
+        },
+      });
     }
 
     if (andConditions.length > 0) {
@@ -272,10 +296,7 @@ export class ItemsService {
         category: categoryId ? { connect: { id: categoryId } } : undefined,
         platform: platformId ? { connect: { id: platformId } } : undefined,
       },
-      include: {
-        category: { include: { parent: true } },
-        platform: true,
-      },
+      include: this.itemInclude,
     });
     await this.clearCache(userId);
     return updated;
@@ -337,6 +358,7 @@ export class ItemsService {
   async addHistory(userId: string, itemId: string, dto: CreateItemHistoryDto) {
     // 1. 鉴权：确保物品属于该用户
     await this.findOne(userId, itemId);
+    await this.validateRenewalHistoryDates(itemId, dto);
 
     // 2. 事务处理：创建历史记录 + (如果是续费) 更新物品账单日
     const result = await this.prisma.$transaction(async (tx) => {
@@ -347,12 +369,11 @@ export class ItemsService {
         },
       });
 
-      // 如果是续费记录，且提供了结束日期，则更新物品的下期账单日
+      // 如果是续费记录，且提供了结束日期，则更新物品的本期到期日
       if (dto.type === ItemRecordType.RENEWAL && dto.endDate) {
-        const nextDate = dayjs(dto.endDate).add(1, 'day').toDate();
         await tx.item.update({
           where: { id: itemId },
-          data: { nextBillingDate: nextDate },
+          data: { nextBillingDate: dto.endDate },
         });
       }
 
@@ -360,6 +381,41 @@ export class ItemsService {
     });
     await this.clearCache(userId);
     return result;
+  }
+
+  private async validateRenewalHistoryDates(
+    itemId: string,
+    dto: CreateItemHistoryDto,
+  ) {
+    if (dto.type !== ItemRecordType.RENEWAL) return;
+
+    const startDate = dto.startDate
+      ? dayjs(dto.startDate).startOf('day')
+      : null;
+    const endDate = dto.endDate ? dayjs(dto.endDate).startOf('day') : null;
+
+    if (startDate && endDate && endDate.isBefore(startDate)) {
+      throw new BadRequestException('到期日期不能早于开始日期');
+    }
+
+    const latestHistory = await this.prisma.itemHistory.findFirst({
+      where: {
+        itemId,
+        type: ItemRecordType.RENEWAL,
+        endDate: { not: null },
+      },
+      orderBy: { endDate: 'desc' },
+    });
+
+    if (!latestHistory?.endDate) return;
+
+    const latestEndDate = dayjs(latestHistory.endDate).startOf('day');
+    if (startDate && !startDate.isAfter(latestEndDate)) {
+      throw new BadRequestException('续费开始日期不能和上一期重复');
+    }
+    if (endDate && !endDate.isAfter(latestEndDate)) {
+      throw new BadRequestException('续费到期日期不能和上一期重复');
+    }
   }
 
   async findHistories(userId: string, itemId: string) {
@@ -401,7 +457,9 @@ export class ItemsService {
       // 0. Ensure user templates are copied first inside the transaction
       const categoriesCount = await tx.category.count({ where: { userId } });
       if (categoriesCount === 0) {
-        const templates = await tx.category.findMany({ where: { userId: null } });
+        const templates = await tx.category.findMany({
+          where: { userId: null },
+        });
         const idMap = new Map<string, string>();
         for (const template of templates.filter((c) => !c.parentId)) {
           const created = await tx.category.create({
@@ -439,7 +497,9 @@ export class ItemsService {
 
       const platformsCount = await tx.platform.count({ where: { userId } });
       if (platformsCount === 0) {
-        const templates = await tx.platform.findMany({ where: { userId: null } });
+        const templates = await tx.platform.findMany({
+          where: { userId: null },
+        });
         for (const template of templates) {
           await tx.platform.create({
             data: {
@@ -460,8 +520,12 @@ export class ItemsService {
       const existingCategories = await tx.category.findMany({
         where: { OR: [{ userId }, { userId: null }] },
       });
-      const userCategories = existingCategories.filter((c) => c.userId !== null);
-      const templateCategories = existingCategories.filter((c) => c.userId === null);
+      const userCategories = existingCategories.filter(
+        (c) => c.userId !== null,
+      );
+      const templateCategories = existingCategories.filter(
+        (c) => c.userId === null,
+      );
 
       const userCategoryMap = new Map<string, string>(); // name -> id, id -> id
       for (const cat of userCategories) {
@@ -494,7 +558,9 @@ export class ItemsService {
           // Find or create parent if template category has a parent
           let parentId: string | null = null;
           if (templateCat.parentId) {
-            const templateParent = templateCategories.find((c) => c.id === templateCat.parentId);
+            const templateParent = templateCategories.find(
+              (c) => c.id === templateCat.parentId,
+            );
             if (templateParent) {
               // Ensure the parent is copied to the user's categories first
               if (userCategoryMap.has(templateParent.name)) {
@@ -552,7 +618,9 @@ export class ItemsService {
         where: { OR: [{ userId }, { userId: null }] },
       });
       const userPlatforms = existingPlatforms.filter((p) => p.userId !== null);
-      const templatePlatforms = existingPlatforms.filter((p) => p.userId === null);
+      const templatePlatforms = existingPlatforms.filter(
+        (p) => p.userId === null,
+      );
 
       const userPlatformMap = new Map<string, string>(); // name -> id, id -> id
       for (const plat of userPlatforms) {
@@ -663,7 +731,7 @@ export class ItemsService {
 
         // Resolve Category to user-owned Category
         let categoryId: string | null = null;
-        
+
         // 1. Try resolving using categoryUuid from backup
         if (dev.categoryUuid) {
           if (userCategoryMap.has(dev.categoryUuid)) {
@@ -683,11 +751,15 @@ export class ItemsService {
           } else if (templateCategoryMap.has(dev.categoryName)) {
             const templateName = templateCategoryMap.get(dev.categoryName)!;
             // Copy template category to user categories if missing
-            const templateCat = templateCategories.find((c) => c.name === templateName);
+            const templateCat = templateCategories.find(
+              (c) => c.name === templateName,
+            );
             if (templateCat) {
               let parentId: string | null = null;
               if (templateCat.parentId) {
-                const templateParent = templateCategories.find((c) => c.id === templateCat.parentId);
+                const templateParent = templateCategories.find(
+                  (c) => c.id === templateCat.parentId,
+                );
                 if (templateParent) {
                   if (userCategoryMap.has(templateParent.name)) {
                     parentId = userCategoryMap.get(templateParent.name)!;
@@ -731,7 +803,9 @@ export class ItemsService {
           } else if (templatePlatformMap.has(dev.platform)) {
             // Find template platform and copy it for the user
             const templateName = templatePlatformMap.get(dev.platform)!;
-            const templatePlat = templatePlatforms.find((p) => p.name === templateName);
+            const templatePlat = templatePlatforms.find(
+              (p) => p.name === templateName,
+            );
             if (templatePlat) {
               const newPlat = await tx.platform.create({
                 data: {
@@ -767,7 +841,8 @@ export class ItemsService {
           dev.categoryName === '虚拟订阅';
 
         let nextBillingDate: Date | null = null;
-        if (dev.nextBillingDate) nextBillingDate = new Date(dev.nextBillingDate);
+        if (dev.nextBillingDate)
+          nextBillingDate = new Date(dev.nextBillingDate);
 
         const itemData = {
           name: dev.name,
@@ -781,6 +856,7 @@ export class ItemsService {
           currentCycle: dev.currentCycle || null,
           nextBillingDate,
           isAutoRenew: dev.isAutoRenew || false,
+          reminderDays: dev.reminderDays || 0,
           isBackup: dev.backupDate !== undefined,
           backupDate: dev.backupDate ? new Date(dev.backupDate) : null,
           isScrapped: dev.scrapDate !== undefined,

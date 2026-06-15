@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../core/network/api_client.dart';
+import '../../core/network/error_messages.dart';
 
 final dataTransferServiceProvider = Provider<DataTransferService>((ref) {
   return DataTransferService(ref.watch(apiClientProvider));
@@ -90,15 +91,13 @@ class DataTransferService {
     }
 
     final base64Data = base64Encode(bytes);
-    final result = await _channel.invokeMethod<String>(
-      'createFileInDirectory',
-      {
-        'directoryUri': directoryUri,
-        'fileName': fileName,
-        'mimeType': 'application/zip',
-        'data': base64Data,
-      },
-    );
+    final result = await _channel
+        .invokeMethod<String>('createFileInDirectory', {
+          'directoryUri': directoryUri,
+          'fileName': fileName,
+          'mimeType': 'application/zip',
+          'data': base64Data,
+        });
 
     if (result == null) {
       // Directory may have been deleted, clear and retry once
@@ -106,15 +105,13 @@ class DataTransferService {
       final newDir = await _channel.invokeMethod<String>('pickDirectory');
       if (newDir == null) throw '未选择保存位置';
 
-      final retryResult = await _channel.invokeMethod<String>(
-        'createFileInDirectory',
-        {
-          'directoryUri': newDir,
-          'fileName': fileName,
-          'mimeType': 'application/zip',
-          'data': base64Data,
-        },
-      );
+      final retryResult = await _channel
+          .invokeMethod<String>('createFileInDirectory', {
+            'directoryUri': newDir,
+            'fileName': fileName,
+            'mimeType': 'application/zip',
+            'data': base64Data,
+          });
       if (retryResult == null) throw '文件保存失败';
       return retryResult;
     }
@@ -134,7 +131,8 @@ class DataTransferService {
       String? stagingPath;
 
       // Try to detect if it's a ZIP file by checking magic bytes
-      final isZip = bytes.length >= 4 &&
+      final isZip =
+          bytes.length >= 4 &&
           bytes[0] == 0x50 &&
           bytes[1] == 0x4B &&
           bytes[2] == 0x03 &&
@@ -155,8 +153,9 @@ class DataTransferService {
               ..createSync(recursive: true)
               ..writeAsBytesSync(data);
           } else {
-            await Directory('$stagingPath/${file.name}')
-                .create(recursive: true);
+            await Directory(
+              '$stagingPath/${file.name}',
+            ).create(recursive: true);
           }
         }
 
@@ -190,7 +189,7 @@ class DataTransferService {
       return result;
     } catch (e) {
       debugPrint('Import failed: $e');
-      throw '导入失败: $e';
+      throw Exception(userErrorMessage(e, fallback: '导入失败，请稍后重试'));
     }
   }
 
@@ -219,6 +218,7 @@ class DataTransferService {
       'currentCycle': detail['currentCycle'],
       'isAutoRenew': detail['isAutoRenew'] ?? false,
       'nextBillingDate': detail['nextBillingDate'],
+      'reminderDays': detail['reminderDays'] ?? 0,
       'history': histories
           .whereType<Map<String, dynamic>>()
           .map(_exportHistory)
@@ -249,10 +249,7 @@ class DataTransferService {
   }
 
   Future<Map<String, dynamic>?> _restoreToApi(Map<String, dynamic> data) async {
-    final result = await _apiClient.post<dynamic>(
-      '/items/import',
-      data: data,
-    );
+    final result = await _apiClient.post<dynamic>('/items/import', data: data);
     if (result is Map<String, dynamic>) {
       return result;
     }
@@ -278,7 +275,6 @@ class DataTransferService {
       _ => value,
     };
   }
-
 
   Future<String> getBackupDirectoryPath() async {
     if (Platform.isAndroid) {

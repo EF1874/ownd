@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -8,9 +10,11 @@ import '../../data/services/data_transfer_service.dart';
 import '../../data/services/preferences_service.dart';
 import '../../shared/services/notification_service.dart';
 import '../../shared/services/subscription_service.dart';
+import '../../shared/services/app_update_service.dart';
 import '../../features/navigation/navigation_provider.dart';
 import '../../features/auth/auth_controller.dart';
 import '../../core/theme/theme_provider.dart';
+import '../../core/network/error_messages.dart';
 import '../../data/repositories/category_repository.dart';
 import '../../data/repositories/platform_repository.dart';
 import '../home/home_screen.dart';
@@ -18,6 +22,7 @@ import '../home/home_devices_provider.dart';
 
 import '../../shared/widgets/base_card.dart';
 import '../../shared/widgets/app_toast.dart';
+import '../../shared/widgets/app_update_prompt.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -79,7 +84,10 @@ class ProfileScreen extends ConsumerWidget {
                         }
                       } catch (e) {
                         if (context.mounted) {
-                          _showSnackBar(context, '导出失败: $e');
+                          _showSnackBar(
+                            context,
+                            '导出失败: ${userErrorMessage(e)}',
+                          );
                         }
                       }
                     },
@@ -104,7 +112,8 @@ class ProfileScreen extends ConsumerWidget {
                           if (result != null) {
                             final created = result['createdCount'] ?? 0;
                             final updated = result['updatedCount'] ?? 0;
-                            final duplicates = (result['duplicates'] as List<dynamic>?)
+                            final duplicates =
+                                (result['duplicates'] as List<dynamic>?)
                                     ?.cast<String>() ??
                                 [];
                             _showImportResultDialog(
@@ -119,7 +128,10 @@ class ProfileScreen extends ConsumerWidget {
                         }
                       } catch (e) {
                         if (context.mounted) {
-                          _showSnackBar(context, '导入失败: $e');
+                          _showSnackBar(
+                            context,
+                            '导入失败: ${userErrorMessage(e)}',
+                          );
                         }
                       }
                     },
@@ -263,7 +275,16 @@ class ProfileScreen extends ConsumerWidget {
                       return ListTile(
                         leading: const Icon(Icons.info_outline),
                         title: const Text('版本'),
-                        trailing: Text(version),
+                        subtitle: const Text('点击检查更新'),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(version),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.chevron_right),
+                          ],
+                        ),
+                        onTap: () => _checkForUpdate(context, ref),
                       );
                     },
                   ),
@@ -274,6 +295,25 @@ class ProfileScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _checkForUpdate(BuildContext context, WidgetRef ref) async {
+    try {
+      _showSnackBar(context, '正在检查更新...');
+      final result = await ref.read(appUpdateServiceProvider).checkForUpdate();
+      if (!context.mounted) return;
+
+      if (!result.hasUpdate) {
+        _showSnackBar(context, '当前已是最新版本');
+        return;
+      }
+
+      showAppUpdateDialog(context, ref, result.latest);
+    } catch (e) {
+      if (context.mounted) {
+        _showSnackBar(context, '检查更新失败: ${userErrorMessage(e)}');
+      }
+    }
   }
 
   void _showSnackBar(BuildContext context, String message) {
@@ -329,7 +369,6 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-
   Widget _buildSectionHeader(BuildContext context, String title) {
     return Padding(
       padding: const EdgeInsets.only(left: 4),
@@ -342,7 +381,6 @@ class ProfileScreen extends ConsumerWidget {
       ),
     );
   }
-
 
   void _showThemeDialog(
     BuildContext context,

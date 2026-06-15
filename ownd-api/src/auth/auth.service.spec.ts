@@ -5,6 +5,8 @@ import { JwtService } from '@nestjs/jwt';
 import { ConflictException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { User } from '@prisma/client';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { ConfigService } from '@nestjs/config';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -13,11 +15,22 @@ describe('AuthService', () => {
 
   const mockUsersService = {
     findByEmail: jest.fn(),
+    findByNameOrEmail: jest.fn(),
     create: jest.fn(),
   };
 
   const mockJwtService = {
     sign: jest.fn(),
+  };
+
+  const mockCacheManager = {
+    get: jest.fn(),
+    set: jest.fn(),
+    del: jest.fn(),
+  };
+
+  const mockConfigService = {
+    get: jest.fn((_key: string, fallback?: string) => fallback),
   };
 
   beforeEach(async () => {
@@ -26,6 +39,8 @@ describe('AuthService', () => {
         AuthService,
         { provide: UsersService, useValue: mockUsersService },
         { provide: JwtService, useValue: mockJwtService },
+        { provide: CACHE_MANAGER, useValue: mockCacheManager },
+        { provide: ConfigService, useValue: mockConfigService },
       ],
     }).compile();
 
@@ -51,7 +66,7 @@ describe('AuthService', () => {
         updatedAt: new Date(),
       } as User;
 
-      mockUsersService.findByEmail.mockResolvedValue(user);
+      mockUsersService.findByNameOrEmail.mockResolvedValue(user);
 
       const result = await service.validateUser(user.email, password);
 
@@ -65,7 +80,7 @@ describe('AuthService', () => {
         email: 'test@test.com',
         password: 'hashedPassword',
       } as User;
-      mockUsersService.findByEmail.mockResolvedValue(user);
+      mockUsersService.findByNameOrEmail.mockResolvedValue(user);
 
       const result = await service.validateUser(user.email, 'wrongPassword');
 
@@ -73,7 +88,7 @@ describe('AuthService', () => {
     });
 
     it('should return null if user not found', async () => {
-      mockUsersService.findByEmail.mockResolvedValue(null);
+      mockUsersService.findByNameOrEmail.mockResolvedValue(null);
 
       const result = await service.validateUser('none@test.com', 'password');
 
@@ -84,10 +99,12 @@ describe('AuthService', () => {
   describe('register', () => {
     it('should register a new user if email is not taken', async () => {
       const email = 'new@test.com';
+      mockCacheManager.get.mockResolvedValue('123456');
       mockUsersService.findByEmail.mockResolvedValue(null);
+      mockUsersService.findByNameOrEmail.mockResolvedValue(null);
       mockUsersService.create.mockResolvedValue({ id: '1', email } as User);
 
-      const result = await service.register(email, 'pass123', 'Name');
+      const result = await service.register(email, 'pass123', 'Name', '123456');
 
       expect(usersService.create as jest.Mock).toHaveBeenCalledWith(
         email,
@@ -98,13 +115,14 @@ describe('AuthService', () => {
     });
 
     it('should throw ConflictException if email is taken', async () => {
+      mockCacheManager.get.mockResolvedValue('123456');
       mockUsersService.findByEmail.mockResolvedValue({
         id: '1',
         email: 'taken@test.com',
       } as User);
 
       await expect(
-        service.register('taken@test.com', 'pass', 'Name'),
+        service.register('taken@test.com', 'pass', 'Name', '123456'),
       ).rejects.toThrow(ConflictException);
     });
   });

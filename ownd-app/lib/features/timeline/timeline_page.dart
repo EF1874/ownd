@@ -4,6 +4,7 @@ import 'logic/timeline_provider.dart';
 import 'models/timeline_event.dart';
 import 'widgets/timeline_node.dart';
 import '../../data/repositories/category_repository.dart';
+import '../../core/network/error_messages.dart';
 import '../../shared/utils/format_utils.dart';
 import '../home/widgets/multi_select_filter_delegate.dart';
 import '../home/home_screen.dart'; // for deviceListProvider
@@ -253,8 +254,9 @@ Widget _buildTimelineBody(
         loading: () => const SliverFillRemaining(
           child: Center(child: CircularProgressIndicator()),
         ),
-        error: (err, stack) =>
-            SliverFillRemaining(child: Center(child: Text('Error: $err'))),
+        error: (err, stack) => SliverFillRemaining(
+          child: Center(child: Text('加载失败: ${userErrorMessage(err)}')),
+        ),
       ),
     ],
   );

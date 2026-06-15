@@ -7,6 +7,9 @@ abstract class DeviceDataSource {
   /// Get all devices.
   Future<List<Device>> getAll();
 
+  /// Get a single device with full detail.
+  Future<Device> getById(int id);
+
   /// Watch all devices as a reactive stream.
   Stream<List<Device>> watchAll();
 
@@ -18,6 +21,7 @@ abstract class DeviceDataSource {
     String? categoryId,
     String? platformId,
     String? tag,
+    bool expiringSoon = false,
     String? sortBy,
     String? sortOrder,
   });

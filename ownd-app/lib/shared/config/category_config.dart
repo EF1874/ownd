@@ -18,6 +18,13 @@ import 'categories/other.dart';
 export 'category_item.dart';
 
 class CategoryConfig {
+  static final Map<String, List<String>> subscriptionGroups =
+      subscriptionCategoryGroups;
+
+  static final Set<String> subscriptionGroupNames = subscriptionCategoryGroups
+      .keys
+      .toSet();
+
   static final List<CategoryItem> defaultCategories = [
     ...subscriptionCategories,
     ...digitalCategories,
@@ -114,6 +121,7 @@ class CategoryConfig {
       }
     }
     if (hierarchy.containsKey(itemName)) return itemName;
+    if (subscriptionGroupNames.contains(itemName)) return '虚拟订阅';
     for (var entry in hierarchy.entries) {
       if (entry.value.contains(itemName)) {
         return entry.key;

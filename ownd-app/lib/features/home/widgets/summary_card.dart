@@ -4,6 +4,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../../data/models/device.dart';
 import '../../../shared/config/category_config.dart';
 import '../../../shared/utils/format_utils.dart';
+import '../../../shared/utils/category_tree_utils.dart';
+import '../../../shared/utils/subscription_utils.dart';
 
 class SummaryCard extends StatelessWidget {
   final List<Device> filteredDevices;
@@ -36,7 +38,7 @@ class SummaryCard extends StatelessWidget {
     double dailyCost = 0;
     int scrapCount = 0;
 
-    final now = DateTime.now();
+    final today = SubscriptionUtils.dateOnly(DateTime.now());
 
     for (var d in targetDevices) {
       totalValue += d.price;
@@ -46,10 +48,11 @@ class SummaryCard extends StatelessWidget {
       if (d.status == 'scrap') {
         isScrapOrExpired = true;
       } else {
-        if (CategoryConfig.getMajorCategory(d.category.value?.name) == '虚拟订阅') {
+        if (CategoryTreeUtils.isVirtualSubscription(d.category.value)) {
+          final subscriptionDueDate = d.subscriptionDueDate;
           if (!d.isAutoRenew &&
-              d.nextBillingDate != null &&
-              d.nextBillingDate!.isBefore(now)) {
+              subscriptionDueDate != null &&
+              SubscriptionUtils.dateOnly(subscriptionDueDate).isBefore(today)) {
             isScrapOrExpired = true;
           }
         }

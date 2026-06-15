@@ -29,6 +29,30 @@ class RemoteDeviceDataSource implements DeviceDataSource {
   }
 
   @override
+  Future<Device> getById(int id) async {
+    var uuid = _uuidMap[id];
+    if (uuid == null) {
+      await getAll();
+      uuid = _uuidMap[id];
+    }
+
+    if (uuid == null) {
+      throw StateError('Device with id $id not found in memory.');
+    }
+
+    final data = await _apiClient.get<Map<String, dynamic>>('/items/$uuid');
+    final device = deviceFromApi(data);
+    _uuidMap[device.id] = device.uuid;
+    final index = _cache.indexWhere((item) => item.id == device.id);
+    if (index >= 0) {
+      _cache[index] = device;
+    } else {
+      _cache.add(device);
+    }
+    return device;
+  }
+
+  @override
   Stream<List<Device>> watchAll() {
     unawaited(getAll());
     return _controller.stream;
@@ -42,6 +66,7 @@ class RemoteDeviceDataSource implements DeviceDataSource {
     String? categoryId,
     String? platformId,
     String? tag,
+    bool expiringSoon = false,
     String? sortBy,
     String? sortOrder,
   }) async {
@@ -52,6 +77,7 @@ class RemoteDeviceDataSource implements DeviceDataSource {
       if (categoryId != null && categoryId.isNotEmpty) 'categoryId': categoryId,
       if (platformId != null && platformId.isNotEmpty) 'platformId': platformId,
       if (tag != null && tag.isNotEmpty) 'tag': tag,
+      if (expiringSoon) 'expiringSoon': 'true',
       if (sortBy != null && sortBy.isNotEmpty) 'sortBy': sortBy,
       if (sortOrder != null && sortOrder.isNotEmpty) 'sortOrder': sortOrder,
     };
@@ -59,7 +85,10 @@ class RemoteDeviceDataSource implements DeviceDataSource {
       '/items',
       queryParameters: queryParameters,
     );
-    final list = data.whereType<Map<String, dynamic>>().map(deviceFromApi).toList();
+    final list = data
+        .whereType<Map<String, dynamic>>()
+        .map(deviceFromApi)
+        .toList();
     for (final device in list) {
       _uuidMap[device.id] = device.uuid;
     }
@@ -86,20 +115,45 @@ class RemoteDeviceDataSource implements DeviceDataSource {
 
   @override
   Future<void> update(Device device) async {
+    final existingHistoryCount = await _getRemoteHistoryCount(device.uuid);
+    final newHistories = device.history.length > existingHistoryCount
+        ? device.history.skip(existingHistoryCount).toList()
+        : <SubscriptionHistory>[];
+    for (final history in newHistories) {
+      await _apiClient.post<Map<String, dynamic>>(
+        '/items/${device.uuid}/histories',
+        data: historyToApi(history),
+      );
+    }
+
     final data = await _apiClient.patch<Map<String, dynamic>>(
       '/items/${device.uuid}',
       data: deviceToApi(device),
     );
-    final updated = deviceFromApi(data);
+    final refreshedData = newHistories.isEmpty
+        ? data
+        : await _apiClient.get<Map<String, dynamic>>('/items/${device.uuid}');
+    final refreshed = deviceFromApi(refreshedData);
     device
-      ..id = updated.id
-      ..uuid = updated.uuid;
+      ..id = refreshed.id
+      ..uuid = refreshed.uuid
+      ..history = refreshed.history
+      ..nextBillingDate = refreshed.nextBillingDate
+      ..cycleType = refreshed.cycleType
+      ..price = refreshed.price;
     _uuidMap[device.id] = device.uuid;
     try {
       await getAll();
     } catch (_) {
       // Cache refresh failure should not block the success result
     }
+  }
+
+  Future<int> _getRemoteHistoryCount(String itemUuid) async {
+    final data = await _apiClient.get<Map<String, dynamic>>('/items/$itemUuid');
+    final histories = data['itemHistories'];
+    if (histories is List) return histories.length;
+    return 0;
   }
 
   @override
@@ -112,7 +166,8 @@ class RemoteDeviceDataSource implements DeviceDataSource {
     } else {
       final device = _cache.firstWhere(
         (item) => item.id == id,
-        orElse: () => throw StateError('Device with id $id not found in memory.'),
+        orElse: () =>
+            throw StateError('Device with id $id not found in memory.'),
       );
       debugPrint('[DataSource] Calling DELETE /items/${device.uuid}');
       await _apiClient.delete<dynamic>('/items/${device.uuid}');

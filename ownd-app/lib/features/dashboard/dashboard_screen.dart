@@ -4,6 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:go_router/go_router.dart';
 import '../home/home_screen.dart'; // for deviceListProvider
 import '../../data/models/device.dart';
+import '../../core/network/error_messages.dart';
 import '../../shared/utils/format_utils.dart';
 
 /// Extended time filter enum
@@ -338,7 +339,8 @@ class _DashboardContentState extends ConsumerState<DashboardContent>
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, stack) => Center(child: Text('加载失败: $error')),
+      error: (error, stack) =>
+          Center(child: Text('加载失败: ${userErrorMessage(error)}')),
     );
   }
 

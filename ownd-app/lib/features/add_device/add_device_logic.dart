@@ -48,12 +48,12 @@ extension AddDeviceLogic on _AddDeviceScreenState {
     _baseAccumulatedPrice = (total ?? 0.0) - cost;
   }
 
-  void _calculateNextBilling() {
-    // If editing existing device, do not auto-calculate next billing date
-    // This allows users to modify fields without resetting the billing cycle
-    if (widget.device != null) return;
-
+  void _calculateNextBilling({bool force = false}) {
+    // Editing an existing subscription should keep the saved due date unless the
+    // user explicitly changes the cycle.
+    if (widget.device != null && !force) return;
     if (_cycleType == null || _cycleType == CycleType.oneTime) return;
+
     updateState(
       () => _nextBillingDate = SubscriptionUtils.calculateNextBillingDate(
         _purchaseDate,
@@ -96,7 +96,7 @@ extension AddDeviceLogic on _AddDeviceScreenState {
           _scrapDate = picked;
         } else {
           _purchaseDate = picked;
-          if (_isSub) _calculateNextBilling();
+          if (_isSub && widget.device == null) _calculateNextBilling();
         }
       });
     }
@@ -132,6 +132,9 @@ extension AddDeviceLogic on _AddDeviceScreenState {
                 .read(platformRepositoryProvider)
                 .ensurePlatform(selectedPlatformName)
           : null;
+      final normalizedReminderDays = _isSub
+          ? _normalizeReminderDays(_reminderDays)
+          : 0;
 
       final device = widget.device ?? Device();
       device
@@ -159,8 +162,8 @@ extension AddDeviceLogic on _AddDeviceScreenState {
         ..cycleType = _isSub ? _cycleType : null
         ..isAutoRenew = _isSub ? _isAutoRenew : true
         ..nextBillingDate = _isSub ? _nextBillingDate : null
-        ..reminderDays = _isSub ? _reminderDays : 1
-        ..hasReminder = _isSub ? _hasReminder : false
+        ..reminderDays = normalizedReminderDays
+        ..hasReminder = normalizedReminderDays > 0
         ..firstPeriodPrice = (_isSub && _discount)
             ? double.tryParse(_firstPriceCtr.text)
             : null
@@ -196,6 +199,9 @@ extension AddDeviceLogic on _AddDeviceScreenState {
         await ref.read(deviceRepositoryProvider).addDevice(device);
       }
 
+      ref.invalidate(categoryTreeProvider);
+      await ref.read(homeDevicesNotifierProvider.notifier).silentRefresh();
+
       // Handle Notifications
       final subService = ref.read(subscriptionServiceProvider);
 
@@ -222,95 +228,15 @@ extension AddDeviceLogic on _AddDeviceScreenState {
         }
       }
     } catch (e) {
-      if (mounted) _showSnack('保存失败: $e');
+      if (mounted) _showSnack('保存失败: ${userErrorMessage(e)}');
     } finally {
       if (mounted) updateState(() => _isLoading = false);
     }
   }
 
-  void _showSnack(String msg) =>
-      AppToast.show(context, msg, isError: msg.contains('失败') || msg.contains('错误') || msg.contains('请选择'));
-
-  Future<void> _showRenewDialog() async {
-    if (_cycleType == null) return;
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (ctx) => RenewDialog(
-        initialCycleType: _cycleType!,
-        initialPrice: double.tryParse(_priceCtr.text) ?? 0.0,
-      ),
-    );
-
-    if (result != null && mounted) {
-      final newCycle = result['cycle'] as CycleType;
-      final renewPrice = result['price'] as double;
-      final renewalDate = result['date'] as DateTime;
-
-      updateState(() {
-        // Idempotency: Revert previous renewal attempt in this session
-        if (_hasPendingRenewal && widget.device != null) {
-          if (widget.device!.history.isNotEmpty) {
-            // Ensure mutable before removing
-            widget.device!.history = widget.device!.history.toList();
-            widget.device!.history.removeLast();
-          }
-          _totalAccumulatedPrice -= _lastRenewPrice;
-          _totalAccumulatedPriceCtr.text = _totalAccumulatedPrice % 1 == 0
-              ? _totalAccumulatedPrice.toInt().toString()
-              : _totalAccumulatedPrice.toString();
-          _nextBillingDate = _preRenewalNextBillingDate;
-        } else {
-          // First renewal in this session, save state
-          _preRenewalNextBillingDate = _nextBillingDate;
-        }
-
-        if (widget.device != null) {
-          final isOriginallyExpired =
-              _originalNextBillingDate == null ||
-              _originalNextBillingDate!.isBefore(DateTime.now());
-
-          // The cycle ends at the *current* nextBillingDate (or now if null)
-          // The start of the *new* cycle is effectively this date.
-          final cycleEndDate = _nextBillingDate ?? DateTime.now();
-
-          widget.device!.snapshotCurrentSubscription(
-            endDate: cycleEndDate,
-            recordDate: renewalDate,
-          );
-
-          // Calculate NEW nextBillingDate based on the OLD end date (continuity) or renewal date (gap)
-          final effectiveStartDate = renewalDate.isAfter(cycleEndDate)
-              ? renewalDate
-              : cycleEndDate;
-
-          _nextBillingDate = SubscriptionUtils.calculateNextBillingDate(
-            effectiveStartDate,
-            newCycle,
-          );
-
-          // Only update the displayed cycle type if the subscription was already expired
-          if (isOriginallyExpired) {
-            _cycleType = newCycle;
-          }
-        } else {
-          // New device fallback
-          _nextBillingDate = SubscriptionUtils.calculateNextBillingDate(
-            _nextBillingDate ?? DateTime.now(),
-            newCycle,
-          );
-          _cycleType = newCycle;
-        }
-
-        _totalAccumulatedPrice += renewPrice;
-        _totalAccumulatedPriceCtr.text = _totalAccumulatedPrice % 1 == 0
-            ? _totalAccumulatedPrice.toInt().toString()
-            : _totalAccumulatedPrice.toString();
-        _priceCtr.text = renewPrice.toString();
-
-        _hasPendingRenewal = true;
-        _lastRenewPrice = renewPrice;
-      });
-      _showSnack('已更新续费状态，请点击保存');
-    }
-  }
+  void _showSnack(String msg) => AppToast.show(
+    context,
+    msg,
+    isError: msg.contains('失败') || msg.contains('错误') || msg.contains('请选择'),
+  );
 }

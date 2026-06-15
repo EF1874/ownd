@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../config/app_config.dart';
 import 'api_exception.dart';
+import 'error_messages.dart';
 import 'token_storage.dart';
 
 final apiBaseUrlProvider = Provider<String>((ref) {
@@ -90,19 +91,10 @@ class ApiClient {
 
       return body as T;
     } on DioException catch (error) {
-      final data = error.response?.data;
-      String message = error.message ?? '网络请求失败';
-
-      if (data is Map<String, dynamic>) {
-        final rawMessage = data['msg'] ?? data['message'];
-        if (rawMessage is String && rawMessage.isNotEmpty) {
-          message = rawMessage;
-        } else if (rawMessage is List && rawMessage.isNotEmpty) {
-          message = rawMessage.join(', ');
-        }
-      }
-
-      throw ApiException(message, statusCode: error.response?.statusCode);
+      throw ApiException(
+        friendlyDioErrorMessage(error),
+        statusCode: error.response?.statusCode,
+      );
     } on TypeError {
       throw const ApiException('接口响应格式不符合预期');
     }

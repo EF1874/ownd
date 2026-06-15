@@ -12,7 +12,7 @@ class PreferencesService {
 
   static const _keyIsGridView = 'is_grid_view';
   static const _keySortBy = 'sort_by';
-  static const _keyShowExpiringList = 'show_expiring_list';
+  static const _keyExpiringSoonOnly = 'expiring_soon_only';
 
   bool get isGridView => _prefs.getBool(_keyIsGridView) ?? false;
 
@@ -26,10 +26,10 @@ class PreferencesService {
     await _prefs.setString(_keySortBy, value);
   }
 
-  bool get showExpiringList => _prefs.getBool(_keyShowExpiringList) ?? true;
+  bool get expiringSoonOnly => _prefs.getBool(_keyExpiringSoonOnly) ?? false;
 
-  Future<void> setShowExpiringList(bool value) async {
-    await _prefs.setBool(_keyShowExpiringList, value);
+  Future<void> setExpiringSoonOnly(bool value) async {
+    await _prefs.setBool(_keyExpiringSoonOnly, value);
   }
 
   static const _keyThemeMode = 'theme_mode';
@@ -41,6 +41,7 @@ class PreferencesService {
   }
 
   static const _keyNotificationTime = 'notification_time';
+  static const _keyLastAppUpdateAutoCheck = 'last_app_update_auto_check';
 
   /// Format: "HH:mm" 24-hour format
   String get notificationTime =>
@@ -48,6 +49,23 @@ class PreferencesService {
 
   Future<void> setNotificationTime(String value) async {
     await _prefs.setString(_keyNotificationTime, value);
+  }
+
+  bool hasCheckedAppUpdateToday() {
+    final timestamp = _prefs.getInt(_keyLastAppUpdateAutoCheck);
+    if (timestamp == null) return false;
+    final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    final now = DateTime.now();
+    return date.year == now.year &&
+        date.month == now.month &&
+        date.day == now.day;
+  }
+
+  Future<void> setAppUpdateCheckedToday() async {
+    await _prefs.setInt(
+      _keyLastAppUpdateAutoCheck,
+      DateTime.now().millisecondsSinceEpoch,
+    );
   }
 
   // Helper for manual check throttling

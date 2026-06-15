@@ -7,6 +7,14 @@ import 'package:timezone/timezone.dart' as tz;
 final notificationServiceProvider = Provider((ref) => NotificationService());
 
 class NotificationService {
+  static const _subscriptionChannelId = 'subscription_reminders_v3';
+  static const _subscriptionChannelName = '订阅提醒';
+  static const _subscriptionChannelDescription = '即将到期或续费的订阅提醒';
+  static const _appUpdateChannelId = 'app_updates_v1';
+  static const _appUpdateChannelName = '应用更新';
+  static const _appUpdateChannelDescription = '应用更新下载进度';
+  static const _appUpdateNotificationId = 20001;
+
   final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
   bool _isized = false;
@@ -44,11 +52,32 @@ class NotificationService {
 
     // Request Permissions
     if (Platform.isAndroid) {
-      await _notificationsPlugin
+      final androidNotifications = _notificationsPlugin
           .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin
-          >()
-          ?.requestNotificationsPermission();
+          >();
+
+      await androidNotifications?.createNotificationChannel(
+        const AndroidNotificationChannel(
+          _subscriptionChannelId,
+          _subscriptionChannelName,
+          description: _subscriptionChannelDescription,
+          importance: Importance.max,
+          playSound: true,
+          enableVibration: true,
+        ),
+      );
+      await androidNotifications?.createNotificationChannel(
+        const AndroidNotificationChannel(
+          _appUpdateChannelId,
+          _appUpdateChannelName,
+          description: _appUpdateChannelDescription,
+          importance: Importance.low,
+          playSound: false,
+          enableVibration: false,
+        ),
+      );
+      await androidNotifications?.requestNotificationsPermission();
     }
 
     _isized = true;
@@ -64,14 +93,14 @@ class NotificationService {
 
     const AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
-          'subscription_reminders_v2', // Changed ID
-          '订阅提醒', // channel Name
-          channelDescription: '即将到期或续费的订阅提醒',
+          _subscriptionChannelId,
+          _subscriptionChannelName,
+          channelDescription: _subscriptionChannelDescription,
           importance: Importance.max,
           priority: Priority.max,
           enableVibration: true,
           playSound: true,
-          ticker: '订阅提醒',
+          ticker: _subscriptionChannelName,
         );
 
     const NotificationDetails platformDetails = NotificationDetails(
@@ -98,14 +127,14 @@ class NotificationService {
 
     const AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
-          'subscription_reminders_v2', // Changed ID to force update
-          '订阅提醒',
-          channelDescription: '即将到期或续费的订阅提醒',
+          _subscriptionChannelId,
+          _subscriptionChannelName,
+          channelDescription: _subscriptionChannelDescription,
           importance: Importance.max,
           priority: Priority.max,
           enableVibration: true,
           playSound: true,
-          ticker: '订阅提醒', // Accessibility
+          ticker: _subscriptionChannelName,
         );
 
     const NotificationDetails platformDetails = NotificationDetails(
@@ -131,6 +160,77 @@ class NotificationService {
   Future<void> cancelAllNotifications() async {
     if (!_isized) await init();
     await _notificationsPlugin.cancelAll();
+  }
+
+  Future<void> showAppUpdateDownloadProgress(int progress) async {
+    if (!_isized) await init();
+
+    final safeProgress = progress.clamp(0, 100).toInt();
+    final androidDetails = AndroidNotificationDetails(
+      _appUpdateChannelId,
+      _appUpdateChannelName,
+      channelDescription: _appUpdateChannelDescription,
+      importance: Importance.low,
+      priority: Priority.low,
+      onlyAlertOnce: true,
+      ongoing: safeProgress < 100,
+      showProgress: true,
+      maxProgress: 100,
+      progress: safeProgress,
+      playSound: false,
+      enableVibration: false,
+    );
+
+    await _notificationsPlugin.show(
+      _appUpdateNotificationId,
+      '正在下载更新',
+      '$safeProgress%',
+      NotificationDetails(android: androidDetails),
+    );
+  }
+
+  Future<void> showAppUpdateDownloadComplete() async {
+    if (!_isized) await init();
+
+    const androidDetails = AndroidNotificationDetails(
+      _appUpdateChannelId,
+      _appUpdateChannelName,
+      channelDescription: _appUpdateChannelDescription,
+      importance: Importance.low,
+      priority: Priority.low,
+      onlyAlertOnce: true,
+      playSound: false,
+      enableVibration: false,
+    );
+
+    await _notificationsPlugin.show(
+      _appUpdateNotificationId,
+      '更新包已下载',
+      '请按系统提示完成安装',
+      const NotificationDetails(android: androidDetails),
+    );
+  }
+
+  Future<void> showAppUpdateDownloadFailed() async {
+    if (!_isized) await init();
+
+    const androidDetails = AndroidNotificationDetails(
+      _appUpdateChannelId,
+      _appUpdateChannelName,
+      channelDescription: _appUpdateChannelDescription,
+      importance: Importance.defaultImportance,
+      priority: Priority.defaultPriority,
+      onlyAlertOnce: true,
+      playSound: false,
+      enableVibration: false,
+    );
+
+    await _notificationsPlugin.show(
+      _appUpdateNotificationId,
+      '更新包下载失败',
+      '请稍后重试',
+      const NotificationDetails(android: androidDetails),
+    );
   }
 
   Future<bool> isNotificationActive(int id) async {

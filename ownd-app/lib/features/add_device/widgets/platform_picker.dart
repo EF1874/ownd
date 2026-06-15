@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/purchase_platform.dart';
 import '../../../data/repositories/platform_repository.dart';
+import '../../../core/network/error_messages.dart';
 import '../../../shared/utils/icon_utils.dart';
 
 class PlatformPicker extends ConsumerWidget {
@@ -107,7 +108,8 @@ class PlatformPicker extends ConsumerWidget {
                     ),
                     loading: () =>
                         const Center(child: CircularProgressIndicator()),
-                    error: (err, stack) => Center(child: Text('Error: $err')),
+                    error: (err, stack) =>
+                        Center(child: Text('加载失败: ${userErrorMessage(err)}')),
                   ),
                 ),
               ],

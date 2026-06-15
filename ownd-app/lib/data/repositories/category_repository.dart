@@ -3,6 +3,7 @@ import '../models/category.dart';
 import '../datasource/category_datasource.dart';
 import '../datasource/remote/remote_category_datasource.dart';
 import '../../shared/config/category_config.dart';
+import '../../shared/utils/category_tree_utils.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/network/api_client.dart';
 
@@ -45,7 +46,9 @@ class CategoryRepository {
     return categories;
   }
 
-  Future<List<Category>> getCategoryTree() => _dataSource.getTree();
+  Future<List<Category>> getCategoryTree() async {
+    return CategoryTreeUtils.sortTree(await _dataSource.getTree());
+  }
 
   Future<int> addCategory(Category category) => _dataSource.add(category);
 

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
+import '../../core/network/error_messages.dart';
 import '../../shared/services/image_service.dart';
 
 import '../../data/models/category.dart';
@@ -12,16 +13,16 @@ import '../../data/repositories/category_repository.dart';
 import '../../data/repositories/device_repository.dart';
 import '../../data/repositories/platform_repository.dart';
 import '../../features/navigation/navigation_provider.dart';
-import '../../shared/config/category_config.dart';
+import '../../shared/utils/category_tree_utils.dart';
 import '../../shared/utils/subscription_utils.dart';
 import '../../shared/widgets/app_button.dart';
 import '../../shared/widgets/app_toast.dart';
 import '../../shared/services/subscription_service.dart';
+import '../home/home_devices_provider.dart';
 
 import 'widgets/basic_info_section.dart';
 import 'widgets/date_section.dart';
 import 'widgets/subscription_section.dart';
-import 'widgets/renew_dialog.dart';
 
 import 'widgets/additional_info_section.dart';
 
@@ -60,23 +61,15 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
   CycleType? _cycleType;
   bool _isAutoRenew = false;
   DateTime? _nextBillingDate;
-  int _reminderDays = 1;
-  bool _hasReminder = false;
+  int _reminderDays = 0;
   bool _discount = false;
   double _totalAccumulatedPrice = 0.0;
 
-  DateTime? _originalNextBillingDate;
-  bool _hasPendingRenewal = false;
-  double _lastRenewPrice = 0.0;
-  DateTime? _preRenewalNextBillingDate;
   double _baseAccumulatedPrice = 0.0;
 
   late final String _uuid; // Track UUID for file naming
 
-  bool get _isSub =>
-      (_selectedCategory?.parentName ??
-          CategoryConfig.getMajorCategory(_selectedCategory?.name)) ==
-      '虚拟订阅';
+  bool get _isSub => CategoryTreeUtils.isVirtualSubscription(_selectedCategory);
 
   @override
   void initState() {
@@ -98,15 +91,15 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
       _cycleType = d.cycleType;
       _isAutoRenew = d.isAutoRenew;
       _nextBillingDate = d.nextBillingDate;
-      _hasReminder = d.hasReminder;
+      _reminderDays = d.hasReminder
+          ? _normalizeReminderDays(d.reminderDays)
+          : 0;
       _firstPriceCtr.text = d.firstPeriodPrice?.toString() ?? '';
       _discount = d.firstPeriodPrice != null;
       _totalAccumulatedPrice = d.totalAccumulatedPrice;
       _totalAccumulatedPriceCtr.text = d.totalAccumulatedPrice % 1 == 0
           ? d.totalAccumulatedPrice.toInt().toString()
           : d.totalAccumulatedPrice.toString();
-      _originalNextBillingDate = d.nextBillingDate;
-
       // Calculate base price from existing total
       double currentCost = d.firstPeriodPrice ?? d.price;
       _baseAccumulatedPrice = d.totalAccumulatedPrice - currentCost;
@@ -124,6 +117,11 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
   // Helper to allow extension to call setState (which is protected)
   void updateState(VoidCallback fn) {
     if (mounted) setState(fn);
+  }
+
+  int _normalizeReminderDays(int days) {
+    if (days <= 0) return 0;
+    return const [1, 3, 7].contains(days) ? days : 3;
   }
 
   @override
@@ -226,15 +224,12 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
                       onCategorySelected: (c) {
                         setState(() {
                           _selectedCategory = c;
-                          if (c != null && widget.device == null) {
-                            _nameCtr.text = c.name;
-                          }
                           if (_isSub) {
+                            _cycleType ??= CycleType.monthly;
                             if (_nextBillingDate == null) {
                               _calculateNextBilling();
                             }
                             _isAutoRenew = false;
-                            _hasReminder = false;
                           }
                         });
                       },
@@ -252,29 +247,25 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
                         nextBillingDate: _nextBillingDate,
                         cycleType: _cycleType,
                         isAutoRenew: _isAutoRenew,
-                        hasReminder: _hasReminder,
                         reminderDays: _reminderDays,
                         hasFirstPeriodDiscount: _discount,
-                        device: widget.device,
                         onCycleTypeChanged: (v) => setState(() {
                           _cycleType = v;
-                          _calculateNextBilling();
+                          _calculateNextBilling(force: true);
                         }),
                         onAutoRenewChanged: (v) => setState(() {
                           _isAutoRenew = v;
                           if (!v) _discount = false;
                         }),
-                        onReminderChanged: (v) =>
-                            setState(() => _hasReminder = v),
-                        onReminderDaysChanged: (v) =>
-                            setState(() => _reminderDays = v),
+                        onReminderDaysChanged: (v) => setState(() {
+                          _reminderDays = v;
+                        }),
                         onDiscountChanged: (v) => updateState(() {
                           _discount = v;
                           _updateTotalStr();
                         }),
                         onPickDate: () => _pickDate(),
                         onPickBillingDate: () => _pickDate(isBilling: true),
-                        onShowRenewDialog: _showRenewDialog,
                       )
                     else
                       DateSection(

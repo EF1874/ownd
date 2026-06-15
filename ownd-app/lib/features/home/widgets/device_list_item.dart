@@ -4,13 +4,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import '../../../data/models/device.dart';
 import '../../../data/repositories/device_repository.dart';
+import '../../../core/network/error_messages.dart';
 import '../../../shared/utils/icon_utils.dart';
 import '../../../shared/utils/category_utils.dart';
 import '../../../shared/config/category_config.dart';
+import '../../../shared/utils/category_tree_utils.dart';
 import '../../../shared/config/cost_config.dart';
 import '../../../shared/widgets/base_card.dart';
 import '../../../shared/widgets/status_badge.dart';
 import '../../../shared/utils/format_utils.dart';
+import '../../../shared/utils/subscription_utils.dart';
 import 'dart:io';
 import '../../../shared/widgets/image_preview_dialog.dart';
 import '../../add_device/add_device_screen.dart';
@@ -24,7 +27,12 @@ class DeviceListItem extends ConsumerStatefulWidget {
   final int index;
   final OnDeleteComplete? onDeleteComplete;
 
-  const DeviceListItem({super.key, required this.device, this.index = 0, this.onDeleteComplete});
+  const DeviceListItem({
+    super.key,
+    required this.device,
+    this.index = 0,
+    this.onDeleteComplete,
+  });
 
   @override
   ConsumerState<DeviceListItem> createState() => _DeviceListItemState();
@@ -37,6 +45,7 @@ class _DeviceListItemState extends ConsumerState<DeviceListItem>
   late final Animation<double> _opacityAnimation;
   late final AnimationController _entryController;
   bool _isDeleting = false;
+  bool _showSubscriptionUsage = false;
 
   @override
   void initState() {
@@ -55,7 +64,9 @@ class _DeviceListItemState extends ConsumerState<DeviceListItem>
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
-    final delay = Duration(milliseconds: (widget.index > 5 ? 5 : widget.index) * 50);
+    final delay = Duration(
+      milliseconds: (widget.index > 5 ? 5 : widget.index) * 50,
+    );
     if (delay == Duration.zero) {
       _entryController.forward();
     } else {
@@ -64,8 +75,6 @@ class _DeviceListItemState extends ConsumerState<DeviceListItem>
       });
     }
   }
-
-
 
   @override
   void dispose() {
@@ -86,7 +95,9 @@ class _DeviceListItemState extends ConsumerState<DeviceListItem>
 
   Future<void> navigateToEdit(BuildContext context, WidgetRef ref) async {
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => AddDeviceScreen(device: widget.device)),
+      MaterialPageRoute(
+        builder: (context) => AddDeviceScreen(device: widget.device),
+      ),
     );
     await ref.read(homeDevicesNotifierProvider.notifier).refresh();
   }
@@ -105,9 +116,30 @@ class _DeviceListItemState extends ConsumerState<DeviceListItem>
     final dailyCost = widget.device.dailyCost;
     final costColor = CostConfig.getCostColor(dailyCost);
     final effectiveCategoryColor = categoryColor ?? theme.colorScheme.onSurface;
-    final isSubscription =
-        CategoryConfig.getMajorCategory(widget.device.category.value?.name) == '虚拟订阅';
-    final hasBg = widget.device.imagePath != null || widget.device.customIconPath != null;
+    final isSubscription = CategoryTreeUtils.isVirtualSubscription(
+      widget.device.category.value,
+    );
+    final hasBg =
+        widget.device.imagePath != null || widget.device.customIconPath != null;
+    final subscriptionDueDate = widget.device.subscriptionDueDate;
+    final daysUntilDue = subscriptionDueDate == null
+        ? null
+        : SubscriptionUtils.daysUntilDue(subscriptionDueDate);
+    final dueColor = daysUntilDue == null
+        ? theme.colorScheme.primary
+        : SubscriptionUtils.dueColor(context, daysUntilDue);
+    final showUsageMetric = !isSubscription || _showSubscriptionUsage;
+    final metricLabel = showUsageMetric ? '使用 ' : '剩余 ';
+    final metricValue = showUsageMetric
+        ? '${widget.device.daysUsed}'
+        : daysUntilDue == null
+        ? '-'
+        : (daysUntilDue < 0 ? 0 : daysUntilDue).toString();
+    final metricColor = hasBg
+        ? Colors.white
+        : showUsageMetric
+        ? theme.colorScheme.primary
+        : dueColor;
 
     final childWidget = Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -122,7 +154,9 @@ class _DeviceListItemState extends ConsumerState<DeviceListItem>
               foregroundColor: Colors.white,
               icon: Icons.edit,
               label: '编辑',
-              borderRadius: const BorderRadius.horizontal(left: Radius.circular(12)),
+              borderRadius: const BorderRadius.horizontal(
+                left: Radius.circular(12),
+              ),
             ),
             SlidableAction(
               onPressed: (context) => _showDeleteDialog(context, ref),
@@ -130,13 +164,16 @@ class _DeviceListItemState extends ConsumerState<DeviceListItem>
               foregroundColor: Colors.white,
               icon: Icons.delete,
               label: '删除',
-              borderRadius: const BorderRadius.horizontal(right: Radius.circular(12)),
+              borderRadius: const BorderRadius.horizontal(
+                right: Radius.circular(12),
+              ),
             ),
           ],
         ),
         child: BaseCard(
           variant: CardVariant.glass,
-          backgroundImagePath: widget.device.imagePath ?? widget.device.customIconPath,
+          backgroundImagePath:
+              widget.device.imagePath ?? widget.device.customIconPath,
           onTap: () => navigateToDetail(context),
           child: Row(
             children: [
@@ -148,14 +185,25 @@ class _DeviceListItemState extends ConsumerState<DeviceListItem>
                   decoration: BoxDecoration(
                     color: effectiveCategoryColor.withAlpha(50),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: effectiveCategoryColor.withAlpha(100), width: 1),
+                    border: Border.all(
+                      color: effectiveCategoryColor.withAlpha(100),
+                      width: 1,
+                    ),
                   ),
                   child: widget.device.customIconPath != null
                       ? GestureDetector(
-                          onTap: () => ImagePreviewDialog.show(context, widget.device.customIconPath!),
+                          onTap: () => ImagePreviewDialog.show(
+                            context,
+                            widget.device.customIconPath!,
+                          ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(11),
-                            child: Image.file(File(widget.device.customIconPath!), width: 48, height: 48, fit: BoxFit.cover),
+                            child: Image.file(
+                              File(widget.device.customIconPath!),
+                              width: 48,
+                              height: 48,
+                              fit: BoxFit.cover,
+                            ),
                           ),
                         )
                       : Icon(categoryIcon, color: effectiveCategoryColor),
@@ -171,22 +219,45 @@ class _DeviceListItemState extends ConsumerState<DeviceListItem>
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold, fontSize: 15,
-                        color: hasBg ? Colors.white : theme.colorScheme.onSurface,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: hasBg
+                            ? Colors.white
+                            : theme.colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 6),
                     Wrap(
                       crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: 8, runSpacing: 4,
+                      spacing: 8,
+                      runSpacing: 4,
                       children: [
                         Text(
                           '¥${FormatUtils.formatCurrency(isSubscription && widget.device.totalAccumulatedPrice > 0 ? widget.device.totalAccumulatedPrice : widget.device.price)}',
-                          style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.bold, fontSize: 16, color: hasBg ? Colors.white : theme.colorScheme.onSurface),
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: hasBg
+                                ? Colors.white
+                                : theme.colorScheme.onSurface,
+                          ),
                         ),
                         Text(
-                          '¥${FormatUtils.formatCurrency(widget.device.dailyCost)}/天',
-                          style: TextStyle(fontFamily: 'monospace', color: hasBg ? Colors.white70 : (costColor ?? theme.colorScheme.onSurfaceVariant).withValues(alpha: 0.8), fontSize: 12),
+                          isSubscription && subscriptionDueDate != null
+                              ? '到期 ${FormatUtils.formatDate(subscriptionDueDate)}'
+                              : '¥${FormatUtils.formatCurrency(widget.device.dailyCost)}/天',
+                          style: TextStyle(
+                            fontFamily: 'monospace',
+                            color: hasBg
+                                ? Colors.white70
+                                : isSubscription
+                                ? dueColor
+                                : (costColor ??
+                                          theme.colorScheme.onSurfaceVariant)
+                                      .withValues(alpha: 0.8),
+                            fontSize: 12,
+                          ),
                         ),
                       ],
                     ),
@@ -195,16 +266,40 @@ class _DeviceListItemState extends ConsumerState<DeviceListItem>
                       height: 20,
                       child: widget.device.tags.isNotEmpty
                           ? Wrap(
-                              spacing: 4, runSpacing: 4,
-                              children: widget.device.tags.map((tag) => Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: theme.colorScheme.primaryContainer.withAlpha(hasBg ? 100 : 50),
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(color: theme.colorScheme.primary.withAlpha(hasBg ? 200 : 100), width: 0.5),
-                                ),
-                                child: Text('#$tag', style: theme.textTheme.labelSmall?.copyWith(color: hasBg ? Colors.white : theme.colorScheme.primary, fontSize: 10)),
-                              )).toList(),
+                              spacing: 4,
+                              runSpacing: 4,
+                              children: widget.device.tags
+                                  .map(
+                                    (tag) => Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: theme
+                                            .colorScheme
+                                            .primaryContainer
+                                            .withAlpha(hasBg ? 100 : 50),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(
+                                          color: theme.colorScheme.primary
+                                              .withAlpha(hasBg ? 200 : 100),
+                                          width: 0.5,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        '#$tag',
+                                        style: theme.textTheme.labelSmall
+                                            ?.copyWith(
+                                              color: hasBg
+                                                  ? Colors.white
+                                                  : theme.colorScheme.primary,
+                                              fontSize: 10,
+                                            ),
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
                             )
                           : null,
                     ),
@@ -214,26 +309,45 @@ class _DeviceListItemState extends ConsumerState<DeviceListItem>
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  RichText(
-                    text: TextSpan(
-                      children: [
-                        if (isSubscription) ...[
-                          TextSpan(text: '剩余 ', style: theme.textTheme.labelSmall?.copyWith(color: hasBg ? Colors.white : theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: isSubscription
+                        ? () => setState(
+                            () => _showSubscriptionUsage =
+                                !_showSubscriptionUsage,
+                          )
+                        : null,
+                    child: RichText(
+                      text: TextSpan(
+                        children: [
                           TextSpan(
-                            text: () {
-                              if (widget.device.nextBillingDate == null) return '0';
-                              final diff = widget.device.nextBillingDate!.difference(DateTime.now()).inDays + 1;
-                              return (diff < 0 ? 0 : diff).toString();
-                            }(),
-                            style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600, color: theme.colorScheme.primary, fontSize: 18),
+                            text: metricLabel,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: hasBg
+                                  ? Colors.white
+                                  : theme.colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                          TextSpan(text: ' 天', style: theme.textTheme.labelSmall?.copyWith(color: hasBg ? Colors.white : theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
-                        ] else ...[
-                          TextSpan(text: '使用 ', style: theme.textTheme.labelSmall?.copyWith(color: hasBg ? Colors.white : theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
-                          TextSpan(text: '${widget.device.daysUsed}', style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600, color: theme.colorScheme.primary, fontSize: 18)),
-                          TextSpan(text: ' 天', style: theme.textTheme.labelSmall?.copyWith(color: hasBg ? Colors.white : theme.colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+                          TextSpan(
+                            text: metricValue,
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: metricColor,
+                              fontSize: 18,
+                            ),
+                          ),
+                          TextSpan(
+                            text: ' 天',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: hasBg
+                                  ? Colors.white
+                                  : theme.colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ],
-                      ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -267,7 +381,10 @@ class _DeviceListItemState extends ConsumerState<DeviceListItem>
       animation: _entryController,
       builder: (context, child) => Opacity(
         opacity: _entryController.value,
-        child: Transform.translate(offset: Offset((1 - _entryController.value) * 30, 0), child: child),
+        child: Transform.translate(
+          offset: Offset((1 - _entryController.value) * 30, 0),
+          child: child,
+        ),
       ),
       child: childWidget,
     );
@@ -280,7 +397,10 @@ class _DeviceListItemState extends ConsumerState<DeviceListItem>
         title: const Text('确认删除?'),
         content: Text('确定要删除 ${widget.device.name} 吗?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('取消'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('删除', style: TextStyle(color: Colors.red)),
@@ -292,7 +412,7 @@ class _DeviceListItemState extends ConsumerState<DeviceListItem>
     if (confirmed == true) {
       debugPrint('[DELETE] Starting delete for device ${widget.device.id}');
       await _startDeleteAnimation();
-      
+
       try {
         await ref.read(deviceRepositoryProvider).deleteDevice(widget.device.id);
         widget.onDeleteComplete?.call(true, null);
@@ -300,24 +420,26 @@ class _DeviceListItemState extends ConsumerState<DeviceListItem>
         debugPrint('[DELETE] API error: $e');
         setState(() => _isDeleting = false);
         await _deleteController.reverse();
-        widget.onDeleteComplete?.call(false, e.toString());
+        widget.onDeleteComplete?.call(false, userErrorMessage(e));
       }
     }
   }
 
   Widget buildStatusBadges(Device device) {
     List<Widget> badges = [];
-    final isSubscription = CategoryConfig.getMajorCategory(device.category.value?.name) == '虚拟订阅';
+    final isSubscription = CategoryTreeUtils.isVirtualSubscription(
+      device.category.value,
+    );
     if (isSubscription) {
       if (device.status == 'scrap') {
         badges.add(const StatusBadge(text: '已停用', color: Colors.grey));
       } else {
         final now = DateTime.now();
-        final nextDate = device.nextBillingDate;
+        final nextDate = device.subscriptionDueDate;
         if (nextDate != null) {
-          final diff = nextDate.difference(now).inDays;
+          final diff = SubscriptionUtils.daysUntilDue(nextDate, from: now);
           if (device.isAutoRenew) {
-            if (diff <= (device.reminderDays > 0 ? device.reminderDays : 3) && diff >= 0) {
+            if (diff <= 7 && diff >= 0) {
               badges.add(const StatusBadge(text: '即将续费', color: Colors.orange));
             } else {
               badges.add(const StatusBadge(text: '自动续费', color: Colors.green));
@@ -325,7 +447,7 @@ class _DeviceListItemState extends ConsumerState<DeviceListItem>
           } else {
             if (diff < 0) {
               badges.add(const StatusBadge(text: '已过期', color: Colors.grey));
-            } else if (diff <= (device.reminderDays > 0 ? device.reminderDays : 3)) {
+            } else if (diff <= 7) {
               badges.add(const StatusBadge(text: '即将到期', color: Colors.red));
             }
           }
@@ -339,11 +461,17 @@ class _DeviceListItemState extends ConsumerState<DeviceListItem>
       } else {
         if (device.status == 'backup') {
           badges.add(const StatusBadge(text: '备用', color: Colors.blue));
-        } else if (device.warrantyEndDate != null && device.warrantyEndDate!.isBefore(DateTime.now())) {
+        } else if (device.warrantyEndDate != null &&
+            device.warrantyEndDate!.isBefore(DateTime.now())) {
           badges.add(const StatusBadge(text: '过保', color: Colors.orange));
         }
       }
     }
-    return Wrap(spacing: 4, runSpacing: 4, alignment: WrapAlignment.end, children: badges);
+    return Wrap(
+      spacing: 4,
+      runSpacing: 4,
+      alignment: WrapAlignment.end,
+      children: badges,
+    );
   }
 }

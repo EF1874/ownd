@@ -27,6 +27,8 @@ class DeviceRepository {
 
   Future<List<Device>> getAllDevices() => _dataSource.getAll();
 
+  Future<Device> getDevice(int id) => _dataSource.getById(id);
+
   Stream<List<Device>> watchAllDevices() => _dataSource.watchAll();
 
   Future<List<Device>> getPaginatedDevices({
@@ -36,6 +38,7 @@ class DeviceRepository {
     String? categoryId,
     String? platformId,
     String? tag,
+    bool expiringSoon = false,
     String? sortBy,
     String? sortOrder,
   }) {
@@ -46,6 +49,7 @@ class DeviceRepository {
       categoryId: categoryId,
       platformId: platformId,
       tag: tag,
+      expiringSoon: expiringSoon,
       sortBy: sortBy,
       sortOrder: sortOrder,
     );

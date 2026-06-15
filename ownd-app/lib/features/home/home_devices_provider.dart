@@ -6,6 +6,7 @@ import '../../data/models/purchase_platform.dart';
 import '../../data/repositories/device_repository.dart';
 import '../../data/repositories/category_repository.dart';
 import '../../data/repositories/platform_repository.dart';
+import '../../core/network/error_messages.dart';
 
 class HomeDevicesState {
   final List<Device> devices;
@@ -17,6 +18,7 @@ class HomeDevicesState {
   final Set<String> selectedCategories;
   final String? selectedPlatformFilter;
   final Set<String> selectedTags;
+  final bool expiringSoonOnly;
   final String sortField;
   final bool isAscending;
   final String? error;
@@ -31,24 +33,26 @@ class HomeDevicesState {
     required this.selectedCategories,
     this.selectedPlatformFilter,
     required this.selectedTags,
+    required this.expiringSoonOnly,
     required this.sortField,
     required this.isAscending,
     this.error,
   });
 
   HomeDevicesState.initial()
-      : devices = const [],
-        isLoading = true,
-        isLoadingMore = false,
-        hasMore = true,
-        page = 1,
-        search = '',
-        selectedCategories = const {},
-        selectedPlatformFilter = null,
-        selectedTags = const {},
-        sortField = 'date',
-        isAscending = false,
-        error = null;
+    : devices = const [],
+      isLoading = true,
+      isLoadingMore = false,
+      hasMore = true,
+      page = 1,
+      search = '',
+      selectedCategories = const {},
+      selectedPlatformFilter = null,
+      selectedTags = const {},
+      expiringSoonOnly = false,
+      sortField = 'date',
+      isAscending = false,
+      error = null;
 
   HomeDevicesState copyWith({
     List<Device>? devices,
@@ -61,6 +65,7 @@ class HomeDevicesState {
     String? selectedPlatformFilter,
     bool nullPlatform = false,
     Set<String>? selectedTags,
+    bool? expiringSoonOnly,
     String? sortField,
     bool? isAscending,
     String? error,
@@ -74,8 +79,11 @@ class HomeDevicesState {
       page: page ?? this.page,
       search: search ?? this.search,
       selectedCategories: selectedCategories ?? this.selectedCategories,
-      selectedPlatformFilter: nullPlatform ? null : (selectedPlatformFilter ?? this.selectedPlatformFilter),
+      selectedPlatformFilter: nullPlatform
+          ? null
+          : (selectedPlatformFilter ?? this.selectedPlatformFilter),
       selectedTags: selectedTags ?? this.selectedTags,
+      expiringSoonOnly: expiringSoonOnly ?? this.expiringSoonOnly,
       sortField: sortField ?? this.sortField,
       isAscending: isAscending ?? this.isAscending,
       error: clearError ? null : (error ?? this.error),
@@ -87,14 +95,21 @@ class HomeDevicesNotifier extends StateNotifier<HomeDevicesState> {
   final Ref _ref;
   final DeviceRepository _deviceRepository;
 
-  HomeDevicesNotifier(this._ref, this._deviceRepository) : super(HomeDevicesState.initial()) {
+  HomeDevicesNotifier(this._ref, this._deviceRepository)
+    : super(HomeDevicesState.initial()) {
     _loadFirstPage();
   }
 
   static const int _limit = 10;
 
   Future<void> _loadFirstPage() async {
-    state = state.copyWith(isLoading: true, page: 1, hasMore: true, error: null, clearError: true);
+    state = state.copyWith(
+      isLoading: true,
+      page: 1,
+      hasMore: true,
+      error: null,
+      clearError: true,
+    );
     try {
       final fetched = await _fetchDevices(page: 1);
       state = state.copyWith(
@@ -103,14 +118,14 @@ class HomeDevicesNotifier extends StateNotifier<HomeDevicesState> {
         hasMore: fetched.length >= _limit,
       );
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: userErrorMessage(e));
     }
   }
 
-  Future<List<Device>> _fetchDevices({required int page, int? customLimit}) async {
+  Future<List<Device>> _fetchDevices({
+    required int page,
+    int? customLimit,
+  }) async {
     // 1. Map category names to UUIDs
     final categoryTree = _ref.read(categoryTreeProvider).valueOrNull ?? [];
     final selectedCategoryUuids = <String>[];
@@ -125,7 +140,9 @@ class HomeDevicesNotifier extends StateNotifier<HomeDevicesState> {
         selectedCategoryUuids.add(category.uuid!);
       }
     }
-    final categoryIdParam = selectedCategoryUuids.isNotEmpty ? selectedCategoryUuids.join(',') : null;
+    final categoryIdParam = selectedCategoryUuids.isNotEmpty
+        ? selectedCategoryUuids.join(',')
+        : null;
 
     // 2. Map platform name to UUID
     final platforms = _ref.read(platformsProvider).valueOrNull ?? [];
@@ -148,7 +165,9 @@ class HomeDevicesNotifier extends StateNotifier<HomeDevicesState> {
     }
 
     // 3. Map tags
-    final tagsParam = state.selectedTags.isNotEmpty ? state.selectedTags.join(',') : null;
+    final tagsParam = state.selectedTags.isNotEmpty
+        ? state.selectedTags.join(',')
+        : null;
 
     // 4. Map sorting parameters
     final sortBy = state.sortField; // date, price, expiry
@@ -161,6 +180,7 @@ class HomeDevicesNotifier extends StateNotifier<HomeDevicesState> {
       categoryId: categoryIdParam,
       platformId: platformIdParam,
       tag: tagsParam,
+      expiringSoon: state.expiringSoonOnly,
       sortBy: sortBy,
       sortOrder: sortOrder,
     );
@@ -180,10 +200,7 @@ class HomeDevicesNotifier extends StateNotifier<HomeDevicesState> {
         hasMore: fetched.length >= _limit,
       );
     } catch (e) {
-      state = state.copyWith(
-        isLoadingMore: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoadingMore: false, error: userErrorMessage(e));
     }
   }
 
@@ -196,7 +213,9 @@ class HomeDevicesNotifier extends StateNotifier<HomeDevicesState> {
     try {
       final currentPages = state.page;
       final totalLimit = _limit * currentPages;
-      debugPrint('[Provider] silentRefresh: fetching page 1 with limit $totalLimit');
+      debugPrint(
+        '[Provider] silentRefresh: fetching page 1 with limit $totalLimit',
+      );
       final fetched = await _fetchDevices(page: 1, customLimit: totalLimit);
       debugPrint('[Provider] silentRefresh: got ${fetched.length} devices');
       state = state.copyWith(
@@ -254,6 +273,12 @@ class HomeDevicesNotifier extends StateNotifier<HomeDevicesState> {
     _loadFirstPage();
   }
 
+  void updateExpiringSoonOnly(bool value) {
+    if (state.expiringSoonOnly == value) return;
+    state = state.copyWith(expiringSoonOnly: value);
+    _loadFirstPage();
+  }
+
   void updateSortField(String sortField) {
     if (state.sortField == sortField) return;
     state = state.copyWith(sortField: sortField);
@@ -267,7 +292,8 @@ class HomeDevicesNotifier extends StateNotifier<HomeDevicesState> {
   }
 }
 
-final homeDevicesNotifierProvider = StateNotifierProvider<HomeDevicesNotifier, HomeDevicesState>((ref) {
-  final repository = ref.watch(deviceRepositoryProvider);
-  return HomeDevicesNotifier(ref, repository);
-});
+final homeDevicesNotifierProvider =
+    StateNotifierProvider<HomeDevicesNotifier, HomeDevicesState>((ref) {
+      final repository = ref.watch(deviceRepositoryProvider);
+      return HomeDevicesNotifier(ref, repository);
+    });

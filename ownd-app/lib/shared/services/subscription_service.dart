@@ -28,11 +28,13 @@ class SubscriptionService {
       bool needUpdate = false;
       // Only process auto-renew subscriptions with valid cycles
       if (device.isAutoRenew &&
-          device.nextBillingDate != null &&
+          device.subscriptionDueDate != null &&
           device.cycleType != null &&
           device.cycleType != CycleType.oneTime) {
         // Check if due
-        if (device.nextBillingDate!.isBefore(now)) {
+        if (SubscriptionUtils.dateOnly(
+          device.subscriptionDueDate!,
+        ).isBefore(SubscriptionUtils.dateOnly(now))) {
           bool renewed = _processRenewal(device, now);
           if (renewed) {
             needUpdate = true;
@@ -50,9 +52,9 @@ class SubscriptionService {
   }
 
   Future<void> scheduleSubscriptionNotification(Device device) async {
-    if (!device.hasReminder || device.nextBillingDate == null) return;
+    final billingDate = device.subscriptionDueDate;
+    if (!device.hasReminder || billingDate == null) return;
 
-    final billingDate = device.nextBillingDate!;
     // Calculate notification date: billingDate - reminderDays
     final reminderDate = billingDate.subtract(
       Duration(days: device.reminderDays),
@@ -149,9 +151,9 @@ class SubscriptionService {
     final minute = int.parse(timeParts[1]);
 
     for (final device in devices) {
-      if (!device.hasReminder || device.nextBillingDate == null) continue;
+      final billingDate = device.subscriptionDueDate;
+      if (!device.hasReminder || billingDate == null) continue;
 
-      final billingDate = device.nextBillingDate!;
       final reminderDate = billingDate.subtract(
         Duration(days: device.reminderDays),
       );
@@ -210,35 +212,33 @@ class SubscriptionService {
   /// Recursively renews the device until nextBillingDate is in the future.
   /// Returns true if any renewal happened.
   bool _processRenewal(Device device, DateTime targetDate) {
-    if (device.nextBillingDate == null || device.cycleType == null) {
+    final dueDate = device.subscriptionDueDate;
+    if (dueDate == null || device.cycleType == null) {
       return false;
     }
 
     bool renewed = false;
-    DateTime next = device.nextBillingDate!;
+    DateTime next = dueDate;
 
     // Safety break to prevent infinite loops if cycle is 0 or something weird
     int safetyCounter = 0;
 
-    while (next.isBefore(targetDate) && safetyCounter < 1000) {
-      // Snapshot current period
+    final targetDay = SubscriptionUtils.dateOnly(targetDate);
+    while (SubscriptionUtils.dateOnly(next).isBefore(targetDay) &&
+        safetyCounter < 1000) {
+      final start = SubscriptionUtils.dateOnly(
+        next,
+      ).add(const Duration(days: 1));
+      final end = SubscriptionUtils.advanceDueDate(next, device.cycleType!);
+
       final historyEntry = SubscriptionHistory()
-        ..endDate = next
+        ..startDate = start
+        ..endDate = end
         ..price = device.price
         ..isAutoRenew = true
-        ..cycleType = device.cycleType!;
-
-      DateTime calculatedStart = next.subtract(_getDuration(device.cycleType!));
-      if (device.history.isNotEmpty) {
-        if (device.history.last.endDate != null) {
-          calculatedStart = device.history.last.endDate!;
-        }
-      } else {
-        if (calculatedStart.isBefore(device.purchaseDate)) {
-          calculatedStart = device.purchaseDate;
-        }
-      }
-      historyEntry.startDate = calculatedStart;
+        ..cycleType = device.cycleType!
+        ..recordDate = targetDate
+        ..note = '自动续费';
 
       List<SubscriptionHistory> newHistory = List.from(device.history);
       newHistory.add(historyEntry);
@@ -248,10 +248,7 @@ class SubscriptionService {
       device.totalAccumulatedPrice += device.price;
 
       // Calculate next date
-      next = SubscriptionUtils.calculateNextBillingDate(
-        next,
-        device.cycleType!,
-      );
+      next = end;
       device.nextBillingDate = next;
 
       renewed = true;
@@ -267,61 +264,36 @@ class SubscriptionService {
       return;
     }
 
-    DateTime next = device.nextBillingDate ?? DateTime.now();
+    DateTime next = device.subscriptionDueDate ?? DateTime.now();
 
     for (int i = 0; i < cycles; i++) {
-      // Snapshot current period before extending
+      final start = SubscriptionUtils.dateOnly(
+        next,
+      ).add(const Duration(days: 1));
+      final end = SubscriptionUtils.advanceDueDate(next, device.cycleType!);
+
       final historyEntry = SubscriptionHistory()
-        ..endDate = next
+        ..startDate = start
+        ..endDate = end
         ..price = device
             .price // Renewal price
         ..isAutoRenew =
             false // Manual renewal
-        ..cycleType = device.cycleType!;
-
-      DateTime calculatedStart = next.subtract(_getDuration(device.cycleType!));
-      if (device.history.isNotEmpty) {
-        if (device.history.last.endDate != null) {
-          calculatedStart = device.history.last.endDate!;
-        }
-      } else {
-        if (calculatedStart.isBefore(device.purchaseDate)) {
-          calculatedStart = device.purchaseDate;
-        }
-      }
-      historyEntry.startDate = calculatedStart;
+        ..cycleType = device.cycleType!
+        ..recordDate = DateTime.now()
+        ..note = '手动续费';
 
       List<SubscriptionHistory> newHistory = List.from(device.history);
       newHistory.add(historyEntry);
       device.history = newHistory;
 
       device.totalAccumulatedPrice += device.price;
-      next = SubscriptionUtils.calculateNextBillingDate(
-        next,
-        device.cycleType!,
-      );
+      next = end;
     }
 
     device.nextBillingDate = next;
     await _deviceRepo.updateDevice(device);
     // Use the updated date for scheduling
     await scheduleSubscriptionNotification(device);
-  }
-
-  Duration _getDuration(CycleType type) {
-    switch (type) {
-      case CycleType.daily:
-        return const Duration(days: 1);
-      case CycleType.weekly:
-        return const Duration(days: 7);
-      case CycleType.monthly:
-        return const Duration(days: 30); // Approx
-      case CycleType.quarterly:
-        return const Duration(days: 90); // Approx
-      case CycleType.yearly:
-        return const Duration(days: 365); // Approx
-      case CycleType.oneTime:
-        return Duration.zero;
-    }
   }
 }

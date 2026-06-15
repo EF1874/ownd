@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/repositories/auth_repository.dart';
 import 'auth_controller.dart';
 import '../../shared/widgets/app_toast.dart';
+import '../../core/network/error_messages.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -15,7 +16,8 @@ class LoginScreen extends ConsumerStatefulWidget {
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingObserver {
+class _LoginScreenState extends ConsumerState<LoginScreen>
+    with WidgetsBindingObserver {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -25,7 +27,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
   final _emailFocusNode = FocusNode();
   bool _isSignup = false;
   List<String> _savedAccounts = [];
-  
+
   // 注册验证码倒计时相关
   int _signupCountdown = 0;
   DateTime? _signupEndTime;
@@ -129,14 +131,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
     }
     setState(() => _isSendingCode = true);
     try {
-      await ref.read(authRepositoryProvider).sendVerificationCode(email, type: 'signup');
+      await ref
+          .read(authRepositoryProvider)
+          .sendVerificationCode(email, type: 'signup');
       _startSignupCountdown();
       if (mounted) {
         AppToast.show(context, '验证码已发送，请检查邮箱');
       }
     } catch (e) {
       if (mounted) {
-        AppToast.show(context, '发送失败: ${e.toString().replaceAll('ApiException: ', '')}', isError: true);
+        AppToast.show(context, '发送失败: ${userErrorMessage(e)}', isError: true);
       }
     } finally {
       if (mounted) {
@@ -175,7 +179,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
 
   Future<void> _submit() async {
     // 节流防抖：若正在提交，则直接返回
-    if (ref.read(authControllerProvider).isLoading || _isResettingPassword) return;
+    if (ref.read(authControllerProvider).isLoading || _isResettingPassword) {
+      return;
+    }
     if (!_formKey.currentState!.validate()) return;
 
     final controller = ref.read(authControllerProvider.notifier);
@@ -204,7 +210,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
         }
       } catch (e) {
         if (mounted) {
-          AppToast.show(context, '重置失败: ${e.toString().replaceAll('ApiException: ', '')}', isError: true);
+          AppToast.show(context, '重置失败: ${userErrorMessage(e)}', isError: true);
         }
       } finally {
         if (mounted) {
@@ -239,7 +245,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
         }
       },
       error: (error, _) {
-        AppToast.show(context, error.toString(), isError: true);
+        AppToast.show(context, userErrorMessage(error), isError: true);
       },
     );
   }
@@ -266,14 +272,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
     }
     setState(() => _isSendingResetCode = true);
     try {
-      await ref.read(authRepositoryProvider).sendVerificationCode(email, type: 'reset');
+      await ref
+          .read(authRepositoryProvider)
+          .sendVerificationCode(email, type: 'reset');
       _startResetCountdown();
       if (mounted) {
         AppToast.show(context, '验证码已发送，请检查邮箱');
       }
     } catch (e) {
       if (mounted) {
-        AppToast.show(context, '发送失败: ${e.toString().replaceAll('ApiException: ', '')}', isError: true);
+        AppToast.show(context, '发送失败: ${userErrorMessage(e)}', isError: true);
       }
     } finally {
       if (mounted) {
@@ -363,19 +371,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
                             child: Container(
                               margin: const EdgeInsets.only(top: 4),
                               constraints: const BoxConstraints(
-                                  maxHeight: 200,
-                                  maxWidth: 372,
-                                ),
+                                maxHeight: 200,
+                                maxWidth: 372,
+                              ),
                               decoration: BoxDecoration(
-                                color: isDark ? const Color(0xFF1E1E24) : Colors.white,
+                                color: isDark
+                                    ? const Color(0xFF1E1E24)
+                                    : Colors.white,
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: isDark ? const Color(0xFF2E2E38) : const Color(0xFFE4E4E7),
+                                  color: isDark
+                                      ? const Color(0xFF2E2E38)
+                                      : const Color(0xFFE4E4E7),
                                   width: 1,
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.1),
+                                    color: Colors.black.withValues(
+                                      alpha: isDark ? 0.4 : 0.1,
+                                    ),
                                     blurRadius: 10,
                                     offset: const Offset(0, 4),
                                   ),
@@ -387,32 +401,45 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
                                 itemCount: options.length,
                                 separatorBuilder: (context, index) => Divider(
                                   height: 1,
-                                  color: isDark ? const Color(0xFF2E2E38) : const Color(0xFFF4F4F5),
+                                  color: isDark
+                                      ? const Color(0xFF2E2E38)
+                                      : const Color(0xFFF4F4F5),
                                 ),
                                 itemBuilder: (BuildContext context, int index) {
                                   final option = options.elementAt(index);
                                   return InkWell(
                                     onTap: () => onSelected(option),
                                     borderRadius: BorderRadius.vertical(
-                                      top: index == 0 ? const Radius.circular(12) : Radius.zero,
-                                      bottom: index == options.length - 1 ? const Radius.circular(12) : Radius.zero,
+                                      top: index == 0
+                                          ? const Radius.circular(12)
+                                          : Radius.zero,
+                                      bottom: index == options.length - 1
+                                          ? const Radius.circular(12)
+                                          : Radius.zero,
                                     ),
                                     child: Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 12,
+                                      ),
                                       child: Row(
                                         children: [
                                           Icon(
                                             Icons.history,
                                             size: 16,
-                                            color: theme.colorScheme.primary.withValues(alpha: 0.7),
+                                            color: theme.colorScheme.primary
+                                                .withValues(alpha: 0.7),
                                           ),
                                           const SizedBox(width: 12),
                                           Expanded(
                                             child: Text(
                                               option,
-                                              style: theme.textTheme.bodyMedium?.copyWith(
-                                                color: isDark ? Colors.white70 : Colors.black87,
-                                              ),
+                                              style: theme.textTheme.bodyMedium
+                                                  ?.copyWith(
+                                                    color: isDark
+                                                        ? Colors.white70
+                                                        : Colors.black87,
+                                                  ),
                                             ),
                                           ),
                                         ],
@@ -425,62 +452,80 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
                           ),
                         );
                       },
-                      fieldViewBuilder: (
-                        context,
-                        textEditingController,
-                        focusNode,
-                        onFieldSubmitted,
-                      ) {
-                        return TextFormField(
-                          key: ValueKey(_isResetPassword
-                              ? 'reset_email_field'
-                              : (_isSignup ? 'signup_email_field' : 'login_credential_field')),
-                          controller: textEditingController,
-                          focusNode: focusNode,
-                          onFieldSubmitted: (value) => onFieldSubmitted(),
-                          onChanged: (value) {
-                            setState(() {});
-                          },
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: InputDecoration(
-                            labelText: (_isSignup || _isResetPassword) ? '邮箱' : '用户名或邮箱',
-                            suffixIcon: textEditingController.text.isNotEmpty
-                                ? IconButton(
-                                    icon: const Icon(Icons.clear, size: 18),
-                                    onPressed: () {
-                                      setState(() {
-                                        textEditingController.clear();
-                                      });
-                                    },
-                                  )
-                                : (_savedAccounts.isNotEmpty && !_isSignup && !_isResetPassword
+                      fieldViewBuilder:
+                          (
+                            context,
+                            textEditingController,
+                            focusNode,
+                            onFieldSubmitted,
+                          ) {
+                            return TextFormField(
+                              key: ValueKey(
+                                _isResetPassword
+                                    ? 'reset_email_field'
+                                    : (_isSignup
+                                          ? 'signup_email_field'
+                                          : 'login_credential_field'),
+                              ),
+                              controller: textEditingController,
+                              focusNode: focusNode,
+                              onFieldSubmitted: (value) => onFieldSubmitted(),
+                              onChanged: (value) {
+                                setState(() {});
+                              },
+                              keyboardType: TextInputType.emailAddress,
+                              decoration: InputDecoration(
+                                labelText: (_isSignup || _isResetPassword)
+                                    ? '邮箱'
+                                    : '用户名或邮箱',
+                                suffixIcon:
+                                    textEditingController.text.isNotEmpty
                                     ? IconButton(
-                                        icon: const Icon(Icons.arrow_drop_down),
+                                        icon: const Icon(Icons.clear, size: 18),
                                         onPressed: () {
-                                          if (focusNode.hasFocus) {
-                                            focusNode.unfocus();
-                                            Future.delayed(
-                                              const Duration(milliseconds: 50),
-                                              () => focusNode.requestFocus(),
-                                            );
-                                          } else {
-                                            focusNode.requestFocus();
-                                          }
+                                          setState(() {
+                                            textEditingController.clear();
+                                          });
                                         },
                                       )
-                                    : null),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return (_isSignup || _isResetPassword) ? '请输入邮箱' : '请输入用户名或邮箱';
-                            }
-                            if ((_isSignup || _isResetPassword) && !value.contains('@')) {
-                              return '请输入有效邮箱';
-                            }
-                            return null;
+                                    : (_savedAccounts.isNotEmpty &&
+                                              !_isSignup &&
+                                              !_isResetPassword
+                                          ? IconButton(
+                                              icon: const Icon(
+                                                Icons.arrow_drop_down,
+                                              ),
+                                              onPressed: () {
+                                                if (focusNode.hasFocus) {
+                                                  focusNode.unfocus();
+                                                  Future.delayed(
+                                                    const Duration(
+                                                      milliseconds: 50,
+                                                    ),
+                                                    () => focusNode
+                                                        .requestFocus(),
+                                                  );
+                                                } else {
+                                                  focusNode.requestFocus();
+                                                }
+                                              },
+                                            )
+                                          : null),
+                              ),
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return (_isSignup || _isResetPassword)
+                                      ? '请输入邮箱'
+                                      : '请输入用户名或邮箱';
+                                }
+                                if ((_isSignup || _isResetPassword) &&
+                                    !value.contains('@')) {
+                                  return '请输入有效邮箱';
+                                }
+                                return null;
+                              },
+                            );
                           },
-                        );
-                      },
                       textEditingController: _emailController,
                       focusNode: _emailFocusNode,
                     ),
@@ -491,7 +536,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
                         children: [
                           Expanded(
                             child: TextFormField(
-                              key: ValueKey(_isResetPassword ? 'reset_code_field' : 'signup_code_field'),
+                              key: ValueKey(
+                                _isResetPassword
+                                    ? 'reset_code_field'
+                                    : 'signup_code_field',
+                              ),
                               controller: _codeController,
                               onChanged: (value) => setState(() {}),
                               decoration: InputDecoration(
@@ -508,7 +557,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
                                     : null,
                               ),
                               validator: (value) {
-                                if (!_isSignup && !_isResetPassword) return null;
+                                if (!_isSignup && !_isResetPassword) {
+                                  return null;
+                                }
                                 return (value == null || value.trim().isEmpty)
                                     ? '请输入验证码'
                                     : null;
@@ -520,17 +571,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
                             width: 120,
                             child: TextButton(
                               onPressed: _isResetPassword
-                                  ? ((_resetCountdown > 0 || _isSendingResetCode) ? null : _sendResetCode)
-                                  : ((_signupCountdown > 0 || _isSendingCode) ? null : _sendSignupCode),
-                              child: (_isResetPassword ? _isSendingResetCode : _isSendingCode)
+                                  ? ((_resetCountdown > 0 ||
+                                            _isSendingResetCode)
+                                        ? null
+                                        : _sendResetCode)
+                                  : ((_signupCountdown > 0 || _isSendingCode)
+                                        ? null
+                                        : _sendSignupCode),
+                              child:
+                                  (_isResetPassword
+                                      ? _isSendingResetCode
+                                      : _isSendingCode)
                                   ? const SizedBox(
                                       width: 16,
                                       height: 16,
-                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
                                     )
-                                  : Text(_isResetPassword
-                                      ? (_resetCountdown > 0 ? '${_resetCountdown}s' : '获取验证码')
-                                      : (_signupCountdown > 0 ? '${_signupCountdown}s' : '获取验证码')),
+                                  : Text(
+                                      _isResetPassword
+                                          ? (_resetCountdown > 0
+                                                ? '${_resetCountdown}s'
+                                                : '获取验证码')
+                                          : (_signupCountdown > 0
+                                                ? '${_signupCountdown}s'
+                                                : '获取验证码'),
+                                    ),
                             ),
                           ),
                         ],
@@ -547,7 +614,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
                             : (_isSignup ? '设置密码' : '密码'),
                         suffixIcon: IconButton(
                           icon: Icon(
-                            _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                            _obscurePassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
                             size: 18,
                           ),
                           onPressed: () {
@@ -567,19 +636,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
                     if (_isSignup || _isResetPassword) ...[
                       const SizedBox(height: 16),
                       TextFormField(
-                        key: ValueKey(_isResetPassword ? 'reset_confirm_password_field' : 'signup_confirm_password_field'),
+                        key: ValueKey(
+                          _isResetPassword
+                              ? 'reset_confirm_password_field'
+                              : 'signup_confirm_password_field',
+                        ),
                         controller: _confirmPasswordController,
                         obscureText: _obscureConfirmPassword,
                         decoration: InputDecoration(
                           labelText: _isResetPassword ? '确认新密码' : '确认密码',
                           suffixIcon: IconButton(
                             icon: Icon(
-                              _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                              _obscureConfirmPassword
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
                               size: 18,
                             ),
                             onPressed: () {
                               setState(() {
-                                _obscureConfirmPassword = !_obscureConfirmPassword;
+                                _obscureConfirmPassword =
+                                    !_obscureConfirmPassword;
                               });
                             },
                           ),
@@ -616,16 +692,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with WidgetsBindingOb
                       ),
                     const SizedBox(height: 24),
                     FilledButton(
-                      onPressed: (isLoading || _isResettingPassword) ? null : _submit,
+                      onPressed: (isLoading || _isResettingPassword)
+                          ? null
+                          : _submit,
                       child: (isLoading || _isResettingPassword)
                           ? const SizedBox(
                               width: 20,
                               height: 20,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : Text(_isResetPassword
-                              ? '重置密码'
-                              : (_isSignup ? '注册并登录' : '登录')),
+                          : Text(
+                              _isResetPassword
+                                  ? '重置密码'
+                                  : (_isSignup ? '注册并登录' : '登录'),
+                            ),
                     ),
                     if (_isResetPassword)
                       TextButton(

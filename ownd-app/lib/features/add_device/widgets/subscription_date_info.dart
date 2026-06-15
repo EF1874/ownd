@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../../../shared/utils/subscription_utils.dart';
 
 class SubscriptionDateInfo extends StatelessWidget {
   final DateTime purchaseDate;
@@ -44,25 +45,25 @@ class SubscriptionDateInfo extends StatelessWidget {
                 label: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('${isAutoRenew ? '下次扣款' : '到期日'}(自动计算)'),
+                    Text(isAutoRenew ? '到期/续费日' : '到期日'),
                     if (nextBillingDate != null) ...[
                       const SizedBox(width: 4),
                       Builder(
                         builder: (context) {
-                          final diff = nextBillingDate!
-                              .difference(DateTime.now())
-                              .inDays;
+                          final diff = SubscriptionUtils.daysUntilDue(
+                            nextBillingDate!,
+                          );
                           String label;
                           Color color;
                           if (diff < 0) {
-                            label = '(已过期 ${-diff} 天)';
+                            label = '(已过期${-diff}天)';
                             color = Colors.red;
                           } else if (diff == 0) {
-                            label = '(今天)';
-                            color = Colors.orange;
+                            label = '(今天到期)';
+                            color = Colors.red;
                           } else {
-                            label = '(剩 $diff 天)';
-                            color = Colors.grey;
+                            label = '(剩余$diff天)';
+                            color = SubscriptionUtils.dueColor(context, diff);
                           }
                           return Text(
                             label,

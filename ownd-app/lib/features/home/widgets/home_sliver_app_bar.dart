@@ -3,19 +3,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../data/models/purchase_platform.dart';
 import '../../../data/repositories/platform_repository.dart';
+import '../../../core/network/error_messages.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../shared/utils/icon_utils.dart';
 
 class HomeSliverAppBar extends ConsumerWidget {
   final TextEditingController searchController;
   final bool isGridView;
-  final bool showExpiringList;
+  final bool expiringSoonOnly;
   final String sortField;
   final bool isAscending;
   final String? selectedPlatformFilter;
 
   final ValueChanged<bool> onGridViewChanged;
-  final ValueChanged<bool> onShowExpiringChanged;
+  final ValueChanged<bool> onExpiringSoonOnlyChanged;
   final ValueChanged<String> onSortFieldChanged;
   final ValueChanged<bool> onSortOrderChanged;
   final ValueChanged<String?> onPlatformFilterChanged;
@@ -26,12 +27,12 @@ class HomeSliverAppBar extends ConsumerWidget {
     super.key,
     required this.searchController,
     required this.isGridView,
-    required this.showExpiringList,
+    required this.expiringSoonOnly,
     required this.sortField,
     required this.isAscending,
     required this.selectedPlatformFilter,
     required this.onGridViewChanged,
-    required this.onShowExpiringChanged,
+    required this.onExpiringSoonOnlyChanged,
     required this.onSortFieldChanged,
     required this.onSortOrderChanged,
     required this.onPlatformFilterChanged,
@@ -86,19 +87,22 @@ class HomeSliverAppBar extends ConsumerWidget {
               final textStyle = Theme.of(context).textTheme.bodyMedium;
               return [
                 PopupMenuItem(
-                  value: 'toggle_expiring',
+                  value: 'filter_expiring',
                   height: itemHeight,
                   child: Row(
                     children: [
                       Icon(
-                        showExpiringList
-                            ? Icons.visibility_off
-                            : Icons.visibility,
+                        expiringSoonOnly
+                            ? Icons.notifications_active
+                            : Icons.notifications_active_outlined,
                         size: 18,
+                        color: expiringSoonOnly
+                            ? Theme.of(context).colorScheme.primary
+                            : null,
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        showExpiringList ? '隐藏到期列表' : '显示到期列表',
+                        expiringSoonOnly ? '取消到期筛选' : '仅看即将到期/续费',
                         style: textStyle,
                       ),
                     ],
@@ -219,8 +223,8 @@ class HomeSliverAppBar extends ConsumerWidget {
               ];
             },
             onSelected: (v) {
-              if (v == 'toggle_expiring') {
-                onShowExpiringChanged(!showExpiringList);
+              if (v == 'filter_expiring') {
+                onExpiringSoonOnlyChanged(!expiringSoonOnly);
               } else if (v == 'platform_filter') {
                 _showPlatformFilterDialog(context);
               } else if (v.startsWith('field_')) {
@@ -339,8 +343,9 @@ class HomeSliverAppBar extends ConsumerWidget {
                         ),
                         loading: () =>
                             const Center(child: CircularProgressIndicator()),
-                        error: (err, stack) =>
-                            Center(child: Text('Error: $err')),
+                        error: (err, stack) => Center(
+                          child: Text('加载失败: ${userErrorMessage(err)}'),
+                        ),
                       ),
                     ),
                   ],

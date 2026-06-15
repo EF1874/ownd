@@ -4,3 +4,4 @@ node_modules/
 .pnpm-workspace-state-v1.json
 **/.pnpm-workspace-state-v1.json
 .claude/
+.tmp_update_server/

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/device.dart';
 import '../../../data/repositories/device_repository.dart';
+import '../../../core/network/error_messages.dart';
 import '../../../shared/utils/icon_utils.dart';
 import '../../../shared/utils/category_utils.dart';
 import '../../../shared/config/category_config.dart';
@@ -10,6 +11,8 @@ import '../../../shared/config/cost_config.dart';
 import '../../../shared/widgets/base_card.dart';
 import '../../../shared/widgets/status_badge.dart';
 import '../../../shared/utils/format_utils.dart';
+import '../../../shared/utils/category_tree_utils.dart';
+import '../../../shared/utils/subscription_utils.dart';
 import 'dart:io';
 import '../../../shared/widgets/image_preview_dialog.dart';
 import '../../add_device/add_device_screen.dart';
@@ -22,7 +25,12 @@ class DeviceGridItem extends ConsumerStatefulWidget {
   final int index;
   final OnDeleteComplete? onDeleteComplete;
 
-  const DeviceGridItem({super.key, required this.device, this.index = 0, this.onDeleteComplete});
+  const DeviceGridItem({
+    super.key,
+    required this.device,
+    this.index = 0,
+    this.onDeleteComplete,
+  });
 
   @override
   ConsumerState<DeviceGridItem> createState() => _DeviceGridItemState();
@@ -35,6 +43,7 @@ class _DeviceGridItemState extends ConsumerState<DeviceGridItem>
   late final Animation<double> _opacityAnimation;
   late final AnimationController _entryController;
   bool _isDeleting = false;
+  bool _showSubscriptionUsage = false;
 
   @override
   void initState() {
@@ -43,9 +52,10 @@ class _DeviceGridItemState extends ConsumerState<DeviceGridItem>
       vsync: this,
       duration: const Duration(milliseconds: 250),
     );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
-      CurvedAnimation(parent: _deleteController, curve: Curves.easeIn),
-    );
+    _scaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.0,
+    ).animate(CurvedAnimation(parent: _deleteController, curve: Curves.easeIn));
     _opacityAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
       CurvedAnimation(parent: _deleteController, curve: Curves.easeOut),
     );
@@ -53,7 +63,9 @@ class _DeviceGridItemState extends ConsumerState<DeviceGridItem>
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
-    final delay = Duration(milliseconds: (widget.index > 5 ? 5 : widget.index) * 50);
+    final delay = Duration(
+      milliseconds: (widget.index > 5 ? 5 : widget.index) * 50,
+    );
     if (delay == Duration.zero) {
       _entryController.forward();
     } else {
@@ -62,8 +74,6 @@ class _DeviceGridItemState extends ConsumerState<DeviceGridItem>
       });
     }
   }
-
-
 
   @override
   void dispose() {
@@ -84,7 +94,9 @@ class _DeviceGridItemState extends ConsumerState<DeviceGridItem>
 
   Future<void> _navigateToEdit(BuildContext context, WidgetRef ref) async {
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => AddDeviceScreen(device: widget.device)),
+      MaterialPageRoute(
+        builder: (context) => AddDeviceScreen(device: widget.device),
+      ),
     );
     await ref.read(homeDevicesNotifierProvider.notifier).refresh();
   }
@@ -106,11 +118,35 @@ class _DeviceGridItemState extends ConsumerState<DeviceGridItem>
     // Handle adaptive color for null categoryColor
     final effectiveCategoryColor = categoryColor ?? theme.colorScheme.onSurface;
 
-    final hasBg = widget.device.imagePath != null || widget.device.customIconPath != null;
+    final hasBg =
+        widget.device.imagePath != null || widget.device.customIconPath != null;
+    final isSubscription = CategoryTreeUtils.isVirtualSubscription(
+      widget.device.category.value,
+    );
+    final subscriptionDueDate = widget.device.subscriptionDueDate;
+    final daysUntilDue = subscriptionDueDate == null
+        ? null
+        : SubscriptionUtils.daysUntilDue(subscriptionDueDate);
+    final dueColor = daysUntilDue == null
+        ? theme.colorScheme.primary
+        : SubscriptionUtils.dueColor(context, daysUntilDue);
+    final showUsageMetric = !isSubscription || _showSubscriptionUsage;
+    final metricLabel = showUsageMetric ? '使用' : '剩余';
+    final metricValue = showUsageMetric
+        ? '${widget.device.daysUsed}'
+        : daysUntilDue == null
+        ? '-'
+        : (daysUntilDue < 0 ? 0 : daysUntilDue).toString();
+    final metricColor = hasBg
+        ? Colors.white
+        : showUsageMetric
+        ? theme.colorScheme.primary
+        : dueColor;
 
     final childWidget = BaseCard(
       variant: CardVariant.glass,
-      backgroundImagePath: widget.device.imagePath ?? widget.device.customIconPath,
+      backgroundImagePath:
+          widget.device.imagePath ?? widget.device.customIconPath,
       onTap: () => _navigateToDetail(context),
       onLongPress: () async {
         final confirmed = await showModalBottomSheet<bool>(
@@ -128,10 +164,7 @@ class _DeviceGridItemState extends ConsumerState<DeviceGridItem>
               ),
               ListTile(
                 leading: const Icon(Icons.delete, color: Colors.red),
-                title: const Text(
-                  '删除',
-                  style: TextStyle(color: Colors.red),
-                ),
+                title: const Text('删除', style: TextStyle(color: Colors.red)),
                 onTap: () => Navigator.pop(ctx, true),
               ),
             ],
@@ -139,17 +172,21 @@ class _DeviceGridItemState extends ConsumerState<DeviceGridItem>
         );
 
         if (confirmed == true) {
-          debugPrint('[DELETE-GRID] Starting delete for device ${widget.device.id}');
+          debugPrint(
+            '[DELETE-GRID] Starting delete for device ${widget.device.id}',
+          );
           await _startDeleteAnimation();
-          
+
           try {
-            await ref.read(deviceRepositoryProvider).deleteDevice(widget.device.id);
+            await ref
+                .read(deviceRepositoryProvider)
+                .deleteDevice(widget.device.id);
             widget.onDeleteComplete?.call(true, null);
           } catch (e) {
             debugPrint('[DELETE-GRID] API error: $e');
             setState(() => _isDeleting = false);
             await _deleteController.reverse();
-            widget.onDeleteComplete?.call(false, e.toString());
+            widget.onDeleteComplete?.call(false, userErrorMessage(e));
           }
         }
       },
@@ -187,11 +224,7 @@ class _DeviceGridItemState extends ConsumerState<DeviceGridItem>
                         ),
                       ),
                     )
-                  : Icon(
-                      categoryIcon,
-                      size: 28,
-                      color: effectiveCategoryColor,
-                    ),
+                  : Icon(categoryIcon, size: 28, color: effectiveCategoryColor),
             ),
           ),
           const SizedBox(height: 12),
@@ -206,16 +239,19 @@ class _DeviceGridItemState extends ConsumerState<DeviceGridItem>
             ),
           ),
           const SizedBox(height: 6),
-          RichText(
-            textAlign: TextAlign.center,
-            text: TextSpan(
-              children: [
-                if (CategoryConfig.getMajorCategory(
-                      widget.device.category.value?.name,
-                    ) ==
-                    '虚拟订阅') ...[
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: isSubscription
+                ? () => setState(
+                    () => _showSubscriptionUsage = !_showSubscriptionUsage,
+                  )
+                : null,
+            child: RichText(
+              textAlign: TextAlign.center,
+              text: TextSpan(
+                children: [
                   TextSpan(
-                    text: '剩余',
+                    text: metricLabel,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: hasBg
                           ? Colors.white
@@ -225,52 +261,11 @@ class _DeviceGridItemState extends ConsumerState<DeviceGridItem>
                     ),
                   ),
                   TextSpan(
-                    text: () {
-                      if (widget.device.nextBillingDate == null) return '0';
-                      final diff = widget.device.nextBillingDate!
-                              .difference(DateTime.now())
-                              .inDays +
-                          1;
-                      return (diff < 0 ? 0 : diff).toString();
-                    }(),
+                    text: metricValue,
                     style: TextStyle(
                       fontFamily: 'monospace',
                       fontWeight: FontWeight.bold,
-                      color: hasBg
-                          ? Colors.white
-                          : theme.colorScheme.primary,
-                      fontSize: 20,
-                    ),
-                  ),
-                  TextSpan(
-                    text: '天',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: hasBg
-                          ? Colors.white
-                          : theme.colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
-                    ),
-                  ),
-                ] else ...[
-                  TextSpan(
-                    text: '使用',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: hasBg
-                          ? Colors.white
-                          : theme.colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
-                    ),
-                  ),
-                  TextSpan(
-                    text: '${widget.device.daysUsed}',
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontWeight: FontWeight.bold,
-                      color: hasBg
-                          ? Colors.white
-                          : theme.colorScheme.primary,
+                      color: metricColor,
                       fontSize: 20,
                     ),
                   ),
@@ -285,7 +280,7 @@ class _DeviceGridItemState extends ConsumerState<DeviceGridItem>
                     ),
                   ),
                 ],
-              ],
+              ),
             ),
           ),
           const SizedBox(height: 4),
@@ -302,11 +297,15 @@ class _DeviceGridItemState extends ConsumerState<DeviceGridItem>
               ),
               const SizedBox(height: 2),
               Text(
-                '¥${FormatUtils.formatCurrency(dailyCost)}/天',
+                isSubscription && subscriptionDueDate != null
+                    ? '到期 ${FormatUtils.formatDateShort(subscriptionDueDate)}'
+                    : '¥${FormatUtils.formatCurrency(dailyCost)}/天',
                 style: TextStyle(
                   fontFamily: 'monospace',
                   color: hasBg
                       ? Colors.white
+                      : isSubscription
+                      ? dueColor
                       : (costColor ?? theme.colorScheme.onSurfaceVariant),
                   fontWeight: FontWeight.bold,
                   fontSize: 11,
@@ -378,10 +377,7 @@ class _DeviceGridItemState extends ConsumerState<DeviceGridItem>
         builder: (context, child) {
           return Opacity(
             opacity: _opacityAnimation.value,
-            child: Transform.scale(
-              scale: _scaleAnimation.value,
-              child: child,
-            ),
+            child: Transform.scale(scale: _scaleAnimation.value, child: child),
           );
         },
         child: childWidget,
@@ -405,19 +401,19 @@ class _DeviceGridItemState extends ConsumerState<DeviceGridItem>
 
   Widget _buildStatusBadges(Device device) {
     List<Widget> badges = [];
-    final isSubscription =
-        CategoryConfig.getMajorCategory(device.category.value?.name) == '虚拟订阅';
+    final isSubscription = CategoryTreeUtils.isVirtualSubscription(
+      device.category.value,
+    );
     if (isSubscription) {
       if (device.status == 'scrap') {
         badges.add(const StatusBadge(text: '已停用', color: Colors.grey));
       } else {
         final now = DateTime.now();
-        final nextDate = device.nextBillingDate;
+        final nextDate = device.subscriptionDueDate;
         if (nextDate != null) {
-          final diff = nextDate.difference(now).inDays;
+          final diff = SubscriptionUtils.daysUntilDue(nextDate, from: now);
           if (device.isAutoRenew) {
-            if (diff <= (device.reminderDays > 0 ? device.reminderDays : 3) &&
-                diff >= 0) {
+            if (diff <= 7 && diff >= 0) {
               badges.add(const StatusBadge(text: '即将续费', color: Colors.orange));
             } else {
               badges.add(const StatusBadge(text: '自动续费', color: Colors.green));
@@ -425,8 +421,7 @@ class _DeviceGridItemState extends ConsumerState<DeviceGridItem>
           } else {
             if (diff < 0) {
               badges.add(const StatusBadge(text: '已过期', color: Colors.grey));
-            } else if (diff <=
-                (device.reminderDays > 0 ? device.reminderDays : 3)) {
+            } else if (diff <= 7) {
               badges.add(const StatusBadge(text: '即将到期', color: Colors.red));
             }
           }

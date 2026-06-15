@@ -103,6 +103,7 @@ model Item {
   currentCycle     Int?
   nextBillingDate  DateTime?
   isAutoRenew      Boolean        @default(false)
+  reminderDays     Int            @default(0)
 
   isBackup   Boolean   @default(false)
   backupDate DateTime?

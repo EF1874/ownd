@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/category.dart';
 import '../../../data/repositories/category_repository.dart';
+import '../../../core/network/error_messages.dart';
 import '../../../shared/config/category_config.dart';
 import '../../../shared/utils/icon_utils.dart';
+import '../../../shared/utils/category_tree_utils.dart';
 import '../../../shared/widgets/image_preview_dialog.dart';
 
 class CategoryPicker extends ConsumerWidget {
@@ -200,15 +202,9 @@ class _CategorySheetContentState extends ConsumerState<_CategorySheetContent> {
     _majorScrollController = ScrollController();
 
     if (widget.selectedCategory != null) {
-      final name = widget.selectedCategory!.name;
-      if (widget.selectedCategory!.parentName != null) {
-        _selectedMajor = widget.selectedCategory!.parentName!;
-        // Robust check: if name is directly a Major Category, use it.
-      } else if (CategoryConfig.hierarchy.containsKey(name)) {
-        _selectedMajor = name;
-      } else {
-        _selectedMajor = CategoryConfig.getMajorCategory(name);
-      }
+      _selectedMajor = CategoryTreeUtils.majorCategoryFor(
+        widget.selectedCategory,
+      );
     }
 
     _searchController.addListener(() {
@@ -235,6 +231,120 @@ class _CategorySheetContentState extends ConsumerState<_CategorySheetContent> {
     widget.onCategorySelected(category);
   }
 
+  bool _isSelectedCategory(Category category) {
+    final selected = widget.selectedCategory;
+    if (selected == null) return false;
+    if (selected.uuid != null && category.uuid != null) {
+      return selected.uuid == category.uuid;
+    }
+    if (selected.id > 0 && category.id > 0) {
+      return selected.id == category.id;
+    }
+    return selected.id < 0 &&
+        selected.name == category.name &&
+        selected.parentName == category.parentName;
+  }
+
+  Widget _buildCategoryWrap(
+    List<Category> categories,
+    List<Category> categoryTree,
+  ) {
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: categories
+          .map((category) => _buildCategoryChip(category, categoryTree))
+          .toList(),
+    );
+  }
+
+  Widget _buildSubscriptionGroups(
+    List<Category> categories,
+    List<Category> categoryTree,
+  ) {
+    final groupedNames = CategoryConfig.subscriptionGroups.values
+        .expand((names) => names)
+        .toSet();
+    final otherCategories = categories
+        .where((category) => category.name == '其它')
+        .toList();
+    final ungroupedCategories = categories
+        .where(
+          (category) =>
+              category.name != '其它' && !groupedNames.contains(category.name),
+        )
+        .toList();
+
+    final tiles = <Widget>[];
+    for (final entry in CategoryConfig.subscriptionGroups.entries) {
+      final groupCategories = categories
+          .where((category) => entry.value.contains(category.name))
+          .toList();
+      if (groupCategories.isEmpty) continue;
+      tiles.add(
+        _CategoryGroupTile(
+          title: entry.key,
+          initiallyExpanded:
+              entry.key == CategoryConfig.subscriptionGroups.keys.first ||
+              groupCategories.any(_isSelectedCategory),
+          child: _buildCategoryWrap(groupCategories, categoryTree),
+        ),
+      );
+    }
+
+    if (ungroupedCategories.isNotEmpty) {
+      tiles.add(
+        _CategoryGroupTile(
+          title: '其它订阅',
+          initiallyExpanded: ungroupedCategories.any(_isSelectedCategory),
+          child: _buildCategoryWrap(ungroupedCategories, categoryTree),
+        ),
+      );
+    }
+
+    if (otherCategories.isNotEmpty) {
+      tiles.add(
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: _buildCategoryWrap(otherCategories, categoryTree),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: tiles,
+    );
+  }
+
+  Widget _buildCategoryChip(Category category, List<Category> categoryTree) {
+    final isOther = category.name == '其它';
+    final itemConfig = isOther ? null : CategoryConfig.getItem(category.name);
+
+    return ChoiceChip(
+      label: Text(category.name),
+      selected: _isSelectedCategory(category),
+      showCheckmark: false,
+      onSelected: (selected) {
+        if (selected) {
+          _selectionMade = true;
+          widget.onCategorySelected(category);
+          Navigator.of(context).pop();
+        } else {
+          _confirmMajorCategory(categoryTree);
+          Navigator.of(context).pop();
+        }
+      },
+      avatar: Icon(
+        IconUtils.getIconData(category.iconPath),
+        size: 18,
+        color: isOther
+            ? Colors.grey
+            : (itemConfig?.color ?? Theme.of(context).colorScheme.primary),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final categoriesAsync = ref.watch(categoryTreeProvider);
@@ -251,9 +361,9 @@ class _CategorySheetContentState extends ConsumerState<_CategorySheetContent> {
             !_selectionMade &&
             widget.selectedCategory != null) {
           // Check if we navigated away from the original Major selection
-          final originalMajor =
-              widget.selectedCategory!.parentName ??
-              CategoryConfig.getMajorCategory(widget.selectedCategory!.name);
+          final originalMajor = CategoryTreeUtils.majorCategoryFor(
+            widget.selectedCategory,
+          );
           if (_selectedMajor != originalMajor) {
             _confirmMajorCategory(categoryTree);
           }
@@ -355,9 +465,9 @@ class _CategorySheetContentState extends ConsumerState<_CategorySheetContent> {
             Expanded(
               child: categoriesAsync.when(
                 data: (categoryTree) {
-                  final allCategories = categoryTree
-                      .expand((category) => [category, ...category.children])
-                      .toList();
+                  final allCategories = CategoryTreeUtils.flattenTree(
+                    categoryTree,
+                  );
                   List<Category> visualCategories;
 
                   if (_searchText.isNotEmpty) {
@@ -396,61 +506,13 @@ class _CategorySheetContentState extends ConsumerState<_CategorySheetContent> {
                               style: Theme.of(context).textTheme.titleSmall,
                             ),
                           ),
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 12,
-                          children: visualCategories.map((category) {
-                            final isOther = category.name == '其它';
-
-                            // Improved selection check for scoped "Other"
-                            final isSameId =
-                                widget.selectedCategory?.id == category.id;
-                            final isSameName =
-                                widget.selectedCategory?.name == category.name;
-                            final isScopedOther =
-                                isOther &&
-                                widget.selectedCategory?.parentName ==
-                                    _selectedMajor;
-
-                            final isSelected =
-                                (widget.selectedCategory != null) &&
-                                (isSameId ||
-                                    (widget.selectedCategory!.id < 0 &&
-                                        isSameName) ||
-                                    isScopedOther);
-
-                            final itemConfig = isOther
-                                ? null
-                                : CategoryConfig.getItem(category.name);
-
-                            return ChoiceChip(
-                              label: Text(category.name),
-                              selected: isSelected,
-                              showCheckmark: false,
-                              onSelected: (selected) {
-                                if (selected) {
-                                  _selectionMade = true;
-                                  widget.onCategorySelected(category);
-                                  Navigator.of(context).pop();
-                                } else {
-                                  // Deselect -> Revert to Major Category
-                                  _confirmMajorCategory(categoryTree);
-                                  Navigator.of(context).pop();
-                                }
-                              },
-                              avatar: Icon(
-                                IconUtils.getIconData(category.iconPath),
-                                size: 18,
-                                color: isOther
-                                    ? Colors.grey
-                                    : (itemConfig?.color ??
-                                          Theme.of(
-                                            context,
-                                          ).colorScheme.primary),
-                              ),
-                            );
-                          }).toList(),
-                        ),
+                        if (_searchText.isEmpty && _selectedMajor == '虚拟订阅')
+                          _buildSubscriptionGroups(
+                            visualCategories,
+                            categoryTree,
+                          )
+                        else
+                          _buildCategoryWrap(visualCategories, categoryTree),
                         SizedBox(
                           height: 32 + MediaQuery.of(context).padding.bottom,
                         ),
@@ -459,11 +521,43 @@ class _CategorySheetContentState extends ConsumerState<_CategorySheetContent> {
                   );
                 },
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (err, stack) => Center(child: Text('Error: $err')),
+                error: (err, stack) =>
+                    Center(child: Text('加载失败: ${userErrorMessage(err)}')),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _CategoryGroupTile extends StatelessWidget {
+  final String title;
+  final bool initiallyExpanded;
+  final Widget child;
+
+  const _CategoryGroupTile({
+    required this.title,
+    required this.initiallyExpanded,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        childrenPadding: const EdgeInsets.only(bottom: 12),
+        title: Text(
+          title,
+          style: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        initiallyExpanded: initiallyExpanded,
+        children: [Align(alignment: Alignment.centerLeft, child: child)],
       ),
     );
   }

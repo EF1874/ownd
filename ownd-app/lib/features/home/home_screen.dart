@@ -39,15 +39,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   String? _selectedPlatformFilter;
   final Set<String> _selectedTags = {};
 
-  // State
-  bool _showExpiringList = true;
+  bool _expiringSoonOnly = false;
 
   @override
   void initState() {
     super.initState();
     final prefs = ref.read(preferencesServiceProvider);
     _isGridView = prefs.isGridView;
-    _showExpiringList = prefs.showExpiringList;
+    _expiringSoonOnly = prefs.expiringSoonOnly;
     _scrollController.addListener(_onScroll);
     _searchController.addListener(_onSearchChanged);
   }
@@ -110,7 +109,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   HomeSliverAppBar(
                     searchController: _searchController,
                     isGridView: _isGridView,
-                    showExpiringList: _showExpiringList,
+                    expiringSoonOnly: _expiringSoonOnly,
                     sortField: _sortField,
                     isAscending: _isAscending,
                     selectedPlatformFilter: _selectedPlatformFilter,
@@ -118,11 +117,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       setState(() => _isGridView = val);
                       ref.read(preferencesServiceProvider).setGridView(val);
                     },
-                    onShowExpiringChanged: (val) {
-                      setState(() => _showExpiringList = val);
+                    onExpiringSoonOnlyChanged: (val) {
+                      setState(() => _expiringSoonOnly = val);
                       ref
                           .read(preferencesServiceProvider)
-                          .setShowExpiringList(val);
+                          .setExpiringSoonOnly(val);
+                      ref
+                          .read(homeDevicesNotifierProvider.notifier)
+                          .updateExpiringSoonOnly(val);
                     },
                     onSortFieldChanged: (val) {
                       setState(() => _sortField = val);
@@ -149,7 +151,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           builder: (context) => const AddDeviceScreen(),
                         ),
                       );
-                      await ref.read(homeDevicesNotifierProvider.notifier).refresh();
+                      await ref
+                          .read(homeDevicesNotifierProvider.notifier)
+                          .refresh();
                     },
                   ),
                   SliverPersistentHeader(
@@ -205,7 +209,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                       }
                                     });
                                     ref
-                                        .read(homeDevicesNotifierProvider.notifier)
+                                        .read(
+                                          homeDevicesNotifierProvider.notifier,
+                                        )
                                         .toggleTag(tag);
                                   },
                                 ),
@@ -233,16 +239,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     HomeDeviceList(
                       processedDevices: homeDevicesState.devices,
                       allDevices: homeDevicesState.devices,
-                      showExpiringList: _showExpiringList,
                       isGridView: _isGridView,
-                      categoryName: _selectedCategories.isNotEmpty &&
+                      categoryName:
+                          _selectedCategories.isNotEmpty &&
                               _selectedCategories.length == 1
                           ? _selectedCategories.first
                           : null,
-                       onDeleteComplete: (success, error) {
-                        debugPrint('[HomeScreen] onDeleteComplete: success=$success, error=$error');
-                        AppToast.show(context, success ? '删除成功' : '删除失败', isError: !success);
-                        unawaited(ref.read(homeDevicesNotifierProvider.notifier).silentRefresh());
+                      onDeleteComplete: (success, error) {
+                        debugPrint(
+                          '[HomeScreen] onDeleteComplete: success=$success, error=$error',
+                        );
+                        AppToast.show(
+                          context,
+                          success ? '删除成功' : '删除失败: ${error ?? '请稍后重试'}',
+                          isError: !success,
+                        );
+                        unawaited(
+                          ref
+                              .read(homeDevicesNotifierProvider.notifier)
+                              .silentRefresh(),
+                        );
                       },
                     ),
                     if (homeDevicesState.isLoadingMore)

@@ -1,9 +1,15 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ItemsService } from './items.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
-import { PrismaClient, Item } from '@prisma/client';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import {
+  PrismaClient,
+  Item,
+  ItemCycleType,
+  ItemRecordType,
+} from '@prisma/client';
 import { CreateItemDto } from './dto/create-item.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
 
@@ -20,6 +26,14 @@ describe('ItemsService', () => {
         {
           provide: PrismaService,
           useValue: mockPrisma,
+        },
+        {
+          provide: CACHE_MANAGER,
+          useValue: {
+            get: jest.fn(),
+            set: jest.fn(),
+            del: jest.fn(),
+          },
         },
       ],
     }).compile();
@@ -43,6 +57,7 @@ describe('ItemsService', () => {
     currentCycle: null,
     nextBillingDate: null,
     isAutoRenew: false,
+    reminderDays: 0,
     isBackup: false,
     backupDate: null,
     isScrapped: false,
@@ -87,6 +102,40 @@ describe('ItemsService', () => {
       });
       expect(result).toEqual(mockResult);
     });
+
+    it('应该按开通日和周期计算订阅到期日', async () => {
+      const purchaseDate = new Date('2026-06-12T00:00:00.000Z');
+      const dto: CreateItemDto = {
+        name: '月付订阅',
+        price: 30,
+        isVirtual: true,
+        purchaseDate,
+        currentCycleType: ItemCycleType.MONTH,
+        currentCycle: 1,
+        reminderDays: 7,
+      };
+      const userId = 'user-1';
+
+      prisma.item.create.mockResolvedValue(createMockItem({ ...dto, userId }));
+
+      await service.create(userId, dto);
+
+      const createCall = prisma.item.create.mock.calls[0][0];
+      expect(createCall.data.nextBillingDate).toEqual(
+        new Date('2026-07-11T00:00:00.000Z'),
+      );
+      expect(createCall.data.itemHistories).toEqual({
+        create: [
+          expect.objectContaining({
+            startDate: purchaseDate,
+            endDate: new Date('2026-07-11T00:00:00.000Z'),
+            cycleType: ItemCycleType.MONTH,
+            cycle: 1,
+            price: 30,
+          }),
+        ],
+      });
+    });
   });
 
   describe('findAll', () => {
@@ -108,7 +157,43 @@ describe('ItemsService', () => {
             take: 1,
           },
         },
+        orderBy: { purchaseDate: 'desc' },
+        skip: undefined,
+        take: undefined,
       });
+      expect(result).toEqual(mockItems);
+    });
+
+    it('应该支持筛选即将到期或续费的虚拟订阅', async () => {
+      const userId = 'user-1';
+      const mockItems = [
+        createMockItem({
+          userId,
+          isVirtual: true,
+          nextBillingDate: new Date(),
+        }),
+      ];
+
+      prisma.item.findMany.mockResolvedValue(mockItems);
+
+      const result = await service.findAll(userId, { expiringSoon: true });
+
+      expect(prisma.item.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            userId,
+            AND: [
+              {
+                isVirtual: true,
+                nextBillingDate: {
+                  gte: expect.any(Date),
+                  lte: expect.any(Date),
+                },
+              },
+            ],
+          },
+        }),
+      );
       expect(result).toEqual(mockItems);
     });
   });
@@ -172,6 +257,7 @@ describe('ItemsService', () => {
         include: {
           category: { include: { parent: true } },
           platform: true,
+          itemHistories: true,
         },
       });
       expect(result.name).toBe(dto.name);
@@ -220,6 +306,98 @@ describe('ItemsService', () => {
         data: { imagePath },
       });
       expect(result.imagePath).toBe(imagePath);
+    });
+  });
+
+  describe('addHistory', () => {
+    const userId = 'user-1';
+    const itemId = 'item-1';
+    const latestHistory = {
+      id: 'history-1',
+      itemId,
+      type: ItemRecordType.RENEWAL,
+      price: 30,
+      recordDate: new Date('2026-06-12T00:00:00.000Z'),
+      startDate: new Date('2026-06-12T00:00:00.000Z'),
+      endDate: new Date('2026-07-11T00:00:00.000Z'),
+      cycleType: ItemCycleType.MONTH,
+      cycle: 1,
+      note: null,
+      createdAt: new Date('2026-06-12T00:00:00.000Z'),
+      updatedAt: new Date('2026-06-12T00:00:00.000Z'),
+    };
+
+    beforeEach(() => {
+      prisma.item.findFirst.mockResolvedValue(createMockItem({ id: itemId }));
+    });
+
+    it('应该拒绝到期日期早于开始日期的续费记录', async () => {
+      await expect(
+        service.addHistory(userId, itemId, {
+          type: ItemRecordType.RENEWAL,
+          price: 30,
+          startDate: new Date('2026-07-12T00:00:00.000Z'),
+          endDate: new Date('2026-07-11T00:00:00.000Z'),
+          cycleType: ItemCycleType.MONTH,
+          cycle: 1,
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(prisma.itemHistory.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('应该拒绝和上一期日期重复的续费记录', async () => {
+      prisma.itemHistory.findFirst.mockResolvedValue(latestHistory);
+
+      await expect(
+        service.addHistory(userId, itemId, {
+          type: ItemRecordType.RENEWAL,
+          price: 30,
+          startDate: new Date('2026-07-11T00:00:00.000Z'),
+          endDate: new Date('2026-08-10T00:00:00.000Z'),
+          cycleType: ItemCycleType.MONTH,
+          cycle: 1,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('应该允许紧接上一期后的续费记录并更新最后到期日', async () => {
+      const newHistory = {
+        ...latestHistory,
+        id: 'history-2',
+        startDate: new Date('2026-07-12T00:00:00.000Z'),
+        endDate: new Date('2026-08-11T00:00:00.000Z'),
+      };
+      prisma.itemHistory.findFirst.mockResolvedValue(latestHistory);
+      prisma.itemHistory.create.mockResolvedValue(newHistory);
+      prisma.item.update.mockResolvedValue(
+        createMockItem({ id: itemId, nextBillingDate: newHistory.endDate }),
+      );
+      prisma.$transaction.mockImplementation(async (callback) =>
+        callback(prisma),
+      );
+
+      const result = await service.addHistory(userId, itemId, {
+        type: ItemRecordType.RENEWAL,
+        price: 30,
+        startDate: newHistory.startDate,
+        endDate: newHistory.endDate,
+        cycleType: ItemCycleType.MONTH,
+        cycle: 1,
+      });
+
+      expect(prisma.itemHistory.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          itemId,
+          startDate: newHistory.startDate,
+          endDate: newHistory.endDate,
+        }),
+      });
+      expect(prisma.item.update).toHaveBeenCalledWith({
+        where: { id: itemId },
+        data: { nextBillingDate: newHistory.endDate },
+      });
+      expect(result).toEqual(newHistory);
     });
   });
 });

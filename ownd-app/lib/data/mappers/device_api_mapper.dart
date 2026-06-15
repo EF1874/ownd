@@ -1,4 +1,4 @@
-import '../../shared/config/category_config.dart';
+import '../../shared/utils/category_tree_utils.dart';
 import '../models/device.dart';
 import 'api_id_mapper.dart';
 import 'category_api_mapper.dart';
@@ -27,12 +27,12 @@ Device deviceFromApi(Map<String, dynamic> json) {
     ..periodPrice = (json['isVirtual'] as bool? ?? false)
         ? (json['price'] as num?)?.toDouble()
         : null
-    ..hasReminder = false
-    ..reminderDays = 1
+    ..reminderDays = (json['reminderDays'] as num?)?.toInt() ?? 0
     ..history = ((json['itemHistories'] as List<dynamic>?) ?? const [])
         .whereType<Map<String, dynamic>>()
         .map(historyFromApi)
         .toList();
+  device.hasReminder = device.reminderDays > 0;
 
   final categoryJson = json['category'];
   if (categoryJson is Map<String, dynamic>) {
@@ -53,18 +53,31 @@ SubscriptionHistory historyFromApi(Map<String, dynamic> json) {
     ..note = json['note'] as String?;
 }
 
+Map<String, dynamic> historyToApi(SubscriptionHistory history) {
+  return {
+    'type': 'RENEWAL',
+    'price': history.price,
+    if (history.recordDate != null)
+      'recordDate': _dateOnlyToApi(history.recordDate!),
+    if (history.note != null && history.note!.isNotEmpty) 'note': history.note,
+    if (history.startDate != null)
+      'startDate': _dateOnlyToApi(history.startDate!),
+    if (history.endDate != null) 'endDate': _dateOnlyToApi(history.endDate!),
+    'cycleType': _cycleTypeToApi(history.cycleType),
+    'cycle': 1,
+  };
+}
+
 Map<String, dynamic> deviceToApi(Device device) {
   final category = device.category.value;
   final isVirtual =
       device.cycleType != null ||
-      (category?.parentName ??
-              CategoryConfig.getMajorCategory(category?.name)) ==
-          '虚拟订阅';
+      CategoryTreeUtils.isVirtualSubscription(category);
 
   return {
     'name': device.name,
     'price': device.price,
-    'purchaseDate': device.purchaseDate.toIso8601String(),
+    'purchaseDate': _dateOnlyToApi(device.purchaseDate),
     if (category?.uuid != null) 'categoryId': category!.uuid,
     if (device.platformUuid != null) 'platformId': device.platformUuid,
     if (device.notes != null) 'notes': device.notes,
@@ -73,23 +86,37 @@ Map<String, dynamic> deviceToApi(Device device) {
     if (device.cycleType != null)
       'currentCycleType': _cycleTypeToApi(device.cycleType!),
     if (device.cycleType != null) 'currentCycle': 1,
+    if (device.nextBillingDate != null)
+      'nextBillingDate': _dateOnlyToApi(device.nextBillingDate!),
     'isAutoRenew': device.isAutoRenew,
+    'reminderDays': device.hasReminder ? device.reminderDays : 0,
     if (device.warrantyEndDate != null)
-      'warrantyEndDate': device.warrantyEndDate!.toIso8601String(),
+      'warrantyEndDate': _dateOnlyToApi(device.warrantyEndDate!),
     'isBackup': device.backupDate != null,
     if (device.backupDate != null)
-      'backupDate': device.backupDate!.toIso8601String(),
+      'backupDate': _dateOnlyToApi(device.backupDate!),
     'isScrapped': device.scrapDate != null,
     if (device.scrapDate != null)
-      'scrappedDate': device.scrapDate!.toIso8601String(),
+      'scrappedDate': _dateOnlyToApi(device.scrapDate!),
   };
 }
 
 DateTime? _date(dynamic value) {
   if (value is String && value.isNotEmpty) {
-    return DateTime.tryParse(value);
+    final parsed = DateTime.tryParse(value);
+    if (parsed == null) return null;
+    final local = parsed.toLocal();
+    return DateTime(local.year, local.month, local.day);
   }
   return null;
+}
+
+String _dateOnlyToApi(DateTime date) {
+  final local = date.toLocal();
+  final year = local.year.toString().padLeft(4, '0');
+  final month = local.month.toString().padLeft(2, '0');
+  final day = local.day.toString().padLeft(2, '0');
+  return '$year-$month-$day';
 }
 
 CycleType? _cycleTypeFromApi(String? value) {

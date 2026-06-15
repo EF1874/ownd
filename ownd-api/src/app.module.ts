@@ -11,6 +11,7 @@ import { CategoriesModule } from './categories/categories.module';
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { StatisticsModule } from './statistics/statistics.module';
 import { PlatformModule } from './platform/platform.module';
+import { AppUpdatesModule } from './app-updates/app-updates.module';
 import { APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { CacheModule } from '@nestjs/cache-manager';
@@ -77,6 +78,7 @@ import { ThrottlerStorageRedisService } from 'nestjs-throttler-storage-redis';
     CategoriesModule,
     StatisticsModule,
     PlatformModule,
+    AppUpdatesModule,
   ],
   controllers: [AppController],
   providers: [
