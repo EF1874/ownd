@@ -5,7 +5,10 @@ import 'api_exception.dart';
 
 String userErrorMessage(Object error, {String fallback = '操作失败，请稍后重试'}) {
   if (error is ApiException) {
-    return _cleanMessage(error.message, fallback: fallback);
+    return _cleanMessage(
+      error.message,
+      fallback: _httpStatusMessage(error.statusCode, fallback: fallback),
+    );
   }
 
   if (error is DioException) {
@@ -57,7 +60,11 @@ String userErrorMessage(Object error, {String fallback = '操作失败，请稍�
 }
 
 String friendlyDioErrorMessage(DioException error) {
-  final serverMessage = _serverMessage(error.response?.data);
+  final statusCode = error.response?.statusCode;
+  final serverMessage = _serverMessage(
+    error.response?.data,
+    statusCode: statusCode,
+  );
   if (serverMessage != null) {
     return serverMessage;
   }
@@ -74,20 +81,20 @@ String friendlyDioErrorMessage(DioException error) {
     case DioExceptionType.cancel:
       return '请求已取消';
     case DioExceptionType.badResponse:
-      return _httpStatusMessage(error.response?.statusCode);
+      return _httpStatusMessage(statusCode);
     case DioExceptionType.unknown:
       return userErrorMessage(error.message ?? '', fallback: '网络请求失败，请稍后重试');
   }
 }
 
-String? _serverMessage(Object? data) {
+String? _serverMessage(Object? data, {int? statusCode}) {
   if (data is! Map<String, dynamic>) {
     return null;
   }
 
   final rawMessage = data['msg'] ?? data['message'];
   if (rawMessage is String && rawMessage.trim().isNotEmpty) {
-    return _cleanMessage(rawMessage, fallback: '提交的信息有误，请检查后重试');
+    return _cleanMessage(rawMessage, fallback: _httpStatusMessage(statusCode));
   }
 
   if (rawMessage is List && rawMessage.isNotEmpty) {
@@ -95,16 +102,16 @@ String? _serverMessage(Object? data) {
         .map((message) => _cleanMessage('$message', fallback: ''))
         .where((message) => message.isNotEmpty)
         .join('，');
-    return messages.isEmpty ? '提交的信息有误，请检查后重试' : messages;
+    return messages.isEmpty ? _httpStatusMessage(statusCode) : messages;
   }
 
   return null;
 }
 
-String _httpStatusMessage(int? statusCode) {
+String _httpStatusMessage(int? statusCode, {String fallback = '请求失败，请稍后重试'}) {
   switch (statusCode) {
     case 400:
-      return '提交的信息有误，请检查后重试';
+      return '请求内容有误，请检查后重试';
     case 401:
       return '登录状态已失效，请重新登录';
     case 403:
@@ -125,7 +132,7 @@ String _httpStatusMessage(int? statusCode) {
     case 504:
       return '服务器暂时不可用，请稍后重试';
     default:
-      return '请求失败，请稍后重试';
+      return fallback;
   }
 }
 
@@ -152,6 +159,33 @@ String _cleanMessage(String message, {required String fallback}) {
     'localhost',
   ])) {
     return fallback;
+  }
+
+  if (_containsAny(lower, const [
+    '分类不存在或无权访问',
+    'category does not exist',
+    'category not found',
+  ])) {
+    return '分类信息异常，请稍后重试';
+  }
+
+  if (_containsAny(lower, const [
+    '应用更新服务未配置',
+    '应用更新信息暂时不可用',
+    '应用更新信息格式错误',
+    '应用更新平台配置不匹配',
+    '应用更新配置不完整',
+  ])) {
+    return '更新服务暂时不可用，请稍后重试';
+  }
+
+  if (_containsAny(lower, const [
+    'nextbillingdate should not exist',
+    'reminderdays should not exist',
+    'currentcycletype should not exist',
+    'currentcycle should not exist',
+  ])) {
+    return '服务器正在更新，请稍后重试';
   }
 
   if (_containsAny(lower, const [

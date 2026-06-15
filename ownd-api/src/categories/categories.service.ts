@@ -151,6 +151,8 @@ export class CategoriesService {
 
     if (existingUserCategories === 0) {
       await this.copySystemCategoryTemplates(userId);
+    } else {
+      await this.syncMissingSystemCategoryTemplates(userId);
     }
 
     if (!user.categoryDefaultsInitialized) {
@@ -196,6 +198,69 @@ export class CategoriesService {
         },
       });
       idMap.set(template.id, created.id);
+    }
+  }
+
+  private async syncMissingSystemCategoryTemplates(userId: string) {
+    const templates = await this.prisma.category.findMany({
+      where: { userId: null },
+      orderBy: { createdAt: 'asc' },
+    });
+    const userCategories = await this.prisma.category.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'asc' },
+    });
+    const userByParentAndName = new Set(
+      userCategories.map(
+        (category) => `${category.parentId ?? 'root'}:${category.name}`,
+      ),
+    );
+    const userRootByName = new Map(
+      userCategories
+        .filter((category) => !category.parentId)
+        .map((category) => [category.name, category.id]),
+    );
+    const templateRootById = new Map(
+      templates
+        .filter((category) => !category.parentId)
+        .map((category) => [category.id, category.name]),
+    );
+
+    for (const template of templates.filter((category) => !category.parentId)) {
+      if (userRootByName.has(template.name)) continue;
+
+      const created = await this.prisma.category.create({
+        data: {
+          name: template.name,
+          icon: template.icon,
+          isVirtual: template.isVirtual,
+          userId,
+        },
+      });
+      userRootByName.set(created.name, created.id);
+      userByParentAndName.add(`root:${created.name}`);
+    }
+
+    for (const template of templates.filter((category) => category.parentId)) {
+      const templateParentName = template.parentId
+        ? templateRootById.get(template.parentId)
+        : undefined;
+      const parentId = templateParentName
+        ? userRootByName.get(templateParentName)
+        : undefined;
+      if (!parentId) continue;
+      if (userByParentAndName.has(`${parentId}:${template.name}`)) continue;
+
+      const created = await this.prisma.category.create({
+        data: {
+          name: template.name,
+          icon: template.icon,
+          isVirtual: template.isVirtual,
+          parentId,
+          userId,
+        },
+      });
+      userByParentAndName.add(`${parentId}:${created.name}`);
     }
   }
 }

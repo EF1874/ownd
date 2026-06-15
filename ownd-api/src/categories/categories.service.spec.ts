@@ -170,6 +170,64 @@ describe('CategoriesService', () => {
       });
       expect(result).toHaveLength(1);
     });
+
+    it('老账号读取分类时应补齐新增的系统模板子分类', async () => {
+      const userId = 'u1';
+      prisma.user.findUnique.mockResolvedValue({
+        categoryDefaultsInitialized: true,
+      });
+      prisma.category.count.mockResolvedValue(2);
+      prisma.category.findMany
+        .mockResolvedValueOnce([
+          {
+            id: 'tpl-root',
+            name: '虚拟订阅',
+            icon: 'MdiIcons.youtubeSubscription',
+            parentId: null,
+            userId: null,
+            isVirtual: true,
+          },
+          {
+            id: 'tpl-child',
+            name: '咖啡月卡',
+            icon: 'MdiIcons.coffeeMaker',
+            parentId: 'tpl-root',
+            userId: null,
+            isVirtual: false,
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'user-root',
+            name: '虚拟订阅',
+            icon: 'MdiIcons.youtubeSubscription',
+            parentId: null,
+            userId,
+            isVirtual: true,
+          },
+        ])
+        .mockResolvedValueOnce([
+          { id: 'user-root', name: '虚拟订阅', parentId: null, userId },
+          { id: 'user-child', name: '咖啡月卡', parentId: 'user-root', userId },
+        ]);
+      prisma.category.create.mockResolvedValue({
+        id: 'user-child',
+        name: '咖啡月卡',
+      });
+
+      const result = await service.findAll(userId);
+
+      expect(prisma.category.create).toHaveBeenCalledWith({
+        data: {
+          name: '咖啡月卡',
+          icon: 'MdiIcons.coffeeMaker',
+          isVirtual: false,
+          parentId: 'user-root',
+          userId,
+        },
+      });
+      expect(result[0].children?.[0]?.name).toBe('咖啡月卡');
+    });
   });
 
   describe('update/remove', () => {

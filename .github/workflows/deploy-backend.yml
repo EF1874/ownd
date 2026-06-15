@@ -37,8 +37,7 @@ jobs:
         run: |
           cd ownd-api
           pnpm run prisma:generate
-          # If you have unit tests, you can run them here
-          # pnpm test
+          pnpm test
           pnpm run build
 
   deploy:
@@ -52,7 +51,10 @@ jobs:
           username: ${{ secrets.SERVER_USERNAME }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT || 22 }}
+          script_stop: true
           script: |
+            set -euo pipefail
+
             if [ -d "$HOME/ownd-full-stack" ]; then
               cd "$HOME/ownd-full-stack"
             elif [ -d "$HOME/ownd" ]; then
@@ -63,10 +65,22 @@ jobs:
               cd "$HOME/ownd"
             fi
             
-            # Pull latest code
-            git pull origin master
+            if ! git diff --quiet; then
+              backup_dir="$HOME/ownd-deploy-backups/$(date +%Y%m%d%H%M%S)"
+              mkdir -p "$backup_dir"
+              git status --short > "$backup_dir/status.txt"
+              git diff --binary > "$backup_dir/tracked-changes.patch"
+              echo "Backed up local tracked changes to $backup_dir"
+            fi
+
+            git fetch origin master
+            git reset --hard origin/master
+            echo "Deploying commit $(git rev-parse --short HEAD)"
             
             cd ownd-api
+            if ! grep -q '^APP_UPDATE_ANDROID_MANIFEST_URL=' .env.production; then
+              echo 'APP_UPDATE_ANDROID_MANIFEST_URL=https://download.ownd.cc/android/latest.json' >> .env.production
+            fi
             # Rebuild and restart docker compose containers
             sudo docker compose -f docker-compose.prod.yaml up -d --build
             

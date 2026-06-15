@@ -14,6 +14,7 @@ import '../../shared/services/app_update_service.dart';
 import '../../features/navigation/navigation_provider.dart';
 import '../../features/auth/auth_controller.dart';
 import '../../core/theme/theme_provider.dart';
+import '../../core/network/api_exception.dart';
 import '../../core/network/error_messages.dart';
 import '../../data/repositories/category_repository.dart';
 import '../../data/repositories/platform_repository.dart';
@@ -311,7 +312,14 @@ class ProfileScreen extends ConsumerWidget {
       showAppUpdateDialog(context, ref, result.latest);
     } catch (e) {
       if (context.mounted) {
-        _showSnackBar(context, '检查更新失败: ${userErrorMessage(e)}');
+        final message = userErrorMessage(e, fallback: '更新失败，请稍后重试');
+        final isUnavailable =
+            e is ApiException &&
+            (e.statusCode == 400 || e.statusCode == 404 || e.statusCode == 503);
+        final displayMessage = isUnavailable || message == '请求内容有误，请检查后重试'
+            ? '检查更新失败，请稍后重试'
+            : '检查更新失败: $message';
+        _showSnackBar(context, displayMessage);
       }
     }
   }

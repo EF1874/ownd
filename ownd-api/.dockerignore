@@ -3,6 +3,8 @@ dist
 coverage
 logs
 *.log
+blog_data/
+blog_data_prod/
 .git
 .env
 .env.*
