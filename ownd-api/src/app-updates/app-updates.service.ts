@@ -9,6 +9,7 @@ import { AppUpdateArtifactDto, AppUpdateDto } from './dto/app-update.dto';
 type UpdateArtifactManifest = {
   abi?: unknown;
   apkUrl?: unknown;
+  versionCode?: unknown;
   apkSizeBytes?: unknown;
   sha256?: unknown;
 };
@@ -73,7 +74,8 @@ export class AppUpdatesService {
       throw new ServiceUnavailableException('应用更新平台配置不匹配');
     }
 
-    const artifacts = this.artifacts(manifest);
+    const versionCode = this.requiredNumber(manifest.versionCode, 'versionCode');
+    const artifacts = this.artifacts(manifest, versionCode);
     const defaultArtifact =
       artifacts.find((artifact) => artifact.abi === 'universal') ??
       artifacts[0];
@@ -81,7 +83,7 @@ export class AppUpdatesService {
     return {
       platform,
       version: this.requiredString(manifest.version, 'version'),
-      versionCode: this.requiredNumber(manifest.versionCode, 'versionCode'),
+      versionCode,
       forceUpdate:
         typeof manifest.forceUpdate === 'boolean'
           ? manifest.forceUpdate
@@ -97,10 +99,13 @@ export class AppUpdatesService {
     };
   }
 
-  private artifacts(manifest: UpdateManifest): AppUpdateArtifactDto[] {
+  private artifacts(
+    manifest: UpdateManifest,
+    fallbackVersionCode: number,
+  ): AppUpdateArtifactDto[] {
     if (Array.isArray(manifest.artifacts)) {
       const artifacts = manifest.artifacts.map((artifact, index) =>
-        this.artifact(artifact, `artifacts[${index}]`),
+        this.artifact(artifact, `artifacts[${index}]`, fallbackVersionCode),
       );
       if (artifacts.length > 0) {
         return artifacts;
@@ -111,6 +116,7 @@ export class AppUpdatesService {
       {
         abi: 'universal',
         apkUrl: this.requiredString(manifest.apkUrl, 'apkUrl'),
+        versionCode: fallbackVersionCode,
         apkSizeBytes: this.requiredNumber(
           manifest.apkSizeBytes,
           'apkSizeBytes',
@@ -120,7 +126,11 @@ export class AppUpdatesService {
     ];
   }
 
-  private artifact(value: unknown, field: string): AppUpdateArtifactDto {
+  private artifact(
+    value: unknown,
+    field: string,
+    fallbackVersionCode: number,
+  ): AppUpdateArtifactDto {
     if (!value || typeof value !== 'object') {
       throw new ServiceUnavailableException('应用更新配置不完整，请稍后再试');
     }
@@ -129,6 +139,10 @@ export class AppUpdatesService {
     return {
       abi: this.requiredString(artifact.abi, `${field}.abi`),
       apkUrl: this.requiredString(artifact.apkUrl, `${field}.apkUrl`),
+      versionCode:
+        artifact.versionCode === undefined
+          ? fallbackVersionCode
+          : this.requiredNumber(artifact.versionCode, `${field}.versionCode`),
       apkSizeBytes: this.requiredNumber(
         artifact.apkSizeBytes,
         `${field}.apkSizeBytes`,

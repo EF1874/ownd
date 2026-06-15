@@ -24,6 +24,7 @@ describe('AppUpdatesService', () => {
         abi: 'arm64-v8a',
         apkUrl:
           'https://download.ownd.cc/android/releases/v2.0.5/ownd-android-v2.0.5+205-arm64-v8a.apk',
+        versionCode: 2205,
         apkSizeBytes: 42100000,
         sha256: 'arm64abc',
       },
@@ -31,6 +32,7 @@ describe('AppUpdatesService', () => {
         abi: 'universal',
         apkUrl:
           'https://download.ownd.cc/android/releases/v2.0.5/ownd-android-v2.0.5+205-universal.apk',
+        versionCode: 205,
         apkSizeBytes: 123456,
         sha256: 'abc123',
       },
@@ -90,6 +92,7 @@ describe('AppUpdatesService', () => {
         {
           abi: 'universal',
           apkUrl: legacyManifest.apkUrl,
+          versionCode: legacyManifest.versionCode,
           apkSizeBytes: legacyManifest.apkSizeBytes,
           sha256: legacyManifest.sha256,
         },

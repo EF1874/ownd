@@ -38,7 +38,9 @@ class AppUpdateInfo {
   factory AppUpdateInfo.fromJson(Map<String, dynamic> json) {
     final artifacts = _artifactsFromJson(json);
     final selectedArtifact =
-        artifacts.where((artifact) => artifact.abi == 'universal').firstOrNull ??
+        artifacts
+            .where((artifact) => artifact.abi == 'universal')
+            .firstOrNull ??
         artifacts.first;
 
     return AppUpdateInfo(
@@ -60,10 +62,16 @@ class AppUpdateInfo {
 
   static List<AppUpdateArtifact> _artifactsFromJson(Map<String, dynamic> json) {
     final artifactsJson = json['artifacts'];
+    final fallbackVersionCode = json['versionCode'] as int;
     if (artifactsJson is List && artifactsJson.isNotEmpty) {
       return artifactsJson
           .whereType<Map<String, dynamic>>()
-          .map(AppUpdateArtifact.fromJson)
+          .map(
+            (artifact) => AppUpdateArtifact.fromJson(
+              artifact,
+              fallbackVersionCode: fallbackVersionCode,
+            ),
+          )
           .toList();
     }
 
@@ -71,6 +79,7 @@ class AppUpdateInfo {
       AppUpdateArtifact(
         abi: 'universal',
         apkUrl: json['apkUrl'] as String,
+        versionCode: fallbackVersionCode,
         apkSizeBytes: json['apkSizeBytes'] as int,
         sha256: json['sha256'] as String,
       ),
@@ -91,6 +100,8 @@ class AppUpdateInfo {
   String get apkUrl => selectedArtifact.apkUrl;
 
   int get apkSizeBytes => selectedArtifact.apkSizeBytes;
+
+  int get selectedVersionCode => selectedArtifact.versionCode;
 
   String get sha256 => selectedArtifact.sha256;
 
@@ -130,14 +141,19 @@ class AppUpdateArtifact {
   const AppUpdateArtifact({
     required this.abi,
     required this.apkUrl,
+    required this.versionCode,
     required this.apkSizeBytes,
     required this.sha256,
   });
 
-  factory AppUpdateArtifact.fromJson(Map<String, dynamic> json) {
+  factory AppUpdateArtifact.fromJson(
+    Map<String, dynamic> json, {
+    required int fallbackVersionCode,
+  }) {
     return AppUpdateArtifact(
       abi: json['abi'] as String,
       apkUrl: json['apkUrl'] as String,
+      versionCode: json['versionCode'] as int? ?? fallbackVersionCode,
       apkSizeBytes: json['apkSizeBytes'] as int,
       sha256: json['sha256'] as String,
     );
@@ -145,6 +161,7 @@ class AppUpdateArtifact {
 
   final String abi;
   final String apkUrl;
+  final int versionCode;
   final int apkSizeBytes;
   final String sha256;
 }
@@ -195,7 +212,7 @@ class AppUpdateService {
     ).selectArtifact(await _supportedAbis());
     final currentBuildNumber = int.tryParse(packageInfo.buildNumber) ?? 0;
     final hasUpdate = currentBuildNumber > 0
-        ? latest.versionCode > currentBuildNumber
+        ? latest.selectedVersionCode > currentBuildNumber
         : _compareVersions(latest.version, packageInfo.version) > 0;
     await _cleanupCachedApks(keep: hasUpdate ? latest : null);
 
@@ -418,9 +435,8 @@ class AppUpdateService {
     }
 
     try {
-      final result = await _installPermissionChannel.invokeMethod<List<dynamic>>(
-        'supportedAbis',
-      );
+      final result = await _installPermissionChannel
+          .invokeMethod<List<dynamic>>('supportedAbis');
       return result?.whereType<String>().toList() ?? const ['universal'];
     } catch (_) {
       return const ['universal'];

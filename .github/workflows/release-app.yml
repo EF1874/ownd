@@ -148,6 +148,11 @@ jobs:
           VERSION="${{ steps.get_version.outputs.VERSION }}"
           VERSION_CODE="${{ steps.get_version.outputs.VERSION_CODE }}"
           mkdir -p build/app-update
+          AAPT_PATH=$(find "$ANDROID_HOME/build-tools" -name aapt | sort -V | tail -n 1)
+          if [ -z "$AAPT_PATH" ]; then
+            echo "Missing Android aapt tool" >&2
+            exit 1
+          fi
           ARTIFACTS_JSON='[]'
           for ABI in arm64-v8a armeabi-v7a x86_64 universal; do
             SOURCE_PATH="build/app/outputs/flutter-apk/ownd_v${VERSION}_${ABI}.apk"
@@ -157,15 +162,22 @@ jobs:
             APK_NAME="ownd-android-v${VERSION}+${VERSION_CODE}-${ABI}.apk"
             APK_SIZE=$(stat -c%s "$SOURCE_PATH")
             APK_SHA256=$(sha256sum "$SOURCE_PATH" | awk '{print $1}')
+            APK_VERSION_CODE=$("$AAPT_PATH" dump badging "$SOURCE_PATH" | sed -n "s/.*versionCode='\([0-9]\+\)'.*/\1/p" | head -n 1)
+            if [ -z "$APK_VERSION_CODE" ]; then
+              echo "Missing APK versionCode for $SOURCE_PATH" >&2
+              exit 1
+            fi
             cp "$SOURCE_PATH" "build/app-update/$APK_NAME"
             ARTIFACTS_JSON=$(jq \
               --arg abi "$ABI" \
               --arg apkUrl "${BASE_URL}/releases/v${VERSION}/${APK_NAME}" \
+              --argjson versionCode "$APK_VERSION_CODE" \
               --argjson apkSizeBytes "$APK_SIZE" \
               --arg sha256 "$APK_SHA256" \
               '. + [{
                 abi: $abi,
                 apkUrl: $apkUrl,
+                versionCode: $versionCode,
                 apkSizeBytes: $apkSizeBytes,
                 sha256: $sha256
               }]' <<< "$ARTIFACTS_JSON")

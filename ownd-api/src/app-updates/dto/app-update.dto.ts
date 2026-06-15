@@ -10,6 +10,9 @@ export class AppUpdateArtifactDto {
   })
   apkUrl: string;
 
+  @ApiProperty({ example: 2205 })
+  versionCode: number;
+
   @ApiProperty({ example: 42100000 })
   apkSizeBytes: number;
 
