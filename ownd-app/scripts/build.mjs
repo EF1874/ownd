@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { semanticVersionCode } from './version-code.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(scriptDir, '..');
@@ -66,11 +67,23 @@ if (!existsSync(configPath)) {
 }
 
 const config = JSON.parse(readFileSync(configPath, 'utf8'));
+const pubspec = readFileSync(join(projectRoot, 'pubspec.yaml'), 'utf8');
+const appVersion = pubspec.match(/^version:\s*(\S+)/m)?.[1];
+if (!appVersion) {
+  console.error('Missing app version in pubspec.yaml');
+  process.exit(1);
+}
+const appVersionName = appVersion.split('+')[0];
+const appVersionCode = String(semanticVersionCode(appVersionName));
 
 const dartDefines = Object.entries(config).flatMap(([key, value]) => [
   '--dart-define',
   `${key}=${value}`,
 ]);
+
+const versionArgs = platform.startsWith('android')
+  ? ['--build-name', appVersionName, '--build-number', appVersionCode]
+  : [];
 
 const run = (command, args) => {
   const result = spawnSync(command, args, {
@@ -85,4 +98,4 @@ const run = (command, args) => {
 };
 
 run('flutter', ['pub', 'get']);
-run('flutter', [...buildCommands[platform][mode], ...dartDefines]);
+run('flutter', [...buildCommands[platform][mode], ...versionArgs, ...dartDefines]);

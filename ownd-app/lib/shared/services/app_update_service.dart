@@ -211,9 +211,15 @@ class AppUpdateService {
       latestJson,
     ).selectArtifact(await _supportedAbis());
     final currentBuildNumber = int.tryParse(packageInfo.buildNumber) ?? 0;
-    final hasUpdate = currentBuildNumber > 0
-        ? latest.selectedVersionCode > currentBuildNumber
-        : _compareVersions(latest.version, packageInfo.version) > 0;
+    final versionCompare = _compareVersions(
+      latest.version,
+      packageInfo.version,
+    );
+    final hasUpdate =
+        versionCompare > 0 ||
+        (versionCompare == 0 &&
+            currentBuildNumber > 0 &&
+            latest.selectedVersionCode > currentBuildNumber);
     await _cleanupCachedApks(keep: hasUpdate ? latest : null);
 
     return AppUpdateCheckResult(
@@ -357,7 +363,10 @@ class AppUpdateService {
         ? update.sha256.substring(0, 12)
         : update.sha256;
     return File(
-      p.join(updateDir.path, 'ownd-${update.versionCode}-$shaPrefix.apk'),
+      p.join(
+        updateDir.path,
+        'ownd-${update.selectedVersionCode}-$shaPrefix.apk',
+      ),
     );
   }
 

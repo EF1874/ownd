@@ -12,6 +12,8 @@ void showAppUpdateDialog(
   WidgetRef ref,
   AppUpdateInfo update,
 ) {
+  final releaseNoteSections = _parseReleaseNoteSections(update.releaseNotes);
+
   unawaited(
     showDialog<void>(
       context: context,
@@ -37,18 +39,15 @@ void showAppUpdateDialog(
                     ),
                   ),
                 ],
-                if (update.releaseNotes.isNotEmpty) ...[
+                if (releaseNoteSections.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   const Text(
                     '更新内容',
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 4),
-                  ...update.releaseNotes.map(
-                    (note) => Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text('- $note'),
-                    ),
+                  ...releaseNoteSections.map(
+                    (section) => _ReleaseNoteSectionView(section: section),
                   ),
                 ],
               ],
@@ -104,4 +103,110 @@ String _formatBytes(int bytes) {
   }
 
   return '${(bytes / 1024 / 1024).toStringAsFixed(1)} MB';
+}
+
+List<_ReleaseNoteSection> _parseReleaseNoteSections(List<String> notes) {
+  final sections = <_ReleaseNoteSection>[];
+  var currentTitle = '';
+  var currentItems = <String>[];
+
+  void flush() {
+    if (currentItems.isEmpty) {
+      currentTitle = '';
+      currentItems = <String>[];
+      return;
+    }
+
+    sections.add(
+      _ReleaseNoteSection(title: currentTitle, items: List.of(currentItems)),
+    );
+    currentTitle = '';
+    currentItems = <String>[];
+  }
+
+  for (final rawNote in notes) {
+    final note = rawNote.trim();
+    if (note.isEmpty) {
+      continue;
+    }
+
+    final heading = _markdownHeading(note);
+    if (heading != null) {
+      flush();
+      currentTitle = heading;
+      continue;
+    }
+
+    final item = _plainReleaseNoteLine(note);
+    if (item.isNotEmpty) {
+      currentItems.add(item);
+    }
+  }
+
+  flush();
+  return sections;
+}
+
+String? _markdownHeading(String value) {
+  final match = RegExp(r'^(#{1,6})\s+(.+)$').firstMatch(value);
+  if (match == null) {
+    return null;
+  }
+
+  return match.group(2)?.trim();
+}
+
+String _plainReleaseNoteLine(String value) {
+  return value
+      .replaceFirst(RegExp(r'^[-*]\s+'), '')
+      .replaceAll(RegExp(r'[*_`#]'), '')
+      .trim();
+}
+
+class _ReleaseNoteSection {
+  const _ReleaseNoteSection({required this.title, required this.items});
+
+  final String title;
+  final List<String> items;
+}
+
+class _ReleaseNoteSectionView extends StatelessWidget {
+  const _ReleaseNoteSectionView({required this.section});
+
+  final _ReleaseNoteSection section;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (section.title.isNotEmpty) ...[
+            Text(
+              section.title,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 2),
+          ],
+          ...section.items.map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('• '),
+                  Expanded(child: Text(item)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

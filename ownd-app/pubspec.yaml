@@ -1,7 +1,7 @@
 name: ownd
 description: 'A new Flutter project.'
 publish_to: 'none'
-version: 2.0.9+209
+version: 2.0.10+2000010
 
 environment:
     sdk: '>=3.10.0 <4.0.0'
