@@ -152,18 +152,14 @@ jobs:
             ownd-app/build/app-update/latest.json
           generate_release_notes: true
 
-      - name: Configure release storage credentials
-        if: ${{ env.OWND_RELEASES_S3_ENDPOINT != '' }}
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.OWND_RELEASES_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.OWND_RELEASES_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
-
       - name: Upload release assets to MinIO
         if: ${{ env.OWND_RELEASES_S3_ENDPOINT != '' }}
         shell: bash
         env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.OWND_RELEASES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.OWND_RELEASES_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_EC2_METADATA_DISABLED: true
           S3_ENDPOINT: ${{ secrets.OWND_RELEASES_S3_ENDPOINT }}
           S3_BUCKET: ${{ secrets.OWND_RELEASES_BUCKET || 'ownd-releases' }}
         run: |
@@ -203,6 +199,10 @@ jobs:
         if: ${{ env.OWND_RELEASES_S3_ENDPOINT != '' }}
         shell: bash
         env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.OWND_RELEASES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.OWND_RELEASES_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+          AWS_EC2_METADATA_DISABLED: true
           S3_ENDPOINT: ${{ secrets.OWND_RELEASES_S3_ENDPOINT }}
           S3_BUCKET: ${{ secrets.OWND_RELEASES_BUCKET || 'ownd-releases' }}
           APK_KEY: ${{ steps.app_update_manifest.outputs.LATEST_APK_KEY }}
