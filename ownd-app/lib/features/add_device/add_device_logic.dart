@@ -2,46 +2,6 @@ part of 'add_device_screen.dart';
 
 // ignore: library_private_types_in_public_api
 extension AddDeviceLogic on _AddDeviceScreenState {
-  double _getCurrentFirstCost() {
-    double? price = double.tryParse(_priceCtr.text);
-    return price ?? 0.0;
-  }
-
-  void _updateTotalStr() {
-    double cost = _getCurrentFirstCost();
-    double newTotal = _baseAccumulatedPrice + cost;
-
-    String newText =
-        newTotal == 0.0 &&
-            _priceCtr.text.isEmpty &&
-            _baseAccumulatedPrice == 0.0
-        ? ''
-        : newTotal % 1 == 0
-        ? newTotal.toInt().toString()
-        : newTotal.toStringAsFixed(2);
-
-    // Remove trailing zeros if decimal
-    if (newText.contains('.')) {
-      newText = double.parse(newText).toString();
-      if (newText.endsWith('.0')) {
-        newText = newText.substring(0, newText.length - 2);
-      }
-    }
-
-    if (_totalAccumulatedPriceCtr.text != newText) {
-      // Temporarily remove listener to prevent loop
-      _totalAccumulatedPriceCtr.removeListener(_updateBase);
-      _totalAccumulatedPriceCtr.text = newText;
-      _totalAccumulatedPriceCtr.addListener(_updateBase);
-    }
-  }
-
-  void _updateBase() {
-    double? total = double.tryParse(_totalAccumulatedPriceCtr.text);
-    double cost = _getCurrentFirstCost();
-    _baseAccumulatedPrice = (total ?? 0.0) - cost;
-  }
-
   void _calculateNextBilling({bool force = false}) {
     // Editing an existing subscription should keep the saved due date unless the
     // user explicitly changes the cycle.
@@ -174,10 +134,7 @@ extension AddDeviceLogic on _AddDeviceScreenState {
         ..renewalPrice = (_isSub && _isAutoRenew)
             ? double.tryParse(_renewalPriceCtr.text)
             : null
-        ..periodPrice = _isSub ? double.parse(_priceCtr.text) : null
-        ..totalAccumulatedPrice =
-            double.tryParse(_totalAccumulatedPriceCtr.text) ??
-            _totalAccumulatedPrice;
+        ..periodPrice = _isSub ? double.parse(_priceCtr.text) : null;
 
       // Pruning Logic: Remove history records that are "in the future" relative to the new billing date
       if (_isSub && _nextBillingDate != null) {
@@ -190,14 +147,11 @@ extension AddDeviceLogic on _AddDeviceScreenState {
       }
 
       if (widget.device == null && _isSub) {
-        // If user input total accumulated price, use it. Otherwise default to first period or price.
-        final inputTotal = double.tryParse(_totalAccumulatedPriceCtr.text);
-        if (inputTotal != null) {
-          device.totalAccumulatedPrice = inputTotal;
-        } else {
-          device.totalAccumulatedPrice = device.price;
-        }
+        device.totalAccumulatedPrice = device.price;
       }
+      device.totalAccumulatedPrice = _isSub
+          ? _calculatedSubscriptionTotal(device)
+          : double.parse(_priceCtr.text);
 
       if (widget.device != null) {
         await ref.read(deviceRepositoryProvider).updateDevice(device);
@@ -238,6 +192,11 @@ extension AddDeviceLogic on _AddDeviceScreenState {
     } finally {
       if (mounted) updateState(() => _isLoading = false);
     }
+  }
+
+  double _calculatedSubscriptionTotal(Device device) {
+    if (device.history.isEmpty) return device.price;
+    return device.history.fold<double>(0, (sum, item) => sum + item.price);
   }
 
   void _showSnack(String msg) => AppToast.show(

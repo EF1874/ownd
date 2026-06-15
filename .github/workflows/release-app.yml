@@ -33,8 +33,13 @@ jobs:
         id: get_version
         shell: bash
         run: |
-          VERSION=$(grep 'version:' pubspec.yaml | cut -d ' ' -f 2 | cut -d '+' -f 1)
-          VERSION_CODE=${GITHUB_RUN_NUMBER}
+          APP_VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+          VERSION="${APP_VERSION%%+*}"
+          VERSION_CODE="${APP_VERSION##*+}"
+          if [ "$APP_VERSION" = "$VERSION_CODE" ] || ! [[ "$VERSION_CODE" =~ ^[0-9]+$ ]]; then
+            echo "pubspec.yaml version must include a numeric build number, for example 2.0.7+207" >&2
+            exit 1
+          fi
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "VERSION_CODE=$VERSION_CODE" >> $GITHUB_OUTPUT
           echo "Detected Version: $VERSION"

@@ -43,7 +43,6 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
   final _platformCtr = TextEditingController();
   final _catCtr = TextEditingController();
   final _renewalPriceCtr = TextEditingController();
-  final _totalAccumulatedPriceCtr = TextEditingController();
   final _notesCtr = TextEditingController();
   final _tagsCtr = TextEditingController();
 
@@ -64,9 +63,6 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
   bool _isAutoRenew = false;
   DateTime? _nextBillingDate;
   int _reminderDays = 0;
-  double _totalAccumulatedPrice = 0.0;
-
-  double _baseAccumulatedPrice = 0.0;
 
   late final String _uuid; // Track UUID for file naming
 
@@ -100,21 +96,10 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
       _renewalPriceCtr.text =
           d.renewalPrice?.toString() ??
           (d.isAutoRenew ? d.price.toString() : '');
-      _totalAccumulatedPrice = d.totalAccumulatedPrice;
-      _totalAccumulatedPriceCtr.text = d.totalAccumulatedPrice % 1 == 0
-          ? d.totalAccumulatedPrice.toInt().toString()
-          : d.totalAccumulatedPrice.toString();
-      // Calculate base price from existing total
-      double currentCost = d.price;
-      _baseAccumulatedPrice = d.totalAccumulatedPrice - currentCost;
       _uuid = d.uuid;
     } else {
-      _baseAccumulatedPrice = 0.0;
       _uuid = const Uuid().v4();
     }
-
-    _priceCtr.addListener(_updateTotalStr);
-    _totalAccumulatedPriceCtr.addListener(_updateBase);
   }
 
   // Helper to allow extension to call setState (which is protected)
@@ -134,7 +119,6 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
     _platformCtr.dispose();
     _catCtr.dispose();
     _renewalPriceCtr.dispose();
-    _totalAccumulatedPriceCtr.dispose();
     _notesCtr.dispose();
     _tagsCtr.dispose();
     super.dispose();
@@ -244,8 +228,6 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
                       SubscriptionSection(
                         priceController: _priceCtr,
                         renewalPriceController: _renewalPriceCtr,
-                        totalAccumulatedPriceController:
-                            _totalAccumulatedPriceCtr,
                         purchaseDate: _purchaseDate,
                         nextBillingDate: _nextBillingDate,
                         cycleType: _cycleType,
