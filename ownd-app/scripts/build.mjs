@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { semanticVersionCode } from './version-code.mjs';
+import { parseAppVersion } from './version-code.mjs';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(scriptDir, '..');
@@ -73,8 +73,8 @@ if (!appVersion) {
   console.error('Missing app version in pubspec.yaml');
   process.exit(1);
 }
-const appVersionName = appVersion.split('+')[0];
-const appVersionCode = String(semanticVersionCode(appVersionName));
+const { versionName: appVersionName, buildNumber: appVersionCode } =
+  parseAppVersion(appVersion);
 
 const dartDefines = Object.entries(config).flatMap(([key, value]) => [
   '--dart-define',
@@ -82,7 +82,7 @@ const dartDefines = Object.entries(config).flatMap(([key, value]) => [
 ]);
 
 const versionArgs = platform.startsWith('android')
-  ? ['--build-name', appVersionName, '--build-number', appVersionCode]
+  ? ['--build-name', appVersionName, '--build-number', String(appVersionCode)]
   : [];
 
 const run = (command, args) => {
