@@ -1,5 +1,12 @@
 # Project Rules
 
+## Git And Release Rules
+
+- All git commit messages must follow Conventional Commits.
+- Use `feat:` for new user-facing features, `fix:` for bug fixes, `chore:` for maintenance, `docs:` for documentation, `refactor:` for behavior-preserving code changes, `test:` for tests, `ci:` for CI/CD changes, and `build:` for build-system changes.
+- Every version change must produce release notes automatically in the release pipeline.
+- GitHub Releases should show a concise user-facing summary first, followed by the automatically generated changelog.
+
 ## User-Facing Messages
 
 - All user-facing messages must be understandable to non-technical users.

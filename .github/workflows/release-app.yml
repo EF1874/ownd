@@ -28,6 +28,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Get Version
         id: get_version
@@ -84,6 +86,57 @@ jobs:
             mv "$file" "ownd_v${{ steps.get_version.outputs.VERSION }}_${ABI}.apk"
           done
 
+      - name: Generate release notes
+        shell: bash
+        run: |
+          VERSION="${{ steps.get_version.outputs.VERSION }}"
+          VERSION_CODE="${{ steps.get_version.outputs.VERSION_CODE }}"
+          mkdir -p build/app-update
+
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 --match 'v*' HEAD^ 2>/dev/null || true)
+          if [ -n "$PREVIOUS_TAG" ]; then
+            COMMIT_RANGE="${PREVIOUS_TAG}..HEAD"
+            CHANGELOG_URL="https://github.com/${GITHUB_REPOSITORY}/compare/${PREVIOUS_TAG}...v${VERSION}"
+          else
+            COMMIT_RANGE="HEAD"
+            CHANGELOG_URL="https://github.com/${GITHUB_REPOSITORY}/commits/v${VERSION}"
+          fi
+
+          {
+            echo "## 本次更新"
+            echo
+            echo "- Android 版本：${VERSION}"
+            echo "- 版本码：${VERSION_CODE}"
+            echo
+            echo "## 主要变更"
+            echo
+          } > build/app-update/release-notes.md
+
+          FEATURES=$(git log "$COMMIT_RANGE" --pretty=format:'%s' | grep -E '^(feat|feature)(\(.+\))?!?: ' || true)
+          FIXES=$(git log "$COMMIT_RANGE" --pretty=format:'%s' | grep -E '^fix(\(.+\))?!?: ' || true)
+          OTHERS=$(git log "$COMMIT_RANGE" --pretty=format:'%s' | grep -Ev '^(feat|feature|fix)(\(.+\))?!?: ' || true)
+
+          append_section() {
+            local title="$1"
+            local items="$2"
+            if [ -z "$items" ]; then
+              return
+            fi
+            echo "### ${title}" >> build/app-update/release-notes.md
+            echo "$items" | sed -E 's/^[a-zA-Z]+(\([^)]+\))?!?: /- /' >> build/app-update/release-notes.md
+            echo >> build/app-update/release-notes.md
+          }
+
+          append_section "新增功能" "$FEATURES"
+          append_section "问题修复" "$FIXES"
+          append_section "其他调整" "$OTHERS"
+
+          {
+            echo "## 完整记录"
+            echo
+            echo "${CHANGELOG_URL}"
+          } >> build/app-update/release-notes.md
+
       - name: Generate app update manifest
         id: app_update_manifest
         shell: bash
@@ -128,6 +181,7 @@ jobs:
             --argjson versionCode "$VERSION_CODE" \
             --argjson universal "$UNIVERSAL_ARTIFACT" \
             --argjson artifacts "$ARTIFACTS_JSON" \
+            --argjson releaseNotes "$(jq -R -s 'split("\n") | map(select(length > 0))' build/app-update/release-notes.md)" \
             --arg publishedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             '{
               platform: $platform,
@@ -139,7 +193,7 @@ jobs:
               apkSizeBytes: $universal.apkSizeBytes,
               sha256: $universal.sha256,
               artifacts: $artifacts,
-              releaseNotes: ["查看 GitHub Release 获取完整更新记录"],
+              releaseNotes: $releaseNotes,
               publishedAt: $publishedAt,
               retention: {
                 days: 7,
@@ -155,6 +209,7 @@ jobs:
           files: |
             ownd-app/build/app/outputs/flutter-apk/ownd_v*.apk
             ownd-app/build/app-update/latest.json
+          body_path: ownd-app/build/app-update/release-notes.md
           generate_release_notes: true
 
       - name: Upload release assets to MinIO
