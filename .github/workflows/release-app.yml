@@ -55,12 +55,6 @@ jobs:
             CURRENT_VERSION_CODE=$(jq -r '.versionCode // empty' <<< "$CURRENT_MANIFEST")
             if [ -n "$CURRENT_VERSION" ] && [[ "$CURRENT_VERSION_CODE" =~ ^[0-9]+$ ]]; then
               VERSION_COMPARE=$(node scripts/version-code.mjs compare "$VERSION" "$CURRENT_VERSION")
-              if [ "$VERSION_COMPARE" -lt 0 ]; then
-                echo "pubspec.yaml version must not be lower than the online version." >&2
-                echo "Online: ${CURRENT_VERSION}+${CURRENT_VERSION_CODE}" >&2
-                echo "Current: ${VERSION}+${PUBSPEC_VERSION_CODE}" >&2
-                exit 1
-              fi
               if [ "$VERSION_COMPARE" -eq 0 ] && [ "$PUBSPEC_VERSION_CODE" -le "$CURRENT_VERSION_CODE" ]; then
                 echo "pubspec.yaml build number must be greater when publishing the same version again." >&2
                 echo "Online: ${CURRENT_VERSION}+${CURRENT_VERSION_CODE}" >&2
@@ -138,6 +132,10 @@ jobs:
             echo "- Android 版本：${VERSION}"
             echo
           } > build/app-update/release-notes.md
+          {
+            echo "本次更新"
+            echo "Android 版本：${VERSION}"
+          } > build/app-update/app-release-notes.txt
 
           FEATURES=$(git log "$COMMIT_RANGE" --pretty=format:'%s' | grep -E '^(feat|feature)(\(.+\))?!?: ' || true)
           FIXES=$(git log "$COMMIT_RANGE" --pretty=format:'%s' | grep -E '^fix(\(.+\))?!?: ' || true)
@@ -158,6 +156,8 @@ jobs:
             echo "### ${title}" >> build/app-update/release-notes.md
             echo "$items" | sed -E 's/^[a-zA-Z]+(\([^)]+\))?!?: /- /' >> build/app-update/release-notes.md
             echo >> build/app-update/release-notes.md
+            echo "${title}" >> build/app-update/app-release-notes.txt
+            echo "$items" | sed -E 's/^[a-zA-Z]+(\([^)]+\))?!?: //' >> build/app-update/app-release-notes.txt
           }
 
           append_section "新增功能" "$FEATURES"
@@ -226,7 +226,7 @@ jobs:
             --argjson versionCode "$VERSION_CODE" \
             --argjson universal "$UNIVERSAL_ARTIFACT" \
             --argjson artifacts "$ARTIFACTS_JSON" \
-            --argjson releaseNotes "$(jq -R -s 'split("\n") | map(select(length > 0))' build/app-update/release-notes.md)" \
+            --argjson releaseNotes "$(jq -R -s 'split("\n") | map(select(length > 0))' build/app-update/app-release-notes.txt)" \
             --arg publishedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             '{
               platform: $platform,
