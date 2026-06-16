@@ -27,80 +27,104 @@ class DateSection extends StatelessWidget {
 
     return Column(
       children: [
-        // Start Date (Unified)
-        InkWell(
-          onTap: () => onPickDate(false, false, false, false),
-          child: InputDecorator(
-            decoration: const InputDecoration(
-              labelText: '购买日期 / 开始日期',
-              border: OutlineInputBorder(),
+        Row(
+          children: [
+            Expanded(
+              child: _DateField(
+                labelText: '购买日期',
+                valueText: dateFormat.format(purchaseDate),
+                onTap: () => onPickDate(false, false, false, false),
+              ),
             ),
-            child: Text(dateFormat.format(purchaseDate)),
-          ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _DateField(
+                labelText: '保修截止',
+                valueText: warrantyDate != null
+                    ? dateFormat.format(warrantyDate!)
+                    : '未设置',
+                isEmpty: warrantyDate == null,
+                onTap: () => onPickDate(true, false, false, false),
+              ),
+            ),
+          ],
         ),
-
-        const SizedBox(height: 16),
-
-        InkWell(
-          onTap: () => onPickDate(true, false, false, false), // isWarranty
-          child: InputDecorator(
-            decoration: const InputDecoration(
-              labelText: '保修截止日期 (可选)',
-              border: OutlineInputBorder(),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _DateField(
+                labelText: '备用日期',
+                valueText: backupDate != null
+                    ? dateFormat.format(backupDate!)
+                    : '未设置',
+                isEmpty: backupDate == null,
+                suffixIcon: backupDate != null
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () => onClearBackupDate(null),
+                      )
+                    : null,
+                onTap: () => onPickDate(false, true, false, false),
+              ),
             ),
-            child: Text(
-              warrantyDate != null ? dateFormat.format(warrantyDate!) : '未设置',
-              style: warrantyDate != null
-                  ? null
-                  : TextStyle(color: Theme.of(context).hintColor),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _DateField(
+                labelText: '报废日期',
+                valueText: scrapDate != null
+                    ? dateFormat.format(scrapDate!)
+                    : '未设置',
+                isEmpty: scrapDate == null,
+                suffixIcon: scrapDate != null
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () => onClearScrapDate(null),
+                      )
+                    : null,
+                onTap: () => onPickDate(false, false, true, false),
+              ),
             ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        InkWell(
-          onTap: () => onPickDate(false, true, false, false), // isBackup
-          child: InputDecorator(
-            decoration: InputDecoration(
-              labelText: '备用日期 (可选)',
-              border: const OutlineInputBorder(),
-              suffixIcon: backupDate != null
-                  ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () => onClearBackupDate(null),
-                    )
-                  : null,
-            ),
-            child: Text(
-              backupDate != null ? dateFormat.format(backupDate!) : '未设置',
-              style: backupDate != null
-                  ? null
-                  : TextStyle(color: Theme.of(context).hintColor),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        InkWell(
-          onTap: () => onPickDate(false, false, true, false), // isScrap
-          child: InputDecorator(
-            decoration: InputDecoration(
-              labelText: '报废日期 (可选)',
-              border: const OutlineInputBorder(),
-              suffixIcon: scrapDate != null
-                  ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () => onClearScrapDate(null),
-                    )
-                  : null,
-            ),
-            child: Text(
-              scrapDate != null ? dateFormat.format(scrapDate!) : '未设置',
-              style: scrapDate != null
-                  ? null
-                  : TextStyle(color: Theme.of(context).hintColor),
-            ),
-          ),
+          ],
         ),
       ],
+    );
+  }
+}
+
+class _DateField extends StatelessWidget {
+  final String labelText;
+  final String valueText;
+  final bool isEmpty;
+  final Widget? suffixIcon;
+  final VoidCallback onTap;
+
+  const _DateField({
+    required this.labelText,
+    required this.valueText,
+    required this.onTap,
+    this.isEmpty = false,
+    this.suffixIcon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: labelText,
+          border: const OutlineInputBorder(),
+          suffixIcon: suffixIcon,
+          isDense: true,
+        ),
+        child: Text(
+          valueText,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: isEmpty ? TextStyle(color: Theme.of(context).hintColor) : null,
+        ),
+      ),
     );
   }
 }

@@ -80,8 +80,9 @@ class SubscriptionService {
 
     String body = '您的订阅 ${device.name} 即将到期';
     if (device.isAutoRenew) {
+      final renewalPrice = device.renewalPrice ?? device.price;
       body +=
-          '，将在 ${DateFormat('MM-dd').format(billingDate)} 自动续费 ${device.price} 元';
+          '，将在 ${DateFormat('MM-dd').format(billingDate)} 自动续费 $renewalPrice 元';
     } else {
       body += '，将于 ${DateFormat('MM-dd').format(billingDate)} 到期';
     }

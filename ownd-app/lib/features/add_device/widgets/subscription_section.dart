@@ -7,6 +7,9 @@ import 'subscription_settings_info.dart';
 class SubscriptionSection extends StatelessWidget {
   final TextEditingController priceController;
   final TextEditingController renewalPriceController;
+  final bool isEditing;
+  final double currentPrice;
+  final double totalPrice;
   final DateTime purchaseDate;
   final DateTime? nextBillingDate;
   final CycleType? cycleType;
@@ -26,6 +29,9 @@ class SubscriptionSection extends StatelessWidget {
     super.key,
     required this.priceController,
     required this.renewalPriceController,
+    required this.isEditing,
+    required this.currentPrice,
+    required this.totalPrice,
     required this.purchaseDate,
     required this.nextBillingDate,
     required this.cycleType,
@@ -45,7 +51,12 @@ class SubscriptionSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        SubscriptionPricingInfo(priceController: priceController),
+        SubscriptionPricingInfo(
+          priceController: priceController,
+          isEditing: isEditing,
+          currentPrice: currentPrice,
+          totalPrice: totalPrice,
+        ),
         const SizedBox(height: 16),
         SubscriptionDateInfo(
           purchaseDate: purchaseDate,

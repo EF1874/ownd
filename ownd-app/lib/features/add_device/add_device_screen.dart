@@ -228,6 +228,9 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
                       SubscriptionSection(
                         priceController: _priceCtr,
                         renewalPriceController: _renewalPriceCtr,
+                        isEditing: widget.device != null,
+                        currentPrice: _currentSubscriptionPrice(),
+                        totalPrice: _subscriptionTotalPreview(),
                         purchaseDate: _purchaseDate,
                         nextBillingDate: _nextBillingDate,
                         cycleType: _cycleType,

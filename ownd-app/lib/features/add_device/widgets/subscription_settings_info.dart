@@ -41,6 +41,7 @@ class SubscriptionSettingsInfo extends StatelessWidget {
             Expanded(
               child: SubscriptionCycleDropdown(
                 value: cycleType,
+                label: isAutoRenew ? '后续周期' : '周期类型',
                 onChanged: onCycleTypeChanged,
               ),
             ),

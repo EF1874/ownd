@@ -69,6 +69,11 @@ extension AddDeviceLogic on _AddDeviceScreenState {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedCategory == null) return _showSnack('请选择分类');
     if (_isSub && _cycleType == null) return _showSnack('请选择周期类型');
+    final inputPrice = double.tryParse(_priceCtr.text.trim());
+    if (!_isSub && inputPrice == null) return _showSnack('请输入价格');
+    if (_isSub && widget.device == null && inputPrice == null) {
+      return _showSnack('请输入首期价格');
+    }
 
     updateState(() => _isLoading = true);
     try {
@@ -98,13 +103,16 @@ extension AddDeviceLogic on _AddDeviceScreenState {
       final normalizedReminderDays = _isSub
           ? _normalizeReminderDays(_reminderDays)
           : 0;
+      final price = _isSub && widget.device != null
+          ? _currentSubscriptionPrice()
+          : inputPrice!;
 
       final device = widget.device ?? Device();
       device
         ..name = _nameCtr.text.trim().isEmpty
             ? finalCat.name
             : _nameCtr.text.trim()
-        ..price = double.parse(_priceCtr.text)
+        ..price = price
         ..purchaseDate = _purchaseDate
         ..platform = selectedPlatform?.name ?? ''
         ..platformUuid = selectedPlatform?.uuid
@@ -134,7 +142,7 @@ extension AddDeviceLogic on _AddDeviceScreenState {
         ..renewalPrice = (_isSub && _isAutoRenew)
             ? double.tryParse(_renewalPriceCtr.text)
             : null
-        ..periodPrice = _isSub ? double.parse(_priceCtr.text) : null;
+        ..periodPrice = _isSub ? price : null;
 
       // Pruning Logic: Remove history records that are "in the future" relative to the new billing date
       if (_isSub && _nextBillingDate != null) {
@@ -145,13 +153,19 @@ extension AddDeviceLogic on _AddDeviceScreenState {
           return end != null && end.isAfter(_nextBillingDate!);
         });
       }
+      if (_isSub && widget.device != null) {
+        final currentPrice = _currentSubscriptionPrice();
+        device
+          ..price = currentPrice
+          ..periodPrice = currentPrice;
+      }
 
       if (widget.device == null && _isSub) {
         device.totalAccumulatedPrice = device.price;
       }
       device.totalAccumulatedPrice = _isSub
           ? _calculatedSubscriptionTotal(device)
-          : double.parse(_priceCtr.text);
+          : price;
 
       if (widget.device != null) {
         await ref.read(deviceRepositoryProvider).updateDevice(device);
@@ -197,6 +211,43 @@ extension AddDeviceLogic on _AddDeviceScreenState {
   double _calculatedSubscriptionTotal(Device device) {
     if (device.history.isEmpty) return device.price;
     return device.history.fold<double>(0, (sum, item) => sum + item.price);
+  }
+
+  double _currentSubscriptionPrice() {
+    final current = _currentSubscriptionHistory();
+    return current?.price ??
+        widget.device?.price ??
+        double.tryParse(_priceCtr.text) ??
+        0;
+  }
+
+  double _subscriptionTotalPreview() {
+    final histories = widget.device?.history ?? const <SubscriptionHistory>[];
+    if (histories.isEmpty) return _currentSubscriptionPrice();
+    return histories.fold<double>(0, (sum, item) => sum + item.price);
+  }
+
+  SubscriptionHistory? _currentSubscriptionHistory() {
+    final histories =
+        widget.device?.history.toList() ?? <SubscriptionHistory>[];
+    if (histories.isEmpty) return null;
+
+    final today = SubscriptionUtils.dateOnly(DateTime.now());
+    for (final history in histories) {
+      final start = history.startDate;
+      final end = history.endDate;
+      if (start == null || end == null) continue;
+      final startDay = SubscriptionUtils.dateOnly(start);
+      final endDay = SubscriptionUtils.dateOnly(end);
+      if (!today.isBefore(startDay) && !today.isAfter(endDay)) return history;
+    }
+
+    histories.sort((a, b) {
+      final aDate = a.startDate ?? a.endDate ?? DateTime(0);
+      final bDate = b.startDate ?? b.endDate ?? DateTime(0);
+      return aDate.compareTo(bDate);
+    });
+    return histories.last;
   }
 
   void _showSnack(String msg) => AppToast.show(

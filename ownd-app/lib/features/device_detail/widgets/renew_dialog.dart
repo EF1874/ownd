@@ -115,123 +115,136 @@ class _RenewDialogState extends State<RenewDialog> {
           ).add(const Duration(days: 1));
 
     return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       title: Text(widget.title),
+      contentPadding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
       content: Form(
         key: _formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SubscriptionCycleDropdown(
-                value: _selectedCycle,
-                onChanged: (value) {
-                  if (value == null) return;
-                  setState(() {
-                    _selectedCycle = value;
-                    _normalizeCycleDays();
-                    _updateEndDateIfNeeded();
-                  });
-                },
-              ),
-              const SizedBox(height: 14),
-              SubscriptionCycleModeSelector(
-                cycleType: _selectedCycle,
-                calculationMode: _selectedCalculationMode,
-                cycleDays: _cycleDays,
-                onChanged: (mode, days) {
-                  setState(() {
-                    _selectedCalculationMode = mode;
-                    _cycleDays = days;
-                    _updateEndDateIfNeeded();
-                  });
-                },
-              ),
-              const SizedBox(height: 14),
-              TextFormField(
-                controller: _priceController,
-                decoration: const InputDecoration(
-                  labelText: '本期价格',
-                  prefixText: '¥ ',
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
-                ),
-                validator: (value) {
-                  final price = double.tryParse((value ?? '').trim());
-                  if (price == null || price < 0) return '请输入有效金额';
-                  return null;
-                },
-              ),
-              const SizedBox(height: 14),
-              _DatePickerField(
-                label: '开始日期',
-                date: _startDate,
-                textStyle: textTheme.bodyMedium,
-                onPick: () => _pickDate(
-                  initialDate: _startDate,
-                  firstDate: minStartDate,
-                  onPicked: (date) {
-                    setState(() {
-                      _startDate = date;
-                      _updateEndDateIfNeeded();
-                      _dateError = _validateCurrentDates();
-                    });
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: _priceController,
+                  decoration: const InputDecoration(
+                    labelText: '本期价格',
+                    prefixText: '¥ ',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  validator: (value) {
+                    final price = double.tryParse((value ?? '').trim());
+                    if (price == null || price < 0) return '请输入有效金额';
+                    return null;
                   },
                 ),
-              ),
-              const SizedBox(height: 14),
-              _DatePickerField(
-                label: '到期日期',
-                date: _endDate,
-                textStyle: textTheme.bodyMedium,
-                onPick: () => _pickDate(
-                  initialDate: _endDate,
-                  firstDate: _startDate,
-                  onPicked: (date) {
-                    setState(() {
-                      _endDate = date;
-                      _endDateEdited = true;
-                      _dateError = _validateCurrentDates();
-                    });
-                  },
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _DatePickerField(
+                        label: '开始日期',
+                        date: _startDate,
+                        textStyle: textTheme.bodyMedium,
+                        onPick: () => _pickDate(
+                          initialDate: _startDate,
+                          firstDate: minStartDate,
+                          onPicked: (date) {
+                            setState(() {
+                              _startDate = date;
+                              _updateEndDateIfNeeded();
+                              _dateError = _validateCurrentDates();
+                            });
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _DatePickerField(
+                        label: '到期日期',
+                        date: _endDate,
+                        textStyle: textTheme.bodyMedium,
+                        onPick: () => _pickDate(
+                          initialDate: _endDate,
+                          firstDate: _startDate,
+                          onPicked: (date) {
+                            setState(() {
+                              _endDate = date;
+                              _endDateEdited = true;
+                              _dateError = _validateCurrentDates();
+                            });
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              if (_dateError != null) ...[
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    _dateError!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                      fontSize: 12,
+                if (_dateError != null) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      _dateError!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
+                ],
+                const SizedBox(height: 12),
+                SubscriptionCycleDropdown(
+                  value: _selectedCycle,
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() {
+                      _selectedCycle = value;
+                      _normalizeCycleDays();
+                      _updateEndDateIfNeeded();
+                    });
+                  },
+                ),
+                const SizedBox(height: 12),
+                SubscriptionCycleModeSelector(
+                  cycleType: _selectedCycle,
+                  calculationMode: _selectedCalculationMode,
+                  cycleDays: _cycleDays,
+                  onChanged: (mode, days) {
+                    setState(() {
+                      _selectedCalculationMode = mode;
+                      _cycleDays = days;
+                      _updateEndDateIfNeeded();
+                    });
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _noteController,
+                  decoration: InputDecoration(
+                    hintText: '备注',
+                    hintStyle: TextStyle(
+                      color: theme.colorScheme.onSurfaceVariant.withValues(
+                        alpha: 0.48,
+                      ),
+                    ),
+                    border: const OutlineInputBorder(),
+                    suffixIcon: _noteController.text.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: '清空备注',
+                            icon: const Icon(Icons.clear_rounded),
+                            onPressed: _noteController.clear,
+                          ),
+                  ),
+                  textInputAction: TextInputAction.done,
                 ),
               ],
-              const SizedBox(height: 14),
-              TextFormField(
-                controller: _noteController,
-                decoration: InputDecoration(
-                  hintText: '备注',
-                  hintStyle: TextStyle(
-                    color: theme.colorScheme.onSurfaceVariant.withValues(
-                      alpha: 0.48,
-                    ),
-                  ),
-                  border: const OutlineInputBorder(),
-                  suffixIcon: _noteController.text.isEmpty
-                      ? null
-                      : IconButton(
-                          tooltip: '清空备注',
-                          icon: const Icon(Icons.clear_rounded),
-                          onPressed: _noteController.clear,
-                        ),
-                ),
-                textInputAction: TextInputAction.done,
-              ),
-            ],
+            ),
           ),
         ),
       ),
