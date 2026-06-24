@@ -39,8 +39,13 @@ class AppTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textStyle = Theme.of(
+      context,
+    ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w400);
+
     return TextFormField(
       controller: controller,
+      style: textStyle,
       decoration: InputDecoration(
         labelText: label,
         labelStyle: labelStyle,

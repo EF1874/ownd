@@ -150,10 +150,13 @@ class ProfileScreen extends ConsumerWidget {
                   title: const Text('测试通知功能'),
                   subtitle: const Text('立即发送一条测试通知'),
                   onTap: () async {
+                    final notificationId =
+                        900000 +
+                        DateTime.now().millisecondsSinceEpoch.remainder(100000);
                     await ref
                         .read(notificationServiceProvider)
                         .showNotification(
-                          id: 999,
+                          id: notificationId,
                           title: '测试通知',
                           body: '这是一条主动触发的测试通知！',
                         );
@@ -170,26 +173,7 @@ class ProfileScreen extends ConsumerWidget {
               child: Consumer(
                 builder: (context, ref, child) {
                   final currentMode = ref.watch(themeProvider);
-                  // We also need to watch preferences_service to get updates on notificationTime
-                  // But preferences_service is not a notifier, it's a provider.
-                  // Ideally we should make PreferencesService notify listeners or use a StateNotifier.
-                  // For now, we will just read it since we don't have a stream.
-                  // Wait, if it's not reactive, the UI won't update.
-                  // Let's make a small temp provider for it or just use Stateful?
-                  // Actually, to keep it simple and consistent with the codebase:
-                  // The codebase seems to use SharedPreferences directly in service.
-                  // We can wrap the time string in a FutureProvider or just read it.
-                  // Let's use a FutureBuilder or ref.watch if we can.
-                  // The plan didn't specify refactoring Prefs to be reactive.
-                  // I'll assume we can just read it and setState/rebuild when changed.
-                  // However, for the UI to reflect the change, we need state.
-                  // Let's use a Stateful wrapper or just a simple variable if possible.
-                  // Actually, let's look at `themeProvider`. It is reactive.
-                  // I'll implement the UI and assume we can refresh it.
-
                   final prefs = ref.watch(preferencesServiceProvider);
-                  // Just for display, we might need a force rebuild if we change it.
-                  // Or better, let's create a local state or use `ref.refresh`.
 
                   return Column(
                     children: [
@@ -212,48 +196,17 @@ class ProfileScreen extends ConsumerWidget {
                         builder: (context, setState) {
                           return ListTile(
                             leading: const Icon(Icons.access_time),
-                            title: const Text('通知时间'),
-                            subtitle: Text('每天 ${prefs.notificationTime} 发送通知'),
+                            title: const Text('提醒设置'),
+                            subtitle: Text(
+                              '提前 ${prefs.notificationLeadDays} 天 · 每天 ${prefs.notificationTime}',
+                            ),
                             trailing: const Icon(Icons.chevron_right),
                             onTap: () async {
-                              final current = prefs.notificationTime;
-                              final parts = current.split(':');
-                              final time = await showTimePicker(
-                                context: context,
-                                initialTime: TimeOfDay(
-                                  hour: int.parse(parts[0]),
-                                  minute: int.parse(parts[1]),
-                                ),
-                                builder: (context, child) {
-                                  return MediaQuery(
-                                    data: MediaQuery.of(
-                                      context,
-                                    ).copyWith(alwaysUse24HourFormat: true),
-                                    child: child!,
-                                  );
-                                },
+                              await _showNotificationSettingsDialog(
+                                context,
+                                ref,
                               );
-
-                              if (time != null) {
-                                final hour = time.hour.toString().padLeft(
-                                  2,
-                                  '0',
-                                );
-                                final minute = time.minute.toString().padLeft(
-                                  2,
-                                  '0',
-                                );
-                                final newTime = '$hour:$minute';
-                                await prefs.setNotificationTime(newTime);
-                                // Reschedule
-                                await ref
-                                    .read(subscriptionServiceProvider)
-                                    .rescheduleAllNotifications();
-                                setState(() {}); // Rebuild local widget
-                                if (context.mounted) {
-                                  _showSnackBar(context, '通知时间已更新');
-                                }
-                              }
+                              setState(() {});
                             },
                           );
                         },
@@ -329,6 +282,110 @@ class ProfileScreen extends ConsumerWidget {
       context,
       message,
       isError: message.contains('失败') || message.contains('错误'),
+    );
+  }
+
+  Future<void> _showNotificationSettingsDialog(
+    BuildContext context,
+    WidgetRef ref,
+  ) {
+    final prefs = ref.read(preferencesServiceProvider);
+    var leadDays = prefs.notificationLeadDays;
+    var notificationTime = prefs.notificationTime;
+
+    return showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContentContext, setState) {
+          return AlertDialog(
+            title: const Text('提醒设置'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<int>(
+                  initialValue: leadDays,
+                  decoration: const InputDecoration(
+                    labelText: '提前提醒',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: PreferencesService.notificationLeadDayOptions
+                      .map(
+                        (days) => DropdownMenuItem(
+                          value: days,
+                          child: Text('$days 天'),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) setState(() => leadDays = value);
+                  },
+                ),
+                const SizedBox(height: 12),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('提醒时间'),
+                  subtitle: Text('每天 $notificationTime'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () async {
+                    final parts = notificationTime.split(':');
+                    final time = await showTimePicker(
+                      context: dialogContentContext,
+                      initialTime: TimeOfDay(
+                        hour: int.parse(parts[0]),
+                        minute: int.parse(parts[1]),
+                      ),
+                      builder: (pickerContext, child) {
+                        return MediaQuery(
+                          data: MediaQuery.of(
+                            pickerContext,
+                          ).copyWith(alwaysUse24HourFormat: true),
+                          child: child!,
+                        );
+                      },
+                    );
+                    if (time == null) return;
+                    final hour = time.hour.toString().padLeft(2, '0');
+                    final minute = time.minute.toString().padLeft(2, '0');
+                    setState(() => notificationTime = '$hour:$minute');
+                  },
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('取消'),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  try {
+                    await ref
+                        .read(authControllerProvider.notifier)
+                        .updatePreferences(
+                          notificationLeadDays: leadDays,
+                          notificationTime: notificationTime,
+                        );
+                    await ref
+                        .read(subscriptionServiceProvider)
+                        .rescheduleAllNotifications();
+                    if (!dialogContext.mounted) return;
+                    Navigator.pop(dialogContext);
+                    if (context.mounted) _showSnackBar(context, '提醒设置已更新');
+                  } catch (e) {
+                    if (context.mounted) {
+                      _showSnackBar(
+                        context,
+                        '提醒设置保存失败: ${userErrorMessage(e)}',
+                      );
+                    }
+                  }
+                },
+                child: const Text('保存'),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 

@@ -33,12 +33,11 @@ Device deviceFromApi(Map<String, dynamic> json) {
     ..periodPrice = (json['isVirtual'] as bool? ?? false)
         ? (json['price'] as num?)?.toDouble()
         : null
-    ..reminderDays = (json['reminderDays'] as num?)?.toInt() ?? 0
+    ..hasReminder = json['hasReminder'] as bool? ?? false
     ..history = ((json['itemHistories'] as List<dynamic>?) ?? const [])
         .whereType<Map<String, dynamic>>()
         .map(historyFromApi)
         .toList();
-  device.hasReminder = device.reminderDays > 0;
 
   final categoryJson = json['category'];
   if (categoryJson is Map<String, dynamic>) {
@@ -105,7 +104,8 @@ Map<String, dynamic> deviceToApi(Device device) {
     'purchaseDate': _dateOnlyToApi(device.purchaseDate),
     if (category?.uuid != null) 'categoryId': category!.uuid,
     if (device.platformUuid != null) 'platformId': device.platformUuid,
-    if (device.notes != null) 'notes': device.notes,
+    'imagePath': device.imagePath,
+    'notes': device.notes ?? '',
     'tags': device.tags,
     'isVirtual': isVirtual,
     if (device.cycleType != null)
@@ -123,7 +123,7 @@ Map<String, dynamic> deviceToApi(Device device) {
     if (device.nextBillingDate != null)
       'nextBillingDate': _dateOnlyToApi(device.nextBillingDate!),
     'isAutoRenew': device.isAutoRenew,
-    'reminderDays': device.hasReminder ? device.reminderDays : 0,
+    'hasReminder': device.hasReminder,
     if (device.warrantyEndDate != null)
       'warrantyEndDate': _dateOnlyToApi(device.warrantyEndDate!),
     'isBackup': device.backupDate != null,

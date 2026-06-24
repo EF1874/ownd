@@ -14,6 +14,7 @@ import {
   MaxFileSizeValidator,
   FileTypeValidator,
   Query,
+  Res,
 } from '@nestjs/common';
 import { ItemsService } from './items.service';
 import { CreateItemDto } from './dto/create-item.dto';
@@ -33,6 +34,7 @@ import {
 } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ItemEntity } from './entities/item.entity';
+import type { Response } from 'express';
 
 interface RequestWithUser extends Request {
   user: User;
@@ -112,6 +114,16 @@ export class ItemsController {
       sortBy,
       sortOrder,
     });
+  }
+
+  @Get('images/:fileName')
+  @ApiOperation({ summary: '获取物品图片' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  async getImage(@Param('fileName') fileName: string, @Res() res: Response) {
+    const { stream, contentType } = await this.minioService.getFile(fileName);
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'private, max-age=86400');
+    stream.pipe(res);
   }
 
   @Get(':id')

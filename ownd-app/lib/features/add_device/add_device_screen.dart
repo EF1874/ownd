@@ -62,7 +62,7 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
   int? _cycleDays;
   bool _isAutoRenew = false;
   DateTime? _nextBillingDate;
-  int _reminderDays = 0;
+  bool _hasReminder = false;
 
   late final String _uuid; // Track UUID for file naming
 
@@ -73,9 +73,10 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
     super.initState();
     if (widget.device != null) {
       final d = widget.device!;
+      final currentSubscription = _currentSubscriptionHistory();
       _nameCtr.text = d.name;
-      _priceCtr.text = d.price.toString();
-      _purchaseDate = d.purchaseDate;
+      _priceCtr.text = (currentSubscription?.price ?? d.price).toString();
+      _purchaseDate = currentSubscription?.startDate ?? d.purchaseDate;
       _warrantyDate = d.warrantyEndDate;
       _backupDate = d.backupDate;
       _scrapDate = d.scrapDate;
@@ -85,14 +86,13 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
       _imagePath = d.imagePath;
       _notesCtr.text = d.notes ?? '';
       _tagsCtr.text = d.tags.join(', ');
-      _cycleType = d.cycleType;
-      _cycleCalculationMode = d.cycleCalculationMode;
-      _cycleDays = d.cycleDays;
+      _cycleType = currentSubscription?.cycleType ?? d.cycleType;
+      _cycleCalculationMode =
+          currentSubscription?.cycleCalculationMode ?? d.cycleCalculationMode;
+      _cycleDays = currentSubscription?.cycleDays ?? d.cycleDays;
       _isAutoRenew = d.isAutoRenew;
-      _nextBillingDate = d.nextBillingDate;
-      _reminderDays = d.hasReminder
-          ? _normalizeReminderDays(d.reminderDays)
-          : 0;
+      _nextBillingDate = currentSubscription?.endDate ?? d.nextBillingDate;
+      _hasReminder = d.hasReminder;
       _renewalPriceCtr.text =
           d.renewalPrice?.toString() ??
           (d.isAutoRenew ? d.price.toString() : '');
@@ -105,11 +105,6 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
   // Helper to allow extension to call setState (which is protected)
   void updateState(VoidCallback fn) {
     if (mounted) setState(fn);
-  }
-
-  int _normalizeReminderDays(int days) {
-    if (days <= 0) return 0;
-    return const [1, 3, 7].contains(days) ? days : 3;
   }
 
   @override
@@ -237,7 +232,7 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
                         cycleCalculationMode: _cycleCalculationMode,
                         cycleDays: _cycleDays,
                         isAutoRenew: _isAutoRenew,
-                        reminderDays: _reminderDays,
+                        hasReminder: _hasReminder,
                         onCycleTypeChanged: (v) => setState(() {
                           _cycleType = v;
                           _normalizeCycleCalculation();
@@ -257,8 +252,8 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
                           });
                           _calculateNextBilling(force: true);
                         },
-                        onReminderDaysChanged: (v) => setState(() {
-                          _reminderDays = v;
+                        onReminderChanged: (v) => setState(() {
+                          _hasReminder = v;
                         }),
                         onPickDate: () => _pickDate(),
                         onPickBillingDate: () => _pickDate(isBilling: true),
@@ -285,6 +280,7 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
                       notesController: _notesCtr,
                       tagsController: _tagsCtr,
                       imagePath: _imagePath,
+                      showNotes: !_isSub,
                       onPickImage: _pickPhoto,
                       onRemoveImage: _removePhoto,
                     ),

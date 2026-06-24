@@ -7,17 +7,13 @@ import 'device_grid_item.dart';
 
 class HomeDeviceList extends StatelessWidget {
   final List<Device> processedDevices;
-  final List<Device> allDevices;
   final bool isGridView;
-  final String? categoryName;
   final OnDeleteComplete? onDeleteComplete;
 
   const HomeDeviceList({
     super.key,
     required this.processedDevices,
-    required this.allDevices,
     required this.isGridView,
-    this.categoryName,
     this.onDeleteComplete,
   });
 
@@ -28,14 +24,10 @@ class HomeDeviceList extends StatelessWidget {
       sliver: SliverMainAxisGroup(
         slivers: [
           // Summary Card (Placed here to use processed data)
-          SliverToBoxAdapter(
+          const SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.only(bottom: 16.0),
-              child: SummaryCard(
-                filteredDevices: processedDevices,
-                allDevices: allDevices,
-                categoryName: categoryName,
-              ),
+              padding: EdgeInsets.only(bottom: 16.0),
+              child: SummaryCard(),
             ),
           ),
           if (processedDevices.isNotEmpty) ...[

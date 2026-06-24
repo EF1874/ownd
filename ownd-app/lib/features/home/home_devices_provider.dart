@@ -6,7 +6,47 @@ import '../../data/models/purchase_platform.dart';
 import '../../data/repositories/device_repository.dart';
 import '../../data/repositories/category_repository.dart';
 import '../../data/repositories/platform_repository.dart';
+import '../../core/network/api_client.dart';
 import '../../core/network/error_messages.dart';
+
+class HomeSummaryStats {
+  final double totalValue;
+  final double dailyCost;
+  final int itemCount;
+  final int scrapOrExpiredCount;
+  final int expiringSoonCount;
+
+  const HomeSummaryStats({
+    required this.totalValue,
+    required this.dailyCost,
+    required this.itemCount,
+    required this.scrapOrExpiredCount,
+    required this.expiringSoonCount,
+  });
+
+  factory HomeSummaryStats.fromJson(Map<String, dynamic> json) {
+    return HomeSummaryStats(
+      totalValue: _asDouble(json['totalOriginalPrice'] ?? json['totalValue']),
+      dailyCost: _asDouble(json['dailyAverage'] ?? json['dailyCost']),
+      itemCount: _asInt(json['itemCount'] ?? json['totalCount']),
+      scrapOrExpiredCount: _asInt(
+        json['scrapOrExpiredCount'] ?? json['retiredOrExpiredCount'],
+      ),
+      expiringSoonCount: _asInt(json['expiringSoonCount']),
+    );
+  }
+
+  static double _asDouble(Object? value) => value is num ? value.toDouble() : 0;
+
+  static int _asInt(Object? value) => value is num ? value.toInt() : 0;
+}
+
+final homeSummaryProvider = FutureProvider<HomeSummaryStats>((ref) async {
+  final data = await ref
+      .watch(apiClientProvider)
+      .get<Map<String, dynamic>>('/statistics/summary');
+  return HomeSummaryStats.fromJson(data);
+});
 
 class HomeDevicesState {
   final List<Device> devices;
@@ -205,11 +245,13 @@ class HomeDevicesNotifier extends StateNotifier<HomeDevicesState> {
   }
 
   Future<void> refresh() async {
+    _ref.invalidate(homeSummaryProvider);
     await _loadFirstPage();
   }
 
   /// Re-fetch current pages from API without toggling loading state (no flicker)
   Future<void> silentRefresh() async {
+    _ref.invalidate(homeSummaryProvider);
     try {
       final currentPages = state.page;
       final totalLimit = _limit * currentPages;

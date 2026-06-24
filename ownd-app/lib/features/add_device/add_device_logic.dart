@@ -3,19 +3,16 @@ part of 'add_device_screen.dart';
 // ignore: library_private_types_in_public_api
 extension AddDeviceLogic on _AddDeviceScreenState {
   void _calculateNextBilling({bool force = false}) {
-    // Editing an existing subscription should keep the saved due date unless the
-    // user explicitly changes the cycle.
-    if (widget.device != null && !force) return;
+    // Existing subscription dates are edited from the subscription records.
+    if (widget.device != null) return;
     if (_cycleType == null || _cycleType == CycleType.oneTime) return;
 
     updateState(
       () => _nextBillingDate = SubscriptionUtils.calculateNextBillingDate(
         _purchaseDate,
         _cycleType!,
-        calculationMode: _isAutoRenew
-            ? _cycleCalculationMode
-            : CycleCalculationMode.calendar,
-        cycleDays: _isAutoRenew ? _cycleDays : null,
+        calculationMode: _cycleCalculationMode,
+        cycleDays: _cycleDays,
       ),
     );
   }
@@ -100,11 +97,10 @@ extension AddDeviceLogic on _AddDeviceScreenState {
                 .read(platformRepositoryProvider)
                 .ensurePlatform(selectedPlatformName)
           : null;
-      final normalizedReminderDays = _isSub
-          ? _normalizeReminderDays(_reminderDays)
-          : 0;
-      final price = _isSub && widget.device != null
-          ? _currentSubscriptionPrice()
+      final editingExistingSubscription = _isSub && widget.device != null;
+      final originalDevice = widget.device;
+      final price = editingExistingSubscription
+          ? originalDevice!.price
           : inputPrice!;
 
       final device = widget.device ?? Device();
@@ -113,7 +109,9 @@ extension AddDeviceLogic on _AddDeviceScreenState {
             ? finalCat.name
             : _nameCtr.text.trim()
         ..price = price
-        ..purchaseDate = _purchaseDate
+        ..purchaseDate = editingExistingSubscription
+            ? originalDevice!.purchaseDate
+            : _purchaseDate
         ..platform = selectedPlatform?.name ?? ''
         ..platformUuid = selectedPlatform?.uuid
         ..warrantyEndDate = _warrantyDate
@@ -121,7 +119,7 @@ extension AddDeviceLogic on _AddDeviceScreenState {
         ..scrapDate = _scrapDate
         ..customIconPath = _customIconPath
         ..imagePath = _imagePath
-        ..notes = _notesCtr.text.trim().isEmpty ? null : _notesCtr.text.trim()
+        ..notes = _isSub ? null : _notesCtr.text.trim()
         ..tags = _tagsCtr.text.trim().isEmpty
             ? []
             : _tagsCtr.text
@@ -130,42 +128,45 @@ extension AddDeviceLogic on _AddDeviceScreenState {
                   .where((e) => e.isNotEmpty)
                   .toList()
         ..category.value = finalCat
-        ..cycleType = _isSub ? _cycleType : null
-        ..cycleCalculationMode = _isSub && _isAutoRenew
-            ? _cycleCalculationMode
+        ..cycleType = _isSub
+            ? editingExistingSubscription
+                  ? originalDevice!.cycleType
+                  : _cycleType
+            : null
+        ..cycleCalculationMode = _isSub
+            ? editingExistingSubscription
+                  ? originalDevice!.cycleCalculationMode
+                  : _cycleCalculationMode
             : CycleCalculationMode.calendar
-        ..cycleDays = _isSub && _isAutoRenew ? _cycleDays : null
+        ..cycleDays = _isSub
+            ? editingExistingSubscription
+                  ? originalDevice!.cycleDays
+                  : _cycleDays
+            : null
         ..isAutoRenew = _isSub ? _isAutoRenew : true
-        ..nextBillingDate = _isSub ? _nextBillingDate : null
-        ..reminderDays = normalizedReminderDays
-        ..hasReminder = normalizedReminderDays > 0
+        ..nextBillingDate = _isSub
+            ? editingExistingSubscription
+                  ? originalDevice!.nextBillingDate
+                  : _nextBillingDate
+            : null
+        ..hasReminder = _isSub && _hasReminder
         ..renewalPrice = (_isSub && _isAutoRenew)
             ? double.tryParse(_renewalPriceCtr.text)
             : null
-        ..periodPrice = _isSub ? price : null;
-
-      // Pruning Logic: Remove history records that are "in the future" relative to the new billing date
-      if (_isSub && _nextBillingDate != null) {
-        // Ensure history is mutable
-        device.history = device.history.toList();
-        device.history.removeWhere((h) {
-          final end = h.endDate;
-          return end != null && end.isAfter(_nextBillingDate!);
-        });
-      }
-      if (_isSub && widget.device != null) {
-        final currentPrice = _currentSubscriptionPrice();
-        device
-          ..price = currentPrice
-          ..periodPrice = currentPrice;
-      }
+        ..periodPrice = _isSub
+            ? editingExistingSubscription
+                  ? originalDevice!.periodPrice
+                  : price
+            : null;
 
       if (widget.device == null && _isSub) {
         device.totalAccumulatedPrice = device.price;
       }
-      device.totalAccumulatedPrice = _isSub
-          ? _calculatedSubscriptionTotal(device)
-          : price;
+      if (!editingExistingSubscription) {
+        device.totalAccumulatedPrice = _isSub
+            ? _calculatedSubscriptionTotal(device)
+            : price;
+      }
 
       if (widget.device != null) {
         await ref.read(deviceRepositoryProvider).updateDevice(device);

@@ -84,4 +84,23 @@ export class UsersService {
       data: { password: hashedPassword },
     });
   }
+
+  async updatePreferences(
+    userId: string,
+    data: {
+      notificationLeadDays?: number;
+      notificationTime?: string;
+    },
+  ) {
+    const { password: _, ...user } = await this.prisma.user.update({
+      where: { id: userId },
+      data,
+    });
+    try {
+      await this.cacheManager.del(`user:profile:${userId}`);
+    } catch {
+      // ignore
+    }
+    return user;
+  }
 }

@@ -54,7 +54,6 @@ class Device {
 
   bool isAutoRenew = false;
   DateTime? nextBillingDate;
-  int reminderDays = 0;
   bool hasReminder = false;
 
   // --- New fields for v1.2 ---

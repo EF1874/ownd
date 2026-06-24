@@ -1,5 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsString, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsIn,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Matches,
+  MinLength,
+} from 'class-validator';
 
 export class SignupDto {
   @ApiProperty({
@@ -82,4 +90,26 @@ export class ResetPasswordDto {
   @IsString()
   @IsNotEmpty({ message: '验证码不能为空' })
   code: string;
+}
+
+export class UpdateUserPreferencesDto {
+  @ApiProperty({
+    description: '提前提醒天数',
+    example: 3,
+    required: false,
+  })
+  @IsIn([1, 3, 7, 14, 30], { message: '请选择可用的提前提醒天数' })
+  @IsOptional()
+  notificationLeadDays?: number;
+
+  @ApiProperty({
+    description: '提醒时间',
+    example: '08:00',
+    required: false,
+  })
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, {
+    message: '请选择有效的提醒时间',
+  })
+  @IsOptional()
+  notificationTime?: string;
 }

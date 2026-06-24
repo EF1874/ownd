@@ -181,11 +181,10 @@ String _cleanMessage(String message, {required String fallback}) {
 
   if (_containsAny(lower, const [
     'nextbillingdate should not exist',
-    'reminderdays should not exist',
     'currentcycletype should not exist',
     'currentcycle should not exist',
   ])) {
-    return '服务器正在更新，请稍后重试';
+    return '应用和服务版本不一致，请更新应用或重启服务后重试';
   }
 
   if (_containsAny(lower, const [

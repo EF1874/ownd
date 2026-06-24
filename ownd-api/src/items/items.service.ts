@@ -973,7 +973,7 @@ export class ItemsService {
           currentCycleDays: dev.cycleDays || null,
           nextBillingDate,
           isAutoRenew: dev.isAutoRenew || false,
-          reminderDays: dev.reminderDays || 0,
+          hasReminder: dev.hasReminder || false,
           isBackup: dev.backupDate !== undefined,
           backupDate: dev.backupDate ? new Date(dev.backupDate) : null,
           isScrapped: dev.scrapDate !== undefined,

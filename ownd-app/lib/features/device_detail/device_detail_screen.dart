@@ -2,9 +2,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Add for SystemUiOverlayStyle
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../../data/models/device.dart';
 import '../../data/repositories/device_repository.dart';
+import '../../data/services/preferences_service.dart';
 import '../../core/network/error_messages.dart';
 import '../../shared/config/category_config.dart';
 import '../../shared/utils/category_utils.dart';
@@ -13,9 +15,12 @@ import '../../shared/utils/format_utils.dart';
 import '../../shared/utils/category_tree_utils.dart';
 import '../../shared/utils/subscription_utils.dart';
 import '../../shared/config/cost_config.dart';
+import '../../shared/services/image_service.dart';
 import '../../shared/services/subscription_service.dart';
+import '../../shared/widgets/app_image.dart';
 import '../../shared/widgets/base_card.dart';
 import '../../shared/widgets/app_toast.dart';
+import '../../shared/widgets/image_preview_dialog.dart';
 import '../../core/theme/app_colors.dart';
 import '../home/home_devices_provider.dart';
 import '../add_device/add_device_screen.dart';
@@ -51,52 +56,66 @@ class DeviceDetailScreen extends ConsumerWidget {
                   background: Stack(
                     fit: StackFit.expand,
                     children: [
-                      _buildHeaderBackground(device, theme),
-                      Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.transparent,
-                              theme.scaffoldBackgroundColor,
-                            ],
-                            stops: const [0.6, 1.0],
+                      _buildHeaderBackground(device, theme, context, ref),
+                      IgnorePointer(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.transparent,
+                                theme.scaffoldBackgroundColor,
+                              ],
+                              stops: const [0.6, 1.0],
+                            ),
                           ),
                         ),
                       ),
                       // Status bar safety gradient
-                      Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [Colors.black54, Colors.transparent],
-                            stops: [0.0, 0.4],
+                      IgnorePointer(
+                        child: Container(
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [Colors.black54, Colors.transparent],
+                              stops: [0.0, 0.4],
+                            ),
                           ),
                         ),
+                      ),
+                      _HeaderImageButton(
+                        icon: device.imagePath == null
+                            ? Icons.add_a_photo_outlined
+                            : Icons.camera_alt_outlined,
+                        tooltip: device.imagePath == null ? '添加图片' : '更换图片',
+                        onPressed: () =>
+                            _changeHeaderImage(context, ref, device),
                       ),
                     ],
                   ),
                 ),
                 iconTheme: const IconThemeData(color: Colors.white),
-                actions: [
-                  IconButton(
-                    icon: const Icon(Icons.edit),
-                    onPressed: () async {
-                      await Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => AddDeviceScreen(device: device),
+                actions: isSub
+                    ? null
+                    : [
+                        IconButton(
+                          icon: const Icon(Icons.edit),
+                          onPressed: () async {
+                            await Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => AddDeviceScreen(device: device),
+                              ),
+                            );
+                            if (!context.mounted) return;
+                            ref.invalidate(deviceDetailProvider(id));
+                            await ref
+                                .read(homeDevicesNotifierProvider.notifier)
+                                .silentRefresh();
+                          },
                         ),
-                      );
-                      if (!context.mounted) return;
-                      ref.invalidate(deviceDetailProvider(id));
-                      await ref
-                          .read(homeDevicesNotifierProvider.notifier)
-                          .silentRefresh();
-                    },
-                  ),
-                ],
+                      ],
               ),
               SliverToBoxAdapter(
                 child: Padding(
@@ -123,7 +142,9 @@ class DeviceDetailScreen extends ConsumerWidget {
                         _buildSubscriptionHistory(device, theme, context, ref),
                       ] else
                         _buildBasicInfoCard(device, theme),
-                      if (device.notes != null && device.notes!.isNotEmpty) ...[
+                      if (!isSub &&
+                          device.notes != null &&
+                          device.notes!.isNotEmpty) ...[
                         const SizedBox(height: 16),
                         _buildNotesSection(device.notes!, theme),
                       ],
@@ -144,11 +165,25 @@ class DeviceDetailScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildHeaderBackground(Device device, ThemeData theme) {
+  Widget _buildHeaderBackground(
+    Device device,
+    ThemeData theme,
+    BuildContext context,
+    WidgetRef ref,
+  ) {
     if (device.imagePath != null) {
-      return Hero(
-        tag: 'device_image_${device.id}',
-        child: Image.file(File(device.imagePath!), fit: BoxFit.cover),
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          GestureDetector(
+            onTap: () => ImagePreviewDialog.show(context, device.imagePath!),
+            onLongPress: () => _changeHeaderImage(context, ref, device),
+            child: Hero(
+              tag: 'device_image_${device.id}',
+              child: AppImage(path: device.imagePath!),
+            ),
+          ),
+        ],
       );
     }
 
@@ -158,25 +193,71 @@ class DeviceDetailScreen extends ConsumerWidget {
     final item = CategoryConfig.getItem(device.category.value?.name);
     final iconData = IconUtils.getIconData(item.iconPath);
 
-    return Hero(
-      tag: 'device_icon_${device.id}',
-      child: Container(
-        color: color.withValues(alpha: 0.2),
-        child: Center(
-          child: device.customIconPath != null
-              ? ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: Image.file(
-                    File(device.customIconPath!),
-                    width: 80,
-                    height: 80,
-                    fit: BoxFit.cover,
-                  ),
-                )
-              : Icon(iconData, size: 80, color: color),
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Hero(
+          tag: 'device_icon_${device.id}',
+          child: Container(
+            color: color.withValues(alpha: 0.2),
+            child: Center(
+              child: device.customIconPath != null
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: Image.file(
+                        File(device.customIconPath!),
+                        width: 80,
+                        height: 80,
+                        fit: BoxFit.cover,
+                      ),
+                    )
+                  : Icon(iconData, size: 80, color: color),
+            ),
+          ),
         ),
-      ),
+      ],
     );
+  }
+
+  Future<void> _changeHeaderImage(
+    BuildContext context,
+    WidgetRef ref,
+    Device device,
+  ) async {
+    final imageService = ref.read(imageServiceProvider);
+    final file = await imageService.pickAndCropImage(
+      context: context,
+      source: ImageSource.gallery,
+      isSquare: false,
+    );
+    if (file == null || !context.mounted) return;
+
+    final savedPath = await imageService.saveImageToAppDirectory(
+      file,
+      device.uuid,
+      isIcon: false,
+    );
+    if (savedPath == null) {
+      if (context.mounted) {
+        AppToast.show(context, '图片保存失败，请重试', isError: true);
+      }
+      return;
+    }
+    if (!context.mounted) return;
+
+    final oldImagePath = device.imagePath;
+    try {
+      device.imagePath = savedPath;
+      await ref.read(deviceRepositoryProvider).updateDevice(device);
+      if (!context.mounted) return;
+      ref.invalidate(deviceDetailProvider(id));
+      await ref.read(homeDevicesNotifierProvider.notifier).silentRefresh();
+      if (context.mounted) AppToast.show(context, '图片已更新');
+    } catch (e) {
+      device.imagePath = oldImagePath;
+      if (!context.mounted) return;
+      AppToast.show(context, '图片更新失败: ${userErrorMessage(e)}', isError: true);
+    }
   }
 
   Widget _buildCostAnalysisCard(Device device, ThemeData theme) {
@@ -313,9 +394,11 @@ class DeviceDetailScreen extends ConsumerWidget {
   ) {
     final dateFormat = DateFormat('yyyy-MM-dd');
     final periods = _subscriptionPeriods(device);
-    final currentPeriod = _currentPeriodNumber(periods, device);
+    final currentPeriodData = _currentPeriod(periods, device);
+    final currentPeriod = currentPeriodData?.index ?? 0;
     final totalPeriods = periods.length;
-    final dueDate = device.subscriptionDueDate;
+    final currentHistory = currentPeriodData?.history;
+    final dueDate = currentHistory?.endDate ?? device.subscriptionDueDate;
     final daysUntilDue = dueDate == null
         ? null
         : SubscriptionUtils.daysUntilDue(dueDate);
@@ -393,9 +476,10 @@ class DeviceDetailScreen extends ConsumerWidget {
           _InfoRow(
             label: '本期订阅模式',
             value: _subscriptionModeLabel(
-              device.cycleType,
-              device.cycleCalculationMode,
-              device.cycleDays,
+              currentHistory?.cycleType ?? device.cycleType,
+              currentHistory?.cycleCalculationMode ??
+                  device.cycleCalculationMode,
+              currentHistory?.cycleDays ?? device.cycleDays,
             ),
           ),
           const Divider(height: 24),
@@ -409,7 +493,7 @@ class DeviceDetailScreen extends ConsumerWidget {
           _SwitchInfoRow(
             label: '到期提醒',
             subtitle: device.hasReminder
-                ? '到期前 ${device.reminderDays} 天提醒'
+                ? '到期前 ${ref.watch(preferencesServiceProvider).notificationLeadDays} 天提醒'
                 : '不提醒',
             value: device.hasReminder,
             onChanged: (enabled) =>
@@ -443,6 +527,14 @@ class DeviceDetailScreen extends ConsumerWidget {
     }
 
     final today = SubscriptionUtils.dateOnly(DateTime.now());
+    final currentHistory = _currentPeriod(
+      _subscriptionPeriods(device),
+      device,
+    )?.history;
+    final cycleType = currentHistory?.cycleType ?? device.cycleType!;
+    final cycleCalculationMode =
+        currentHistory?.cycleCalculationMode ?? device.cycleCalculationMode;
+    final cycleDays = currentHistory?.cycleDays ?? device.cycleDays;
     final dueDate = device.subscriptionDueDate;
     final dueDay = dueDate == null ? null : SubscriptionUtils.dateOnly(dueDate);
     final minStartDate = dueDay?.add(const Duration(days: 1));
@@ -453,18 +545,19 @@ class DeviceDetailScreen extends ConsumerWidget {
         : minStartDate;
     final initialEndDate = SubscriptionUtils.calculateNextBillingDate(
       initialStartDate,
-      device.cycleType!,
-      calculationMode: device.cycleCalculationMode,
-      cycleDays: device.cycleDays,
+      cycleType,
+      calculationMode: cycleCalculationMode,
+      cycleDays: cycleDays,
     );
 
     final result = await showDialog<RenewDialogResult>(
       context: context,
       builder: (dialogContext) => RenewDialog(
-        initialCycleType: device.cycleType!,
-        initialCycleCalculationMode: device.cycleCalculationMode,
-        initialCycleDays: device.cycleDays,
-        initialPrice: device.periodPrice ?? device.price,
+        initialCycleType: cycleType,
+        initialCycleCalculationMode: cycleCalculationMode,
+        initialCycleDays: cycleDays,
+        initialPrice:
+            currentHistory?.price ?? device.periodPrice ?? device.price,
         initialRecordDate: today,
         initialStartDate: initialStartDate,
         initialEndDate: initialEndDate,
@@ -551,13 +644,10 @@ class DeviceDetailScreen extends ConsumerWidget {
     Device device,
     bool enabled,
   ) async {
-    final previousReminderDays = device.reminderDays;
     final previousHasReminder = device.hasReminder;
 
     try {
-      device
-        ..hasReminder = enabled
-        ..reminderDays = enabled ? _defaultReminderDays(device) : 0;
+      device.hasReminder = enabled;
 
       await ref.read(deviceRepositoryProvider).updateDevice(device);
       await _syncSubscriptionNotification(ref, device);
@@ -566,9 +656,7 @@ class DeviceDetailScreen extends ConsumerWidget {
       if (!context.mounted) return;
       AppToast.show(context, enabled ? '已开启到期提醒' : '已关闭到期提醒');
     } catch (e) {
-      device
-        ..hasReminder = previousHasReminder
-        ..reminderDays = previousReminderDays;
+      device.hasReminder = previousHasReminder;
       if (!context.mounted) return;
       AppToast.show(context, '提醒设置失败: ${userErrorMessage(e)}', isError: true);
     }
@@ -580,11 +668,6 @@ class DeviceDetailScreen extends ConsumerWidget {
       return subscriptionService.scheduleSubscriptionNotification(device);
     }
     return subscriptionService.cancelSubscriptionNotification(device);
-  }
-
-  int _defaultReminderDays(Device device) {
-    if (device.reminderDays > 0) return device.reminderDays;
-    return 3;
   }
 
   double _subscriptionTotal(Device device) {
@@ -756,10 +839,6 @@ class DeviceDetailScreen extends ConsumerWidget {
         canEdit: !usingFallback,
       );
     }).toList();
-  }
-
-  int _currentPeriodNumber(List<_SubscriptionPeriod> periods, Device device) {
-    return _currentPeriod(periods, device)?.index ?? 0;
   }
 
   _SubscriptionPeriod? _currentPeriod(
@@ -1016,6 +1095,35 @@ class DeviceDetailScreen extends ConsumerWidget {
       if (overlaps) return '订阅日期不能和已有记录重叠';
     }
     return null;
+  }
+}
+
+class _HeaderImageButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  const _HeaderImageButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      right: 16,
+      bottom: 24,
+      child: Material(
+        color: Colors.black.withValues(alpha: 0.42),
+        shape: const CircleBorder(),
+        child: IconButton(
+          tooltip: tooltip,
+          icon: Icon(icon, color: Colors.white),
+          onPressed: onPressed,
+        ),
+      ),
+    );
   }
 }
 

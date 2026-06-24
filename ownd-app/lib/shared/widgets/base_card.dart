@@ -1,7 +1,7 @@
-import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
+import 'app_image.dart';
 
 /// A themed card with optional glass-morphism effect and glow border.
 ///
@@ -99,10 +99,7 @@ class _BaseCardState extends State<BaseCard> {
           Positioned.fill(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
-              child: Image.file(
-                File(widget.backgroundImagePath!),
-                fit: BoxFit.cover,
-              ),
+              child: AppImage(path: widget.backgroundImagePath!),
             ),
           ),
           cardVariant,

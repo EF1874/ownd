@@ -57,7 +57,7 @@ describe('ItemsService', () => {
     currentCycle: null,
     nextBillingDate: null,
     isAutoRenew: false,
-    reminderDays: 0,
+    hasReminder: false,
     isBackup: false,
     backupDate: null,
     isScrapped: false,
@@ -112,7 +112,7 @@ describe('ItemsService', () => {
         purchaseDate,
         currentCycleType: ItemCycleType.MONTH,
         currentCycle: 1,
-        reminderDays: 7,
+        hasReminder: true,
       };
       const userId = 'user-1';
 

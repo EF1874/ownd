@@ -102,7 +102,7 @@ class HomeSliverAppBar extends ConsumerWidget {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        expiringSoonOnly ? '取消到期筛选' : '仅看即将到期/续费',
+                        expiringSoonOnly ? '取消到期筛选' : '仅看即将到期',
                         style: textStyle,
                       ),
                     ],

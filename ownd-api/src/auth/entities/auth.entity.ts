@@ -10,6 +10,12 @@ export class UserEntity {
   @ApiProperty({ description: '用户名', example: '张三', nullable: true })
   name: string | null;
 
+  @ApiProperty({ description: '提前提醒天数', example: 3 })
+  notificationLeadDays: number;
+
+  @ApiProperty({ description: '提醒时间', example: '08:00' })
+  notificationTime: string;
+
   @ApiProperty({ description: '创建时间' })
   createdAt: Date;
 

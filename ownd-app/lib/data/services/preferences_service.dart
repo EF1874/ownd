@@ -41,7 +41,9 @@ class PreferencesService {
   }
 
   static const _keyNotificationTime = 'notification_time';
+  static const _keyNotificationLeadDays = 'notification_lead_days';
   static const _keyLastAppUpdateAutoCheck = 'last_app_update_auto_check';
+  static const notificationLeadDayOptions = [1, 3, 7, 14, 30];
 
   /// Format: "HH:mm" 24-hour format
   String get notificationTime =>
@@ -49,6 +51,16 @@ class PreferencesService {
 
   Future<void> setNotificationTime(String value) async {
     await _prefs.setString(_keyNotificationTime, value);
+  }
+
+  int get notificationLeadDays {
+    final days = _prefs.getInt(_keyNotificationLeadDays) ?? 3;
+    return notificationLeadDayOptions.contains(days) ? days : 3;
+  }
+
+  Future<void> setNotificationLeadDays(int value) async {
+    final days = notificationLeadDayOptions.contains(value) ? value : 3;
+    await _prefs.setInt(_keyNotificationLeadDays, days);
   }
 
   bool hasCheckedAppUpdateToday() {

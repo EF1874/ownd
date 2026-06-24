@@ -118,6 +118,14 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.graphite,
+        labelStyle: const TextStyle(
+          color: AppColors.ash,
+          fontWeight: FontWeight.w400,
+        ),
+        floatingLabelStyle: const TextStyle(
+          color: Color(0xFF4F46E5),
+          fontWeight: FontWeight.w400,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
@@ -182,6 +190,16 @@ class AppTheme {
       listTileTheme: const ListTileThemeData(
         iconColor: Color(0xFF4F46E5),
         textColor: AppColors.silver,
+        titleTextStyle: TextStyle(
+          color: AppColors.silver,
+          fontSize: 16,
+          fontWeight: FontWeight.w400,
+        ),
+        subtitleTextStyle: TextStyle(
+          color: AppColors.ash,
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+        ),
       ),
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
@@ -304,6 +322,14 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.frost,
+        labelStyle: const TextStyle(
+          color: AppColors.dimInk,
+          fontWeight: FontWeight.w400,
+        ),
+        floatingLabelStyle: const TextStyle(
+          color: Color(0xFF4F46E5),
+          fontWeight: FontWeight.w400,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
@@ -371,6 +397,16 @@ class AppTheme {
       listTileTheme: const ListTileThemeData(
         iconColor: Color(0xFF4F46E5),
         textColor: AppColors.ink,
+        titleTextStyle: TextStyle(
+          color: AppColors.ink,
+          fontSize: 16,
+          fontWeight: FontWeight.w400,
+        ),
+        subtitleTextStyle: TextStyle(
+          color: AppColors.dimInk,
+          fontSize: 14,
+          fontWeight: FontWeight.w400,
+        ),
       ),
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {

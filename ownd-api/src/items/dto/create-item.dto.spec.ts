@@ -44,24 +44,24 @@ describe('CreateItemDto', () => {
     expect(errors[0].constraints).toHaveProperty('isUuid');
   });
 
-  it('should pass if reminderDays is 0', async () => {
+  it('should pass if hasReminder is false', async () => {
     const dto = plainToInstance(CreateItemDto, {
       name: 'Test Item',
       price: 100,
-      reminderDays: 0,
+      hasReminder: false,
     });
     const errors = await validate(dto);
     expect(errors.length).toBe(0);
   });
 
-  it('should fail if reminderDays is negative', async () => {
+  it('should fail if hasReminder is not boolean', async () => {
     const dto = plainToInstance(CreateItemDto, {
       name: 'Test Item',
       price: 100,
-      reminderDays: -1,
+      hasReminder: 'yes',
     });
     const errors = await validate(dto);
     expect(errors.length).toBeGreaterThan(0);
-    expect(errors[0].constraints).toHaveProperty('min');
+    expect(errors[0].constraints).toHaveProperty('isBoolean');
   });
 });

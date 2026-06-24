@@ -221,7 +221,7 @@ class DataTransferService {
       'cycleDays': detail['currentCycleDays'],
       'isAutoRenew': detail['isAutoRenew'] ?? false,
       'nextBillingDate': detail['nextBillingDate'],
-      'reminderDays': detail['reminderDays'] ?? 0,
+      'hasReminder': detail['hasReminder'] ?? false,
       'history': histories
           .whereType<Map<String, dynamic>>()
           .map(_exportHistory)

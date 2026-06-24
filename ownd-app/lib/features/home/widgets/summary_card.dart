@@ -1,81 +1,17 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import '../../../data/models/device.dart';
-import '../../../shared/config/category_config.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/utils/format_utils.dart';
-import '../../../shared/utils/category_tree_utils.dart';
-import '../../../shared/utils/subscription_utils.dart';
+import '../home_devices_provider.dart';
 
-class SummaryCard extends StatelessWidget {
-  final List<Device> filteredDevices;
-  final List<Device> allDevices;
-  final String? categoryName;
-
-  const SummaryCard({
-    super.key,
-    required this.filteredDevices,
-    required this.allDevices,
-    this.categoryName,
-  });
+class SummaryCard extends ConsumerWidget {
+  const SummaryCard({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // Requirements:
-    // 1. If filtered list is empty (e.g. category has no items), show ALL items stats.
-    // 2. Title changes based on filter (e.g., "Digital Assets" or "Total Assets").
-    // 3. Status label changes (Expired for Subs, Retired for Physical).
-    // 4. Value shows single sum (not split).
-
-    // If filtered list is empty AND no category is selected, show ALL items stats.
-    // If a category IS selected, show 0 stats for that category.
-    final bool useAll = filteredDevices.isEmpty && categoryName == null;
-    final List<Device> targetDevices = useAll ? allDevices : filteredDevices;
-
-    final String? displayCategory = useAll ? null : categoryName;
-
-    double totalValue = 0;
-    double dailyCost = 0;
-    int scrapCount = 0;
-
-    final today = SubscriptionUtils.dateOnly(DateTime.now());
-
-    for (var d in targetDevices) {
-      totalValue += d.price;
-      dailyCost += d.dailyCost;
-
-      bool isScrapOrExpired = false;
-      if (d.status == 'scrap') {
-        isScrapOrExpired = true;
-      } else {
-        if (CategoryTreeUtils.isVirtualSubscription(d.category.value)) {
-          final subscriptionDueDate = d.subscriptionDueDate;
-          if (!d.isAutoRenew &&
-              subscriptionDueDate != null &&
-              SubscriptionUtils.dateOnly(subscriptionDueDate).isBefore(today)) {
-            isScrapOrExpired = true;
-          }
-        }
-      }
-      if (isScrapOrExpired) scrapCount++;
-    }
-
-    // Determine Title
-    String title = '总资产';
-    if (displayCategory != null && displayCategory != '全部') {
-      title = '$displayCategory资产';
-    }
-
-    // Determine Scrap Label
-    String scrapLabel = '已退役/已到期';
-    final majorCat = CategoryConfig.getMajorCategory(displayCategory);
-    if (majorCat == '虚拟订阅') {
-      scrapLabel = '已到期';
-    } else {
-      // Assume physical for others
-      scrapLabel = '已退役';
-    }
-
+  Widget build(BuildContext context, WidgetRef ref) {
+    final summary = ref.watch(homeSummaryProvider);
+    final stats = summary.valueOrNull;
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
     const Color brandColor = Color.fromARGB(
       255,
@@ -118,19 +54,19 @@ class SummaryCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    const Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          title,
-                          style: const TextStyle(
+                          '总资产',
+                          style: TextStyle(
                             color: textColor,
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
                             letterSpacing: 0.5,
                           ),
                         ),
-                        const Icon(
+                        Icon(
                           Icons.insights_rounded,
                           color: Colors.white70,
                           size: 20,
@@ -145,13 +81,17 @@ class SummaryCard extends StatelessWidget {
                         _buildStatItem(
                           context,
                           '资产估值',
-                          '¥${FormatUtils.formatCurrency(totalValue)}',
+                          stats == null
+                              ? '--'
+                              : '¥${FormatUtils.formatCurrency(stats.totalValue)}',
                           textColor: textColor,
                         ),
                         _buildStatItem(
                           context,
                           '预估日耗',
-                          '¥${FormatUtils.formatCurrency(dailyCost)}',
+                          stats == null
+                              ? '--'
+                              : '¥${FormatUtils.formatCurrency(stats.dailyCost)}',
                           crossAxisAlignment: CrossAxisAlignment.end,
                           textColor: textColor,
                         ),
@@ -166,18 +106,44 @@ class SummaryCard extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        _buildBottomInfo(
-                          '总数汇总',
-                          targetDevices.length.toString(),
-                          textColor: textColor,
+                        Expanded(
+                          child: _buildBottomInfo(
+                            '总数',
+                            stats?.itemCount.toString() ?? '--',
+                            textColor: textColor,
+                          ),
                         ),
-                        _buildBottomInfo(
-                          scrapLabel,
-                          scrapCount.toString(),
-                          textColor: textColor,
+                        Expanded(
+                          child: Center(
+                            child: _buildBottomInfo(
+                              '退役/到期',
+                              stats?.scrapOrExpiredCount.toString() ?? '--',
+                              textColor: textColor,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: _buildBottomInfo(
+                              '即将到期',
+                              stats?.expiringSoonCount.toString() ?? '--',
+                              textColor: textColor,
+                            ),
+                          ),
                         ),
                       ],
                     ),
+                    if (summary.hasError && stats == null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        '概览加载失败，请下拉刷新',
+                        style: TextStyle(
+                          color: textColor.withValues(alpha: 0.7),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -232,6 +198,7 @@ class SummaryCard extends StatelessWidget {
     required Color textColor,
   }) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Text(
           '$label: ',

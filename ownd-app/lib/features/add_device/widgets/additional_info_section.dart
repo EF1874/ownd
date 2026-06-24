@@ -1,12 +1,13 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../../shared/widgets/app_text_field.dart';
+import '../../../shared/widgets/app_image.dart';
 import '../../../shared/widgets/base_card.dart';
 
 class AdditionalInfoSection extends StatelessWidget {
   final TextEditingController notesController;
   final TextEditingController tagsController;
   final String? imagePath;
+  final bool showNotes;
   final VoidCallback onPickImage;
   final VoidCallback onRemoveImage;
 
@@ -15,6 +16,7 @@ class AdditionalInfoSection extends StatelessWidget {
     required this.notesController,
     required this.tagsController,
     this.imagePath,
+    this.showNotes = true,
     required this.onPickImage,
     required this.onRemoveImage,
   });
@@ -42,14 +44,16 @@ class AdditionalInfoSection extends StatelessWidget {
             labelStyle: TextStyle(color: theme.hintColor),
           ),
           const SizedBox(height: 16),
-          AppTextField(
-            controller: notesController,
-            label: '备注',
-            hint: '购买渠道、型号、感受等',
-            maxLines: 3,
-            labelStyle: TextStyle(color: theme.hintColor),
-          ),
-          const SizedBox(height: 16),
+          if (showNotes) ...[
+            AppTextField(
+              controller: notesController,
+              label: '备注',
+              hint: '购买渠道、型号、感受等',
+              maxLines: 3,
+              labelStyle: TextStyle(color: theme.hintColor),
+            ),
+            const SizedBox(height: 16),
+          ],
           Text(
             '物品相片',
             style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
@@ -76,10 +80,7 @@ class AdditionalInfoSection extends StatelessWidget {
                       children: [
                         ClipRRect(
                           borderRadius: BorderRadius.circular(12),
-                          child: Image.file(
-                            File(imagePath!),
-                            fit: BoxFit.cover,
-                          ),
+                          child: AppImage(path: imagePath!),
                         ),
                         Positioned(
                           right: 4,

@@ -92,8 +92,8 @@ export class ItemEntity implements Item {
   @ApiProperty({ description: '是否自动续订', default: false })
   isAutoRenew: boolean;
 
-  @ApiProperty({ description: '提前提醒天数，0 表示不提醒', default: 0 })
-  reminderDays: number;
+  @ApiProperty({ description: '是否开启到期提醒', default: false })
+  hasReminder: boolean;
 
   @ApiProperty({
     description: '是否为闲置或备用',

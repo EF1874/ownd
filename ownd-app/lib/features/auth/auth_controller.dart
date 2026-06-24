@@ -5,6 +5,8 @@ import '../../data/models/auth_user.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../data/repositories/device_repository.dart';
 import '../../data/repositories/platform_repository.dart';
+import '../../data/services/preferences_service.dart';
+import '../home/home_devices_provider.dart';
 import '../home/home_screen.dart';
 import '../navigation/navigation_provider.dart';
 import '../timeline/logic/timeline_provider.dart';
@@ -26,6 +28,7 @@ class AuthController extends StateNotifier<AsyncValue<AuthSession?>> {
   Future<void> restore() async {
     state = const AsyncValue.loading();
     final session = await _repository.restoreSession();
+    await _syncPreferences(session);
     state = AsyncValue.data(session);
   }
 
@@ -35,6 +38,7 @@ class AuthController extends StateNotifier<AsyncValue<AuthSession?>> {
       () => _repository.login(email: email, password: password),
     );
     if (result.hasValue) {
+      await _syncPreferences(result.value);
       _invalidateUserData();
     }
     state = result;
@@ -48,12 +52,30 @@ class AuthController extends StateNotifier<AsyncValue<AuthSession?>> {
   }) async {
     state = const AsyncValue.loading();
     final result = await AsyncValue.guard<AuthSession?>(
-      () => _repository.signup(email: email, password: password, name: name, code: code),
+      () => _repository.signup(
+        email: email,
+        password: password,
+        name: name,
+        code: code,
+      ),
     );
     if (result.hasValue) {
+      await _syncPreferences(result.value);
       _invalidateUserData();
     }
     state = result;
+  }
+
+  Future<void> updatePreferences({
+    required int notificationLeadDays,
+    required String notificationTime,
+  }) async {
+    final session = await _repository.updatePreferences(
+      notificationLeadDays: notificationLeadDays,
+      notificationTime: notificationTime,
+    );
+    await _syncPreferences(session);
+    state = AsyncValue.data(session);
   }
 
   Future<void> logout() async {
@@ -64,6 +86,7 @@ class AuthController extends StateNotifier<AsyncValue<AuthSession?>> {
 
   void _invalidateUserData() {
     _ref.invalidate(deviceListProvider);
+    _ref.invalidate(homeSummaryProvider);
     _ref.invalidate(deviceRepositoryProvider);
     _ref.invalidate(deviceDataSourceProvider);
 
@@ -78,5 +101,12 @@ class AuthController extends StateNotifier<AsyncValue<AuthSession?>> {
     _ref.read(timelineFilterProvider.notifier).state = {};
     _ref.read(timelineTagFilterProvider.notifier).state = {};
     _ref.read(bottomNavBarVisibleProvider.notifier).state = true;
+  }
+
+  Future<void> _syncPreferences(AuthSession? session) async {
+    if (session == null) return;
+    final prefs = _ref.read(preferencesServiceProvider);
+    await prefs.setNotificationLeadDays(session.user.notificationLeadDays);
+    await prefs.setNotificationTime(session.user.notificationTime);
   }
 }

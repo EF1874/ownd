@@ -7,6 +7,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import * as cacheManager from 'cache-manager';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
+import { UpdateUserPreferencesDto } from './dto/auth.dto';
 
 @Injectable()
 export class AuthService {
@@ -32,13 +33,20 @@ export class AuthService {
   async login(user: Partial<User>) {
     const payload = { email: user.email, sub: user.id };
     return await Promise.resolve({
-      access_token: this.jwtService.sign(payload),
+      access_token: this.jwtService.sign(payload, { expiresIn: '30d' }),
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
+        notificationLeadDays: user.notificationLeadDays ?? 3,
+        notificationTime: user.notificationTime ?? '08:00',
       },
     });
+  }
+
+  async updatePreferences(userId: string, dto: UpdateUserPreferencesDto) {
+    const user = await this.usersService.updatePreferences(userId, dto);
+    return this.login(user);
   }
 
   private getTransporter() {

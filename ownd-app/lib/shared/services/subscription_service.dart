@@ -55,9 +55,8 @@ class SubscriptionService {
     final billingDate = device.subscriptionDueDate;
     if (!device.hasReminder || billingDate == null) return;
 
-    // Calculate notification date: billingDate - reminderDays
     final reminderDate = billingDate.subtract(
-      Duration(days: device.reminderDays),
+      Duration(days: _prefs.notificationLeadDays),
     );
 
     // Parse user preference time
@@ -156,7 +155,7 @@ class SubscriptionService {
       if (!device.hasReminder || billingDate == null) continue;
 
       final reminderDate = billingDate.subtract(
-        Duration(days: device.reminderDays),
+        Duration(days: _prefs.notificationLeadDays),
       );
 
       // Determine the precise time the notification *should* have happened
@@ -191,7 +190,7 @@ class SubscriptionService {
           await _notificationService.showNotification(
             id: device.id,
             title: '订阅提醒',
-            body: '您的订阅 ${device.name} 即将到期/续费',
+            body: '您的订阅 ${device.name} 即将到期',
             payload: '/device/${device.id}',
           );
 

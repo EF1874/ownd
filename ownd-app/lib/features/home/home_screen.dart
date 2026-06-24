@@ -238,13 +238,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   else ...[
                     HomeDeviceList(
                       processedDevices: homeDevicesState.devices,
-                      allDevices: homeDevicesState.devices,
                       isGridView: _isGridView,
-                      categoryName:
-                          _selectedCategories.isNotEmpty &&
-                              _selectedCategories.length == 1
-                          ? _selectedCategories.first
-                          : null,
                       onDeleteComplete: (success, error) {
                         debugPrint(
                           '[HomeScreen] onDeleteComplete: success=$success, error=$error',

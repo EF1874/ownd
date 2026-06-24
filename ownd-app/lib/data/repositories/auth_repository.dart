@@ -23,7 +23,8 @@ class AuthRepository {
 
     try {
       final user = await profile();
-      return AuthSession(token: token, user: user);
+      final refreshedToken = await _tokenStorage.readToken();
+      return AuthSession(token: refreshedToken ?? token, user: user);
     } catch (_) {
       await _tokenStorage.clearToken();
       return null;
@@ -58,6 +59,14 @@ class AuthRepository {
 
   Future<AuthUser> profile() async {
     final data = await _apiClient.get<Map<String, dynamic>>('/auth/profile');
+    final userData = data['user'];
+    if (userData is Map<String, dynamic>) {
+      final token = (data['access_token'] ?? data['accessToken']) as String?;
+      if (token != null && token.isNotEmpty) {
+        await _tokenStorage.saveToken(token);
+      }
+      return AuthUser.fromJson(userData);
+    }
     return AuthUser.fromJson(data);
   }
 
@@ -71,13 +80,25 @@ class AuthRepository {
     }
   }
 
+  Future<AuthSession> updatePreferences({
+    required int notificationLeadDays,
+    required String notificationTime,
+  }) async {
+    final data = await _apiClient.patch<Map<String, dynamic>>(
+      '/auth/profile',
+      data: {
+        'notificationLeadDays': notificationLeadDays,
+        'notificationTime': notificationTime,
+      },
+    );
+
+    return _persistLoginResult(data);
+  }
+
   Future<void> sendVerificationCode(String email, {String? type}) async {
     await _apiClient.post<dynamic>(
       '/auth/send-code',
-      data: {
-        'email': email,
-        if (type != null) 'type': type,
-      },
+      data: {'email': email, if (type != null) 'type': type},
     );
   }
 
@@ -88,11 +109,7 @@ class AuthRepository {
   }) async {
     await _apiClient.post<dynamic>(
       '/auth/reset-password',
-      data: {
-        'email': email,
-        'newPassword': newPassword,
-        'code': code,
-      },
+      data: {'email': email, 'newPassword': newPassword, 'code': code},
     );
   }
 

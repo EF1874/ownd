@@ -8,6 +8,7 @@ import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
 import { CreateItemDto } from './dto/create-item.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
 import { User } from '@prisma/client';
+import { Readable } from 'stream';
 
 describe('ItemsController', () => {
   let controller: ItemsController;
@@ -19,6 +20,10 @@ describe('ItemsController', () => {
     email: 'test@test.com',
     name: 'Test User',
     password: 'hashedpassword',
+    categoryDefaultsInitialized: false,
+    platformDefaultsInitialized: false,
+    notificationLeadDays: 3,
+    notificationTime: '08:00',
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -134,6 +139,26 @@ describe('ItemsController', () => {
         itemId,
         mockSavedPath,
       );
+    });
+  });
+
+  describe('getImage', () => {
+    it('应该从 MinIO 读取图片并写入响应', async () => {
+      const stream = Readable.from(['image']);
+      const res = {
+        setHeader: jest.fn(),
+      } as any;
+      jest.spyOn(stream, 'pipe').mockImplementation(jest.fn() as any);
+      minioService.getFile.mockResolvedValue({
+        stream,
+        contentType: 'image/png',
+      });
+
+      await controller.getImage('test.png', res);
+
+      expect(minioService.getFile).toHaveBeenCalledWith('test.png');
+      expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'image/png');
+      expect(stream.pipe).toHaveBeenCalledWith(res);
     });
   });
 });

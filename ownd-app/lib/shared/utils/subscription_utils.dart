@@ -113,13 +113,14 @@ class SubscriptionUtils {
 
   static int daysUntilDue(DateTime dueDate, {DateTime? from}) {
     final today = dateOnly(from ?? DateTime.now());
-    return dateOnly(dueDate).difference(today).inDays;
+    final days = dateOnly(dueDate).difference(today).inDays;
+    return days >= 0 ? days + 1 : days;
   }
 
   static Color dueColor(BuildContext context, int daysUntilDue) {
-    if (daysUntilDue <= 1) return Colors.red;
-    if (daysUntilDue <= 3) return Colors.deepOrange;
-    if (daysUntilDue <= 7) return Colors.orange;
+    if (daysUntilDue <= 2) return Colors.red;
+    if (daysUntilDue <= 4) return Colors.deepOrange;
+    if (daysUntilDue <= 8) return Colors.orange;
     return Theme.of(context).colorScheme.primary;
   }
 

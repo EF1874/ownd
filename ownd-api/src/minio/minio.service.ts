@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as Minio from 'minio';
 import path from 'path';
@@ -68,6 +68,20 @@ export class MinioService {
 
     // 返回文件存储的路径（之后会存入数据库）
     return `/${this.bucketName}/${fileName}`;
+  }
+
+  async getFile(fileName: string) {
+    if (fileName.includes('/') || fileName.includes('\\')) {
+      throw new BadRequestException('图片不存在或已被删除');
+    }
+
+    const stat = await this.client.statObject(this.bucketName, fileName);
+    const stream = await this.client.getObject(this.bucketName, fileName);
+    return {
+      stream,
+      contentType:
+        stat.metaData?.['content-type'] ?? 'application/octet-stream',
+    };
   }
 
   async checkHealth() {

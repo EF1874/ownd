@@ -36,6 +36,10 @@ export class StatisticsService {
     let totalOriginalPrice = 0; // 购买总价
     let totalHistoryExpense = 0; // 历史记录总支出 (维修/续费等)
     let totalTco = 0; // 总持有成本
+    let scrapOrExpiredCount = 0;
+    let expiringSoonCount = 0;
+    const today = dayjs().startOf('day');
+    const sevenDaysLater = today.add(7, 'day').endOf('day');
 
     items.forEach((item) => {
       totalOriginalPrice += item.price;
@@ -45,6 +49,24 @@ export class StatisticsService {
       );
       totalHistoryExpense += historySum;
       totalTco += item.price + historySum;
+
+      const dueDate = item.nextBillingDate ? dayjs(item.nextBillingDate) : null;
+      const expiredSubscription =
+        item.isVirtual &&
+        !item.isAutoRenew &&
+        dueDate !== null &&
+        dueDate.isBefore(today);
+      if (item.isScrapped || expiredSubscription) {
+        scrapOrExpiredCount++;
+      }
+      if (
+        item.isVirtual &&
+        dueDate !== null &&
+        !dueDate.isBefore(today) &&
+        !dueDate.isAfter(sevenDaysLater)
+      ) {
+        expiringSoonCount++;
+      }
     });
 
     // 计算日均支出 (基于所有物品的平均持有时间)
@@ -65,6 +87,8 @@ export class StatisticsService {
       totalHistoryExpense,
       totalTco,
       dailyAverage: parseFloat(dailyAverage.toFixed(2)),
+      scrapOrExpiredCount,
+      expiringSoonCount,
     };
 
     try {

@@ -13,3 +13,9 @@
 - Do not expose permission constants, exception class names, endpoint names, ports, stack traces, internal error codes, or raw English infrastructure errors in UI text.
 - Permission flows should open the relevant system settings page directly when possible. Do not show custom confirmation prompts if the buttons do not grant the permission themselves.
 - Error text must explain what happened in plain language and, when useful, tell the user what to do next.
+
+## UI And Product Rules
+
+- New UI must follow existing project patterns and nearby examples before adding new styles or controls.
+- Default text must use regular font weight. Use bold only for explicit titles, selected states, or existing matching examples.
+- If nearby code conflicts with the project's main style, call it out and follow the main style instead of copying the inconsistency.

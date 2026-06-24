@@ -120,53 +120,48 @@ const DeviceSchema = CollectionSchema(
       name: r'purchaseDate',
       type: IsarType.dateTime,
     ),
-    r'reminderDays': PropertySchema(
-      id: 20,
-      name: r'reminderDays',
-      type: IsarType.long,
-    ),
     r'renewalPrice': PropertySchema(
-      id: 21,
+      id: 20,
       name: r'renewalPrice',
       type: IsarType.double,
     ),
     r'scrapDate': PropertySchema(
-      id: 22,
+      id: 21,
       name: r'scrapDate',
       type: IsarType.dateTime,
     ),
     r'status': PropertySchema(
-      id: 23,
+      id: 22,
       name: r'status',
       type: IsarType.string,
     ),
     r'subscriptionDueDate': PropertySchema(
-      id: 24,
+      id: 23,
       name: r'subscriptionDueDate',
       type: IsarType.dateTime,
     ),
     r'tags': PropertySchema(
-      id: 25,
+      id: 24,
       name: r'tags',
       type: IsarType.stringList,
     ),
     r'totalAccumulatedPrice': PropertySchema(
-      id: 26,
+      id: 25,
       name: r'totalAccumulatedPrice',
       type: IsarType.double,
     ),
     r'usageCount': PropertySchema(
-      id: 27,
+      id: 26,
       name: r'usageCount',
       type: IsarType.long,
     ),
     r'uuid': PropertySchema(
-      id: 28,
+      id: 27,
       name: r'uuid',
       type: IsarType.string,
     ),
     r'warrantyEndDate': PropertySchema(
-      id: 29,
+      id: 28,
       name: r'warrantyEndDate',
       type: IsarType.dateTime,
     )
@@ -282,16 +277,15 @@ void _deviceSerialize(
   writer.writeString(offsets[17], object.platform);
   writer.writeDouble(offsets[18], object.price);
   writer.writeDateTime(offsets[19], object.purchaseDate);
-  writer.writeLong(offsets[20], object.reminderDays);
-  writer.writeDouble(offsets[21], object.renewalPrice);
-  writer.writeDateTime(offsets[22], object.scrapDate);
-  writer.writeString(offsets[23], object.status);
-  writer.writeDateTime(offsets[24], object.subscriptionDueDate);
-  writer.writeStringList(offsets[25], object.tags);
-  writer.writeDouble(offsets[26], object.totalAccumulatedPrice);
-  writer.writeLong(offsets[27], object.usageCount);
-  writer.writeString(offsets[28], object.uuid);
-  writer.writeDateTime(offsets[29], object.warrantyEndDate);
+  writer.writeDouble(offsets[20], object.renewalPrice);
+  writer.writeDateTime(offsets[21], object.scrapDate);
+  writer.writeString(offsets[22], object.status);
+  writer.writeDateTime(offsets[23], object.subscriptionDueDate);
+  writer.writeStringList(offsets[24], object.tags);
+  writer.writeDouble(offsets[25], object.totalAccumulatedPrice);
+  writer.writeLong(offsets[26], object.usageCount);
+  writer.writeString(offsets[27], object.uuid);
+  writer.writeDateTime(offsets[28], object.warrantyEndDate);
 }
 
 Device _deviceDeserialize(
@@ -329,14 +323,13 @@ Device _deviceDeserialize(
   object.platform = reader.readStringOrNull(offsets[17]);
   object.price = reader.readDouble(offsets[18]);
   object.purchaseDate = reader.readDateTime(offsets[19]);
-  object.reminderDays = reader.readLong(offsets[20]);
-  object.renewalPrice = reader.readDoubleOrNull(offsets[21]);
-  object.scrapDate = reader.readDateTimeOrNull(offsets[22]);
-  object.tags = reader.readStringList(offsets[25]) ?? [];
-  object.totalAccumulatedPrice = reader.readDouble(offsets[26]);
-  object.usageCount = reader.readLong(offsets[27]);
-  object.uuid = reader.readString(offsets[28]);
-  object.warrantyEndDate = reader.readDateTimeOrNull(offsets[29]);
+  object.renewalPrice = reader.readDoubleOrNull(offsets[20]);
+  object.scrapDate = reader.readDateTimeOrNull(offsets[21]);
+  object.tags = reader.readStringList(offsets[24]) ?? [];
+  object.totalAccumulatedPrice = reader.readDouble(offsets[25]);
+  object.usageCount = reader.readLong(offsets[26]);
+  object.uuid = reader.readString(offsets[27]);
+  object.warrantyEndDate = reader.readDateTimeOrNull(offsets[28]);
   return object;
 }
 
@@ -397,24 +390,22 @@ P _deviceDeserializeProp<P>(
     case 19:
       return (reader.readDateTime(offset)) as P;
     case 20:
-      return (reader.readLong(offset)) as P;
-    case 21:
       return (reader.readDoubleOrNull(offset)) as P;
+    case 21:
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 22:
-      return (reader.readDateTimeOrNull(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 23:
-      return (reader.readString(offset)) as P;
-    case 24:
       return (reader.readDateTimeOrNull(offset)) as P;
-    case 25:
+    case 24:
       return (reader.readStringList(offset) ?? []) as P;
-    case 26:
+    case 25:
       return (reader.readDouble(offset)) as P;
-    case 27:
+    case 26:
       return (reader.readLong(offset)) as P;
-    case 28:
+    case 27:
       return (reader.readString(offset)) as P;
-    case 29:
+    case 28:
       return (reader.readDateTimeOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -2357,59 +2348,6 @@ extension DeviceQueryFilter on QueryBuilder<Device, Device, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Device, Device, QAfterFilterCondition> reminderDaysEqualTo(
-      int value) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'reminderDays',
-        value: value,
-      ));
-    });
-  }
-
-  QueryBuilder<Device, Device, QAfterFilterCondition> reminderDaysGreaterThan(
-    int value, {
-    bool include = false,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.greaterThan(
-        include: include,
-        property: r'reminderDays',
-        value: value,
-      ));
-    });
-  }
-
-  QueryBuilder<Device, Device, QAfterFilterCondition> reminderDaysLessThan(
-    int value, {
-    bool include = false,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.lessThan(
-        include: include,
-        property: r'reminderDays',
-        value: value,
-      ));
-    });
-  }
-
-  QueryBuilder<Device, Device, QAfterFilterCondition> reminderDaysBetween(
-    int lower,
-    int upper, {
-    bool includeLower = true,
-    bool includeUpper = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.between(
-        property: r'reminderDays',
-        lower: lower,
-        includeLower: includeLower,
-        upper: upper,
-        includeUpper: includeUpper,
-      ));
-    });
-  }
-
   QueryBuilder<Device, Device, QAfterFilterCondition> renewalPriceIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(const FilterCondition.isNull(
@@ -3548,18 +3486,6 @@ extension DeviceQuerySortBy on QueryBuilder<Device, Device, QSortBy> {
     });
   }
 
-  QueryBuilder<Device, Device, QAfterSortBy> sortByReminderDays() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'reminderDays', Sort.asc);
-    });
-  }
-
-  QueryBuilder<Device, Device, QAfterSortBy> sortByReminderDaysDesc() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'reminderDays', Sort.desc);
-    });
-  }
-
   QueryBuilder<Device, Device, QAfterSortBy> sortByRenewalPrice() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'renewalPrice', Sort.asc);
@@ -3898,18 +3824,6 @@ extension DeviceQuerySortThenBy on QueryBuilder<Device, Device, QSortThenBy> {
     });
   }
 
-  QueryBuilder<Device, Device, QAfterSortBy> thenByReminderDays() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'reminderDays', Sort.asc);
-    });
-  }
-
-  QueryBuilder<Device, Device, QAfterSortBy> thenByReminderDaysDesc() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'reminderDays', Sort.desc);
-    });
-  }
-
   QueryBuilder<Device, Device, QAfterSortBy> thenByRenewalPrice() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'renewalPrice', Sort.asc);
@@ -4131,12 +4045,6 @@ extension DeviceQueryWhereDistinct on QueryBuilder<Device, Device, QDistinct> {
     });
   }
 
-  QueryBuilder<Device, Device, QDistinct> distinctByReminderDays() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addDistinctBy(r'reminderDays');
-    });
-  }
-
   QueryBuilder<Device, Device, QDistinct> distinctByRenewalPrice() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'renewalPrice');
@@ -4320,12 +4228,6 @@ extension DeviceQueryProperty on QueryBuilder<Device, Device, QQueryProperty> {
   QueryBuilder<Device, DateTime, QQueryOperations> purchaseDateProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'purchaseDate');
-    });
-  }
-
-  QueryBuilder<Device, int, QQueryOperations> reminderDaysProperty() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addPropertyName(r'reminderDays');
     });
   }
 

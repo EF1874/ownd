@@ -1,5 +1,5 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
+import 'app_image.dart';
 
 class ImagePreviewDialog extends StatelessWidget {
   final String imagePath;
@@ -21,7 +21,9 @@ class ImagePreviewDialog extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          InteractiveViewer(child: Image.file(File(imagePath))),
+          InteractiveViewer(
+            child: AppImage(path: imagePath, fit: BoxFit.contain),
+          ),
           Positioned(
             top: 40,
             right: 20,

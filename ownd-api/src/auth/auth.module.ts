@@ -16,7 +16,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         secret: config.get<string>('JWT_SECRET'), // 从 .env.development 读取
-        signOptions: { expiresIn: '7d' }, // 令牌有效期 7 天
+        signOptions: { expiresIn: '30d' },
       }),
     }),
   ],

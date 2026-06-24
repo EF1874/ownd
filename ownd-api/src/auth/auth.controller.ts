@@ -1,6 +1,7 @@
 import {
   Controller,
   Post,
+  Patch,
   Body,
   UnauthorizedException,
   BadRequestException,
@@ -12,11 +13,16 @@ import {
   Inject,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { SignupDto, LoginDto, ResetPasswordDto } from './dto/auth.dto';
+import {
+  SignupDto,
+  LoginDto,
+  ResetPasswordDto,
+  UpdateUserPreferencesDto,
+} from './dto/auth.dto';
 import { JwtAuthGuard } from '../common/guard/jwt.guard';
 import { User } from '@prisma/client';
 import { ApiBearerAuth, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { LoginResultEntity, UserEntity } from './entities/auth.entity';
+import { LoginResultEntity } from './entities/auth.entity';
 import { Audit } from '../common/decorators/audit.decorator';
 import { JwtService } from '@nestjs/jwt';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -108,10 +114,28 @@ export class AuthController {
   @ApiBearerAuth()
   @Get('profile')
   @UseGuards(JwtAuthGuard)
-  @ApiResponse({ status: 200, description: '获取成功', type: UserEntity })
+  @ApiResponse({
+    status: 200,
+    description: '获取成功',
+    type: LoginResultEntity,
+  })
   getProfile(@NestRequest() req: RequestWithUser) {
-    // 因为已经有了 Guard 和 Strategy，这里的 req.user 已经是数据库里的最新对象
-    return req.user;
+    return this.authService.login(req.user);
+  }
+
+  @ApiBearerAuth()
+  @Patch('profile')
+  @UseGuards(JwtAuthGuard)
+  @ApiResponse({
+    status: 200,
+    description: '保存成功',
+    type: LoginResultEntity,
+  })
+  updateProfile(
+    @NestRequest() req: RequestWithUser,
+    @Body() dto: UpdateUserPreferencesDto,
+  ) {
+    return this.authService.updatePreferences(req.user.id, dto);
   }
 
   @ApiBearerAuth()

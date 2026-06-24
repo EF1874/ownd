@@ -439,15 +439,15 @@ class _DeviceListItemState extends ConsumerState<DeviceListItem>
         if (nextDate != null) {
           final diff = SubscriptionUtils.daysUntilDue(nextDate, from: now);
           if (device.isAutoRenew) {
-            if (diff <= 7 && diff >= 0) {
-              badges.add(const StatusBadge(text: '即将续费', color: Colors.orange));
+            if (diff <= 8 && diff >= 1) {
+              badges.add(const StatusBadge(text: '即将到期', color: Colors.orange));
             } else {
               badges.add(const StatusBadge(text: '自动续费', color: Colors.green));
             }
           } else {
             if (diff < 0) {
               badges.add(const StatusBadge(text: '已过期', color: Colors.grey));
-            } else if (diff <= 7) {
+            } else if (diff <= 8) {
               badges.add(const StatusBadge(text: '即将到期', color: Colors.red));
             }
           }

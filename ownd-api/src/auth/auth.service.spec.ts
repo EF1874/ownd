@@ -135,7 +135,10 @@ describe('AuthService', () => {
 
       const result = await service.login(user);
 
-      expect(jwtService.sign as jest.Mock).toHaveBeenCalled();
+      expect(jwtService.sign as jest.Mock).toHaveBeenCalledWith(
+        { email: user.email, sub: user.id },
+        { expiresIn: '30d' },
+      );
       expect(result).toEqual({
         access_token: mockToken,
         user: { id: '1', email: 'test@test.com', name: 'Test' },

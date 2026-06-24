@@ -16,12 +16,12 @@ class SubscriptionSection extends StatelessWidget {
   final CycleCalculationMode cycleCalculationMode;
   final int? cycleDays;
   final bool isAutoRenew;
-  final int reminderDays;
+  final bool hasReminder;
 
   final Function(CycleType?) onCycleTypeChanged;
   final Function(CycleCalculationMode, int?) onCycleCalculationChanged;
   final Function(bool) onAutoRenewChanged;
-  final Function(int) onReminderDaysChanged;
+  final Function(bool) onReminderChanged;
   final VoidCallback onPickDate;
   final VoidCallback onPickBillingDate;
 
@@ -38,11 +38,11 @@ class SubscriptionSection extends StatelessWidget {
     required this.cycleCalculationMode,
     required this.cycleDays,
     required this.isAutoRenew,
-    required this.reminderDays,
+    required this.hasReminder,
     required this.onCycleTypeChanged,
     required this.onCycleCalculationChanged,
     required this.onAutoRenewChanged,
-    required this.onReminderDaysChanged,
+    required this.onReminderChanged,
     required this.onPickDate,
     required this.onPickBillingDate,
   });
@@ -61,7 +61,7 @@ class SubscriptionSection extends StatelessWidget {
         SubscriptionDateInfo(
           purchaseDate: purchaseDate,
           nextBillingDate: nextBillingDate,
-          isAutoRenew: isAutoRenew,
+          isEditing: isEditing,
           onPickDate: onPickDate,
           onPickBillingDate: onPickBillingDate,
         ),
@@ -70,13 +70,14 @@ class SubscriptionSection extends StatelessWidget {
           cycleType: cycleType,
           cycleCalculationMode: cycleCalculationMode,
           cycleDays: cycleDays,
+          isEditing: isEditing,
           isAutoRenew: isAutoRenew,
-          reminderDays: reminderDays,
+          hasReminder: hasReminder,
           renewalPriceController: renewalPriceController,
           onCycleTypeChanged: onCycleTypeChanged,
           onCycleCalculationChanged: onCycleCalculationChanged,
           onAutoRenewChanged: onAutoRenewChanged,
-          onReminderDaysChanged: onReminderDaysChanged,
+          onReminderChanged: onReminderChanged,
         ),
       ],
     );

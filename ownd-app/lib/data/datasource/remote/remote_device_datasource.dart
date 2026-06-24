@@ -1,10 +1,14 @@
 import 'dart:async';
+import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:path/path.dart' as p;
 
 import '../../../core/network/api_client.dart';
 import '../../mappers/device_api_mapper.dart';
 import '../../models/device.dart';
 import '../device_datasource.dart';
+import '../../../shared/utils/image_path_utils.dart';
 
 class RemoteDeviceDataSource implements DeviceDataSource {
   final ApiClient _apiClient;
@@ -97,14 +101,24 @@ class RemoteDeviceDataSource implements DeviceDataSource {
 
   @override
   Future<void> add(Device device) async {
+    final imagePath = device.imagePath;
+    final uploadsImage = await _isLocalImagePath(imagePath);
+    final payload = deviceToApi(device);
+    if (uploadsImage) payload.remove('imagePath');
+
     final data = await _apiClient.post<Map<String, dynamic>>(
       '/items',
-      data: deviceToApi(device),
+      data: payload,
     );
-    final created = deviceFromApi(data);
+    var created = deviceFromApi(data);
+    if (uploadsImage) {
+      await _uploadImage(created.uuid, imagePath!);
+      created = await _fetchByUuid(created.uuid);
+    }
     device
       ..id = created.id
-      ..uuid = created.uuid;
+      ..uuid = created.uuid
+      ..imagePath = created.imagePath;
     _uuidMap[device.id] = device.uuid;
     try {
       await getAll();
@@ -115,6 +129,8 @@ class RemoteDeviceDataSource implements DeviceDataSource {
 
   @override
   Future<void> update(Device device) async {
+    final imagePath = device.imagePath;
+    final uploadsImage = await _isLocalImagePath(imagePath);
     final existingHistoryCount = await _getRemoteHistoryCount(device.uuid);
     final newHistories = device.history.length > existingHistoryCount
         ? device.history.skip(existingHistoryCount).toList()
@@ -126,17 +142,26 @@ class RemoteDeviceDataSource implements DeviceDataSource {
       );
     }
 
+    final payload = deviceToApi(device);
+    if (uploadsImage) payload.remove('imagePath');
+
     final data = await _apiClient.patch<Map<String, dynamic>>(
       '/items/${device.uuid}',
-      data: deviceToApi(device),
+      data: payload,
     );
-    final refreshedData = newHistories.isEmpty
-        ? data
-        : await _apiClient.get<Map<String, dynamic>>('/items/${device.uuid}');
+    if (uploadsImage) {
+      await _uploadImage(device.uuid, imagePath!);
+    }
+    final refreshedData = uploadsImage || newHistories.isNotEmpty
+        ? await _apiClient.get<Map<String, dynamic>>('/items/${device.uuid}')
+        : data;
     final refreshed = deviceFromApi(refreshedData);
     device
       ..id = refreshed.id
       ..uuid = refreshed.uuid
+      ..imagePath = refreshed.imagePath
+      ..notes = refreshed.notes
+      ..tags = refreshed.tags
       ..history = refreshed.history
       ..nextBillingDate = refreshed.nextBillingDate
       ..cycleType = refreshed.cycleType
@@ -202,6 +227,28 @@ class RemoteDeviceDataSource implements DeviceDataSource {
       // Cache refresh failure should not block the success result
     }
     return device;
+  }
+
+  Future<Device> _fetchByUuid(String uuid) async {
+    final data = await _apiClient.get<Map<String, dynamic>>('/items/$uuid');
+    return deviceFromApi(data);
+  }
+
+  Future<void> _uploadImage(String uuid, String imagePath) async {
+    await _apiClient.post<Map<String, dynamic>>(
+      '/items/$uuid/image',
+      data: FormData.fromMap({
+        'file': await MultipartFile.fromFile(
+          imagePath,
+          filename: p.basename(imagePath),
+        ),
+      }),
+    );
+  }
+
+  Future<bool> _isLocalImagePath(String? imagePath) async {
+    if (imagePath == null || isRemoteImagePath(imagePath)) return false;
+    return File(imagePath).exists();
   }
 
   Future<int> _getRemoteHistoryCount(String itemUuid) async {

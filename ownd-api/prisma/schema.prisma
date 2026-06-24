@@ -20,6 +20,8 @@ model User {
   items                       Item[] // 一个用户可以拥有多个物品
   categoryDefaultsInitialized Boolean  @default(false)
   platformDefaultsInitialized Boolean  @default(false)
+  notificationLeadDays        Int      @default(3)
+  notificationTime            String   @default("08:00")
   createdAt                   DateTime @default(now())
   updatedAt                   DateTime @updatedAt
 
@@ -115,7 +117,7 @@ model Item {
   currentCycleDays Int?
   nextBillingDate  DateTime?
   isAutoRenew      Boolean        @default(false)
-  reminderDays     Int            @default(0)
+  hasReminder      Boolean        @default(false)
 
   isBackup   Boolean   @default(false)
   backupDate DateTime?
