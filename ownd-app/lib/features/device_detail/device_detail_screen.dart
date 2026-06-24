@@ -26,7 +26,10 @@ import '../home/home_devices_provider.dart';
 import '../add_device/add_device_screen.dart';
 import 'widgets/renew_dialog.dart';
 
-final deviceDetailProvider = FutureProvider.family<Device, int>((ref, id) {
+final deviceDetailProvider = FutureProvider.autoDispose.family<Device, int>((
+  ref,
+  id,
+) {
   return ref.read(deviceRepositoryProvider).getDevice(id);
 });
 
@@ -93,6 +96,14 @@ class DeviceDetailScreen extends ConsumerWidget {
                         onPressed: () =>
                             _changeHeaderImage(context, ref, device),
                       ),
+                      if (device.imagePath != null)
+                        _HeaderImageButton(
+                          icon: Icons.delete_outline,
+                          tooltip: '删除图片',
+                          bottom: 80,
+                          onPressed: () =>
+                              _deleteHeaderImage(context, ref, device),
+                        ),
                     ],
                   ),
                 ),
@@ -160,7 +171,20 @@ class DeviceDetailScreen extends ConsumerWidget {
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, s) => Scaffold(
-        body: Center(child: Text(userErrorMessage(e, fallback: '加载失败，请稍后重试'))),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(userErrorMessage(e, fallback: '加载失败，请稍后重试')),
+              const SizedBox(height: 12),
+              TextButton.icon(
+                onPressed: () => ref.invalidate(deviceDetailProvider(id)),
+                icon: const Icon(Icons.refresh),
+                label: const Text('重新加载'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -177,7 +201,6 @@ class DeviceDetailScreen extends ConsumerWidget {
         children: [
           GestureDetector(
             onTap: () => ImagePreviewDialog.show(context, device.imagePath!),
-            onLongPress: () => _changeHeaderImage(context, ref, device),
             child: Hero(
               tag: 'device_image_${device.id}',
               child: AppImage(path: device.imagePath!),
@@ -257,6 +280,26 @@ class DeviceDetailScreen extends ConsumerWidget {
       device.imagePath = oldImagePath;
       if (!context.mounted) return;
       AppToast.show(context, '图片更新失败: ${userErrorMessage(e)}', isError: true);
+    }
+  }
+
+  Future<void> _deleteHeaderImage(
+    BuildContext context,
+    WidgetRef ref,
+    Device device,
+  ) async {
+    final oldImagePath = device.imagePath;
+    try {
+      device.imagePath = null;
+      await ref.read(deviceRepositoryProvider).updateDevice(device);
+      if (!context.mounted) return;
+      ref.invalidate(deviceDetailProvider(id));
+      await ref.read(homeDevicesNotifierProvider.notifier).silentRefresh();
+      if (context.mounted) AppToast.show(context, '图片已删除');
+    } catch (e) {
+      device.imagePath = oldImagePath;
+      if (!context.mounted) return;
+      AppToast.show(context, '图片删除失败: ${userErrorMessage(e)}', isError: true);
     }
   }
 
@@ -489,6 +532,39 @@ class DeviceDetailScreen extends ConsumerWidget {
             onChanged: (enabled) =>
                 _toggleAutoRenew(context, ref, device, enabled),
           ),
+          if (device.isAutoRenew) ...[
+            const Divider(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '续费价格',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: AppColors.ash,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '¥${FormatUtils.formatCurrency(device.renewalPrice ?? device.price)}',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: () =>
+                      _showRenewalPriceDialog(context, ref, device),
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('修改'),
+                ),
+              ],
+            ),
+          ],
           const Divider(height: 24),
           _SwitchInfoRow(
             label: '到期提醒',
@@ -635,6 +711,77 @@ class DeviceDetailScreen extends ConsumerWidget {
       device.isAutoRenew = previousAutoRenew;
       if (!context.mounted) return;
       AppToast.show(context, '自动续费设置失败: ${userErrorMessage(e)}', isError: true);
+    }
+  }
+
+  Future<void> _showRenewalPriceDialog(
+    BuildContext context,
+    WidgetRef ref,
+    Device device,
+  ) async {
+    final controller = TextEditingController(
+      text: (device.renewalPrice ?? device.price).toString(),
+    );
+
+    try {
+      final price = await showDialog<double>(
+        context: context,
+        builder: (dialogContext) {
+          String? errorText;
+          return StatefulBuilder(
+            builder: (context, setDialogState) => AlertDialog(
+              title: const Text('修改续费价格'),
+              content: TextField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: '续费价格',
+                  prefixText: '¥',
+                  errorText: errorText,
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('取消'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    final value = double.tryParse(controller.text.trim());
+                    if (value == null || value < 0) {
+                      setDialogState(() => errorText = '请输入正确的价格');
+                      return;
+                    }
+                    Navigator.pop(dialogContext, value);
+                  },
+                  child: const Text('保存'),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+      if (price == null || !context.mounted) return;
+
+      final previousRenewalPrice = device.renewalPrice;
+      try {
+        device.renewalPrice = price;
+        await ref.read(deviceRepositoryProvider).updateDevice(device);
+        ref.invalidate(deviceDetailProvider(id));
+        await ref.read(homeDevicesNotifierProvider.notifier).silentRefresh();
+        if (!context.mounted) return;
+        AppToast.show(context, '续费价格已更新');
+      } catch (e) {
+        device.renewalPrice = previousRenewalPrice;
+        if (!context.mounted) return;
+        AppToast.show(
+          context,
+          '续费价格保存失败: ${userErrorMessage(e)}',
+          isError: true,
+        );
+      }
+    } finally {
+      controller.dispose();
     }
   }
 
@@ -1102,18 +1249,20 @@ class _HeaderImageButton extends StatelessWidget {
   final IconData icon;
   final String tooltip;
   final VoidCallback onPressed;
+  final double bottom;
 
   const _HeaderImageButton({
     required this.icon,
     required this.tooltip,
     required this.onPressed,
+    this.bottom = 24,
   });
 
   @override
   Widget build(BuildContext context) {
     return Positioned(
       right: 16,
-      bottom: 24,
+      bottom: bottom,
       child: Material(
         color: Colors.black.withValues(alpha: 0.42),
         shape: const CircleBorder(),

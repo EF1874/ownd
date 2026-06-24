@@ -18,7 +18,9 @@ final categoryRepositoryProvider = Provider<CategoryRepository>((ref) {
   return CategoryRepository(dataSource);
 });
 
-final categoryTreeProvider = FutureProvider<List<Category>>((ref) async {
+final categoryTreeProvider = FutureProvider.autoDispose<List<Category>>((
+  ref,
+) async {
   return ref.read(categoryRepositoryProvider).getCategoryTree();
 });
 

@@ -41,7 +41,9 @@ class HomeSummaryStats {
   static int _asInt(Object? value) => value is num ? value.toInt() : 0;
 }
 
-final homeSummaryProvider = FutureProvider<HomeSummaryStats>((ref) async {
+final homeSummaryProvider = FutureProvider.autoDispose<HomeSummaryStats>((
+  ref,
+) async {
   final data = await ref
       .watch(apiClientProvider)
       .get<Map<String, dynamic>>('/statistics/summary');

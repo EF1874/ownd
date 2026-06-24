@@ -35,10 +35,15 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ItemEntity } from './entities/item.entity';
 import type { Response } from 'express';
+import { AssetPurpose } from '@prisma/client';
+import { AssetsService } from '../assets/assets.service';
 
 interface RequestWithUser extends Request {
   user: User;
 }
+
+const imageMaxSize = 5 * 1024 * 1024;
+const imageFileType = /image\/(jpeg|jpg|png)/;
 
 @ApiTags('物品管理')
 @ApiBearerAuth()
@@ -48,6 +53,7 @@ export class ItemsController {
   constructor(
     private readonly itemsService: ItemsService,
     private readonly minioService: MinioService,
+    private readonly assetsService: AssetsService,
   ) {}
 
   @Post('import')
@@ -69,8 +75,8 @@ export class ItemsController {
     @UploadedFile(
       new ParseFilePipe({
         validators: [
-          new MaxFileSizeValidator({ maxSize: 1024 * 1024 }),
-          new FileTypeValidator({ fileType: /image\/(jpeg|jpg|png)/ }),
+          new MaxFileSizeValidator({ maxSize: imageMaxSize }),
+          new FileTypeValidator({ fileType: imageFileType }),
         ],
         fileIsRequired: false,
       }),
@@ -79,13 +85,18 @@ export class ItemsController {
   ) {
     let imagePath: string | undefined = undefined;
     if (file) {
-      imagePath = await this.minioService.uploadFile(file);
+      imagePath = await this.uploadTrackedItemImage(req.user.id, file);
     }
 
-    return this.itemsService.create(req.user.id, {
-      ...createItemDto,
-      imagePath,
-    });
+    try {
+      return await this.itemsService.create(req.user.id, {
+        ...createItemDto,
+        imagePath,
+      });
+    } catch (error) {
+      await this.assetsService.discardUpload(imagePath);
+      throw error;
+    }
   }
 
   @Get()
@@ -145,31 +156,50 @@ export class ItemsController {
     @UploadedFile(
       new ParseFilePipe({
         validators: [
-          new MaxFileSizeValidator({ maxSize: 1024 * 1024 }),
-          new FileTypeValidator({ fileType: /image\/(jpeg|jpg|png)/ }),
+          new MaxFileSizeValidator({ maxSize: imageMaxSize }),
+          new FileTypeValidator({ fileType: imageFileType }),
         ],
         fileIsRequired: false,
       }),
     )
     file?: Express.Multer.File,
   ) {
+    const previousItem =
+      file || updateItemDto.imagePath !== undefined
+        ? await this.itemsService.findOne(req.user.id, id)
+        : null;
     let imagePath: string | undefined = undefined;
     if (file) {
-      imagePath = await this.minioService.uploadFile(file);
+      imagePath = await this.uploadTrackedItemImage(req.user.id, file);
     }
 
-    return this.itemsService.update(req.user.id, id, {
-      ...updateItemDto,
-      imagePath,
-    });
+    try {
+      const updated = await this.itemsService.update(req.user.id, id, {
+        ...updateItemDto,
+        imagePath,
+      });
+      if (
+        previousItem?.imagePath &&
+        previousItem.imagePath !== updated.imagePath
+      ) {
+        await this.assetsService.releasePath(previousItem.imagePath);
+      }
+      return updated;
+    } catch (error) {
+      await this.assetsService.discardUpload(imagePath);
+      throw error;
+    }
   }
 
   @Delete(':id')
   @Audit('删除物品')
   @ApiOperation({ summary: '删除物品' })
   @ApiResponse({ status: 200, description: '删除成功' })
-  remove(@Param('id') id: string, @Request() req: RequestWithUser) {
-    return this.itemsService.remove(req.user.id, id);
+  async remove(@Param('id') id: string, @Request() req: RequestWithUser) {
+    const item = await this.itemsService.findOne(req.user.id, id);
+    const deleted = await this.itemsService.remove(req.user.id, id);
+    await this.assetsService.releasePath(item.imagePath);
+    return deleted;
   }
 
   // 保留单独上传图片的接口，用于纯图片更新场景
@@ -184,17 +214,65 @@ export class ItemsController {
     @UploadedFile(
       new ParseFilePipe({
         validators: [
-          new MaxFileSizeValidator({ maxSize: 1024 * 1024 }),
-          new FileTypeValidator({ fileType: /image\/(jpeg|jpg|png)/ }),
+          new MaxFileSizeValidator({ maxSize: imageMaxSize }),
+          new FileTypeValidator({ fileType: imageFileType }),
         ],
       }),
     )
     file: Express.Multer.File,
     @Request() req: RequestWithUser,
   ) {
-    await this.itemsService.findOne(req.user.id, id);
-    const savedPath = await this.minioService.uploadFile(file);
-    return this.itemsService.updateImagePath(req.user.id, id, savedPath);
+    const item = await this.itemsService.findOne(req.user.id, id);
+    const savedPath = await this.uploadTrackedItemImage(req.user.id, file);
+
+    try {
+      const updated = await this.itemsService.updateImagePath(
+        req.user.id,
+        id,
+        savedPath,
+      );
+      if (item.imagePath && item.imagePath !== savedPath) {
+        await this.assetsService.releasePath(item.imagePath);
+      }
+      return updated;
+    } catch (error) {
+      await this.assetsService.discardUpload(savedPath);
+      throw error;
+    }
+  }
+
+  @Delete(':id/image')
+  @Audit('删除物品图片')
+  @ApiOperation({ summary: '删除物品图片' })
+  @ApiResponse({ status: 200, description: '删除成功' })
+  async removeImage(@Param('id') id: string, @Request() req: RequestWithUser) {
+    const item = await this.itemsService.findOne(req.user.id, id);
+    const updated = await this.itemsService.updateImagePath(
+      req.user.id,
+      id,
+      null,
+    );
+    await this.assetsService.releasePath(item.imagePath);
+    return updated;
+  }
+
+  private async uploadTrackedItemImage(
+    userId: string,
+    file: Express.Multer.File,
+  ) {
+    const path = await this.minioService.uploadFile(file);
+    try {
+      await this.assetsService.registerUpload({
+        userId,
+        path,
+        purpose: AssetPurpose.ITEM_IMAGE,
+        file,
+      });
+      return path;
+    } catch (error) {
+      await this.minioService.deleteFile(path).catch(() => undefined);
+      throw error;
+    }
   }
 
   // --- 历史记录 (ItemHistory) 端点 ---

@@ -9,30 +9,30 @@ class ImagePreviewDialog extends StatelessWidget {
   static void show(BuildContext context, String path) {
     showDialog(
       context: context,
+      barrierColor: Colors.black,
+      useSafeArea: false,
       builder: (ctx) => ImagePreviewDialog(imagePath: path),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: EdgeInsets.zero,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          InteractiveViewer(
+    final size = MediaQuery.sizeOf(context);
+
+    return Material(
+      color: Colors.black,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => Navigator.pop(context),
+        child: InteractiveViewer(
+          minScale: 1,
+          maxScale: 5,
+          child: SizedBox(
+            width: size.width,
+            height: size.height,
             child: AppImage(path: imagePath, fit: BoxFit.contain),
           ),
-          Positioned(
-            top: 40,
-            right: 20,
-            child: IconButton(
-              onPressed: () => Navigator.pop(context),
-              icon: const Icon(Icons.close, color: Colors.white, size: 30),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

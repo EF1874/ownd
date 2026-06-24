@@ -15,6 +15,7 @@ class RemoteDeviceDataSource implements DeviceDataSource {
   final _controller = StreamController<List<Device>>.broadcast();
   List<Device> _cache = [];
   final Map<int, String> _uuidMap = {};
+  final Map<String, String?> _imagePathByUuid = {};
   bool _isDisposed = false;
 
   RemoteDeviceDataSource(this._apiClient);
@@ -24,7 +25,7 @@ class RemoteDeviceDataSource implements DeviceDataSource {
     final data = await _apiClient.get<List<dynamic>>('/items');
     _cache = data.whereType<Map<String, dynamic>>().map(deviceFromApi).toList();
     for (final device in _cache) {
-      _uuidMap[device.id] = device.uuid;
+      _rememberDevice(device);
     }
     if (!_isDisposed) {
       _controller.add(List.unmodifiable(_cache));
@@ -46,7 +47,7 @@ class RemoteDeviceDataSource implements DeviceDataSource {
 
     final data = await _apiClient.get<Map<String, dynamic>>('/items/$uuid');
     final device = deviceFromApi(data);
-    _uuidMap[device.id] = device.uuid;
+    _rememberDevice(device);
     final index = _cache.indexWhere((item) => item.id == device.id);
     if (index >= 0) {
       _cache[index] = device;
@@ -94,7 +95,7 @@ class RemoteDeviceDataSource implements DeviceDataSource {
         .map(deviceFromApi)
         .toList();
     for (final device in list) {
-      _uuidMap[device.id] = device.uuid;
+      _rememberDevice(device);
     }
     return list;
   }
@@ -119,7 +120,7 @@ class RemoteDeviceDataSource implements DeviceDataSource {
       ..id = created.id
       ..uuid = created.uuid
       ..imagePath = created.imagePath;
-    _uuidMap[device.id] = device.uuid;
+    _rememberDevice(device);
     try {
       await getAll();
     } catch (_) {
@@ -130,7 +131,12 @@ class RemoteDeviceDataSource implements DeviceDataSource {
   @override
   Future<void> update(Device device) async {
     final imagePath = device.imagePath;
+    final previousImagePath = _imagePathByUuid[device.uuid];
     final uploadsImage = await _isLocalImagePath(imagePath);
+    final deletesImage =
+        imagePath == null &&
+        previousImagePath != null &&
+        isRemoteImagePath(previousImagePath);
     final existingHistoryCount = await _getRemoteHistoryCount(device.uuid);
     final newHistories = device.history.length > existingHistoryCount
         ? device.history.skip(existingHistoryCount).toList()
@@ -144,6 +150,7 @@ class RemoteDeviceDataSource implements DeviceDataSource {
 
     final payload = deviceToApi(device);
     if (uploadsImage) payload.remove('imagePath');
+    if (deletesImage) await _deleteImage(device.uuid);
 
     final data = await _apiClient.patch<Map<String, dynamic>>(
       '/items/${device.uuid}',
@@ -166,7 +173,7 @@ class RemoteDeviceDataSource implements DeviceDataSource {
       ..nextBillingDate = refreshed.nextBillingDate
       ..cycleType = refreshed.cycleType
       ..price = refreshed.price;
-    _uuidMap[device.id] = device.uuid;
+    _rememberDevice(device);
     try {
       await getAll();
     } catch (_) {
@@ -220,7 +227,7 @@ class RemoteDeviceDataSource implements DeviceDataSource {
       ..cycleType = refreshed.cycleType
       ..price = refreshed.price
       ..periodPrice = refreshed.periodPrice;
-    _uuidMap[device.id] = device.uuid;
+    _rememberDevice(device);
     try {
       await getAll();
     } catch (_) {
@@ -235,15 +242,33 @@ class RemoteDeviceDataSource implements DeviceDataSource {
   }
 
   Future<void> _uploadImage(String uuid, String imagePath) async {
+    final contentType = await _imageContentType(imagePath);
     await _apiClient.post<Map<String, dynamic>>(
       '/items/$uuid/image',
       data: FormData.fromMap({
         'file': await MultipartFile.fromFile(
           imagePath,
           filename: p.basename(imagePath),
+          contentType: contentType,
         ),
       }),
     );
+  }
+
+  Future<void> _deleteImage(String uuid) async {
+    await _apiClient.delete<dynamic>('/items/$uuid/image');
+  }
+
+  Future<DioMediaType> _imageContentType(String imagePath) async {
+    final bytes = await File(imagePath).openRead(0, 12).first;
+    if (bytes.length >= 8 &&
+        bytes[0] == 0x89 &&
+        bytes[1] == 0x50 &&
+        bytes[2] == 0x4E &&
+        bytes[3] == 0x47) {
+      return DioMediaType.parse('image/png');
+    }
+    return DioMediaType.parse('image/jpeg');
   }
 
   Future<bool> _isLocalImagePath(String? imagePath) async {
@@ -275,14 +300,21 @@ class RemoteDeviceDataSource implements DeviceDataSource {
       await _apiClient.delete<dynamic>('/items/${device.uuid}');
     }
     _cache.removeWhere((d) => d.id == id);
-    _uuidMap.remove(id);
+    final removedUuid = _uuidMap.remove(id);
+    if (removedUuid != null) _imagePathByUuid.remove(removedUuid);
     debugPrint('[DataSource] delete($id) completed successfully');
+  }
+
+  void _rememberDevice(Device device) {
+    _uuidMap[device.id] = device.uuid;
+    _imagePathByUuid[device.uuid] = device.imagePath;
   }
 
   Future<void> dispose() async {
     _isDisposed = true;
     _cache = [];
     _uuidMap.clear();
+    _imagePathByUuid.clear();
     await _controller.close();
   }
 }

@@ -84,6 +84,25 @@ export class MinioService {
     };
   }
 
+  async deleteFile(storedPath?: string | null) {
+    if (!storedPath) return;
+
+    const prefix = `/${this.bucketName}/`;
+    if (!storedPath.startsWith(prefix)) return;
+
+    const fileName = storedPath.slice(prefix.length);
+    if (!fileName || fileName.includes('/') || fileName.includes('\\')) {
+      throw new BadRequestException('图片不存在或已被删除');
+    }
+
+    try {
+      await this.client.removeObject(this.bucketName, fileName);
+    } catch (error) {
+      this.logger.error('Failed to delete image', error);
+      throw new BadRequestException('图片删除失败，请稍后重试');
+    }
+  }
+
   async checkHealth() {
     try {
       await this.client.bucketExists(this.bucketName);

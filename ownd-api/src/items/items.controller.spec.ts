@@ -3,17 +3,19 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ItemsController } from './items.controller';
 import { ItemsService } from './items.service';
 import { MinioService } from '../minio/minio.service';
+import { AssetsService } from '../assets/assets.service';
 import { JwtAuthGuard } from '../common/guard/jwt.guard';
 import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
 import { CreateItemDto } from './dto/create-item.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
-import { User } from '@prisma/client';
+import { AssetPurpose, User } from '@prisma/client';
 import { Readable } from 'stream';
 
 describe('ItemsController', () => {
   let controller: ItemsController;
   let service: DeepMockProxy<ItemsService>;
   let minioService: DeepMockProxy<MinioService>;
+  let assetsService: DeepMockProxy<AssetsService>;
 
   const mockUser: User = {
     id: 'user-1',
@@ -45,6 +47,10 @@ describe('ItemsController', () => {
           provide: MinioService,
           useValue: mockDeep<MinioService>(),
         },
+        {
+          provide: AssetsService,
+          useValue: mockDeep<AssetsService>(),
+        },
       ],
     })
       .overrideGuard(JwtAuthGuard)
@@ -54,6 +60,7 @@ describe('ItemsController', () => {
     controller = module.get<ItemsController>(ItemsController);
     service = module.get(ItemsService);
     minioService = module.get(MinioService);
+    assetsService = module.get(AssetsService);
   });
 
   it('should be defined', () => {
@@ -109,24 +116,37 @@ describe('ItemsController', () => {
   describe('remove', () => {
     it('应该调用 service.remove 并传入正确的 ID', async () => {
       const itemId = 'item-123';
+      const imagePath = '/ownd-items/test.png';
+      service.findOne.mockResolvedValue({
+        id: itemId,
+        userId: mockUser.id,
+        imagePath,
+      } as any);
+
       await controller.remove(itemId, mockRequest);
 
+      expect(service.findOne).toHaveBeenCalledWith(mockUser.id, itemId);
       expect(service.remove).toHaveBeenCalledWith(mockUser.id, itemId);
+      expect(assetsService.releasePath).toHaveBeenCalledWith(imagePath);
     });
   });
 
   describe('uploadImage', () => {
-    it('应该经过 权限校验 -> MinIO 上传 -> 数据库更新 的完整流程', async () => {
+    it('应该经过 权限校验 -> MinIO 上传 -> 资产登记 -> 数据库更新 的完整流程', async () => {
       const itemId = 'item-123';
       const mockFile = {
         originalname: 'test.png',
         buffer: Buffer.from('test'),
+        mimetype: 'image/png',
+        size: 4,
       } as Express.Multer.File;
+      const oldImagePath = '/ownd-items/old.png';
       const mockSavedPath = '/ownd-items/test.png';
 
       service.findOne.mockResolvedValue({
         id: itemId,
         userId: mockUser.id,
+        imagePath: oldImagePath,
       } as any);
       minioService.uploadFile.mockResolvedValue(mockSavedPath);
 
@@ -134,11 +154,66 @@ describe('ItemsController', () => {
 
       expect(service.findOne).toHaveBeenCalledWith(mockUser.id, itemId);
       expect(minioService.uploadFile).toHaveBeenCalledWith(mockFile);
+      expect(assetsService.registerUpload).toHaveBeenCalledWith({
+        userId: mockUser.id,
+        path: mockSavedPath,
+        purpose: AssetPurpose.ITEM_IMAGE,
+        file: mockFile,
+      });
       expect(service.updateImagePath).toHaveBeenCalledWith(
         mockUser.id,
         itemId,
         mockSavedPath,
       );
+      expect(assetsService.releasePath).toHaveBeenCalledWith(oldImagePath);
+    });
+
+    it('数据库更新失败时应该丢弃刚上传的图片', async () => {
+      const itemId = 'item-123';
+      const mockFile = {
+        originalname: 'test.png',
+        buffer: Buffer.from('test'),
+        mimetype: 'image/png',
+        size: 4,
+      } as Express.Multer.File;
+      const mockSavedPath = '/ownd-items/test.png';
+      const error = new Error('update failed');
+
+      service.findOne.mockResolvedValue({
+        id: itemId,
+        userId: mockUser.id,
+        imagePath: null,
+      } as any);
+      minioService.uploadFile.mockResolvedValue(mockSavedPath);
+      service.updateImagePath.mockRejectedValue(error);
+
+      await expect(
+        controller.uploadImage(itemId, mockFile, mockRequest),
+      ).rejects.toThrow(error);
+
+      expect(assetsService.discardUpload).toHaveBeenCalledWith(mockSavedPath);
+    });
+  });
+
+  describe('removeImage', () => {
+    it('应该删除图片文件并清空物品图片路径', async () => {
+      const itemId = 'item-123';
+      const imagePath = '/ownd-items/test.png';
+      service.findOne.mockResolvedValue({
+        id: itemId,
+        userId: mockUser.id,
+        imagePath,
+      } as any);
+
+      await controller.removeImage(itemId, mockRequest);
+
+      expect(service.findOne).toHaveBeenCalledWith(mockUser.id, itemId);
+      expect(service.updateImagePath).toHaveBeenCalledWith(
+        mockUser.id,
+        itemId,
+        null,
+      );
+      expect(assetsService.releasePath).toHaveBeenCalledWith(imagePath);
     });
   });
 

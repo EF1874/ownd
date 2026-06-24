@@ -154,14 +154,15 @@ class _DeviceGridItemState extends ConsumerState<DeviceGridItem>
           builder: (ctx) => Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ListTile(
-                leading: const Icon(Icons.edit),
-                title: const Text('编辑'),
-                onTap: () {
-                  Navigator.pop(ctx, false);
-                  _navigateToEdit(context, ref);
-                },
-              ),
+              if (!isSubscription)
+                ListTile(
+                  leading: const Icon(Icons.edit),
+                  title: const Text('编辑'),
+                  onTap: () {
+                    Navigator.pop(ctx, false);
+                    _navigateToEdit(context, ref);
+                  },
+                ),
               ListTile(
                 leading: const Icon(Icons.delete, color: Colors.red),
                 title: const Text('删除', style: TextStyle(color: Colors.red)),

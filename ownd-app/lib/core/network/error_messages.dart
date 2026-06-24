@@ -188,6 +188,15 @@ String _cleanMessage(String message, {required String fallback}) {
   }
 
   if (_containsAny(lower, const [
+    'expected type is',
+    'expected size is less than',
+    'file type',
+    'file size',
+  ])) {
+    return '图片格式或大小不合适，请重新选择图片';
+  }
+
+  if (_containsAny(lower, const [
     'bad request',
     'validation failed',
     'must be',

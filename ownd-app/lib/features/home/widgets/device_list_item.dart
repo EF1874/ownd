@@ -148,24 +148,26 @@ class _DeviceListItemState extends ConsumerState<DeviceListItem>
         endActionPane: ActionPane(
           motion: const ScrollMotion(),
           children: [
-            SlidableAction(
-              onPressed: (context) => navigateToEdit(context, ref),
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
-              icon: Icons.edit,
-              label: '编辑',
-              borderRadius: const BorderRadius.horizontal(
-                left: Radius.circular(12),
+            if (!isSubscription)
+              SlidableAction(
+                onPressed: (context) => navigateToEdit(context, ref),
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                icon: Icons.edit,
+                label: '编辑',
+                borderRadius: const BorderRadius.horizontal(
+                  left: Radius.circular(12),
+                ),
               ),
-            ),
             SlidableAction(
               onPressed: (context) => _showDeleteDialog(context, ref),
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
               icon: Icons.delete,
               label: '删除',
-              borderRadius: const BorderRadius.horizontal(
-                right: Radius.circular(12),
+              borderRadius: BorderRadius.horizontal(
+                left: Radius.circular(isSubscription ? 12 : 0),
+                right: const Radius.circular(12),
               ),
             ),
           ],

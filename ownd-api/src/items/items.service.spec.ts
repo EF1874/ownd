@@ -5,6 +5,9 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { mockDeep, DeepMockProxy } from 'jest-mock-extended';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import {
+  AssetPurpose,
+  AssetRefType,
+  AssetStatus,
   PrismaClient,
   Item,
   ItemCycleType,
@@ -40,6 +43,9 @@ describe('ItemsService', () => {
 
     service = module.get<ItemsService>(ItemsService);
     prisma = module.get(PrismaService);
+    prisma.$transaction.mockImplementation(async (callback) =>
+      typeof callback === 'function' ? callback(prisma) : Promise.all(callback),
+    );
   });
 
   // 辅助函数：创建一个符合 Prisma.Item 结构的 Mock 对象
@@ -100,7 +106,33 @@ describe('ItemsService', () => {
           itemHistories: true,
         },
       });
+      expect(prisma.asset.updateMany).not.toHaveBeenCalled();
       expect(result).toEqual(mockResult);
+    });
+
+    it('创建物品时应该把上传图片登记为物品图片资产', async () => {
+      const imagePath = '/ownd-items/test.png';
+      const dto: CreateItemDto = {
+        name: '测试物品',
+        price: 100,
+        imagePath,
+      };
+      const userId = 'user-1';
+      const mockResult = createMockItem({ ...dto, userId });
+
+      prisma.item.create.mockResolvedValue(mockResult);
+
+      await service.create(userId, dto);
+
+      expect(prisma.asset.updateMany).toHaveBeenCalledWith({
+        where: { userId, path: imagePath },
+        data: {
+          purpose: AssetPurpose.ITEM_IMAGE,
+          status: AssetStatus.ACTIVE,
+          refType: AssetRefType.ITEM,
+          refId: mockResult.id,
+        },
+      });
     });
 
     it('应该按开通日和周期计算订阅到期日', async () => {
@@ -260,6 +292,7 @@ describe('ItemsService', () => {
           itemHistories: true,
         },
       });
+      expect(prisma.asset.updateMany).not.toHaveBeenCalled();
       expect(result.name).toBe(dto.name);
     });
   });
@@ -305,7 +338,50 @@ describe('ItemsService', () => {
         where: { id: itemId },
         data: { imagePath },
       });
+      expect(prisma.asset.updateMany).toHaveBeenCalledWith({
+        where: { userId, path: imagePath },
+        data: {
+          purpose: AssetPurpose.ITEM_IMAGE,
+          status: AssetStatus.ACTIVE,
+          refType: AssetRefType.ITEM,
+          refId: itemId,
+        },
+      });
       expect(result.imagePath).toBe(imagePath);
+    });
+
+    it('应该支持清空物品图片路径', async () => {
+      const userId = 'user-1';
+      const itemId = 'item-1';
+      const oldPath = '/ownd-items/test.png';
+
+      prisma.item.update.mockResolvedValue(
+        createMockItem({ id: itemId, userId, imagePath: null }),
+      );
+
+      prisma.item.findFirst.mockResolvedValue(
+        createMockItem({
+          id: itemId,
+          userId,
+          imagePath: oldPath,
+        }),
+      );
+
+      const result = await service.updateImagePath(userId, itemId, null);
+
+      expect(prisma.item.update).toHaveBeenCalledWith({
+        where: { id: itemId },
+        data: { imagePath: null },
+      });
+      expect(prisma.asset.updateMany).toHaveBeenCalledWith({
+        where: { userId, path: oldPath },
+        data: {
+          status: AssetStatus.ORPHAN,
+          refType: null,
+          refId: null,
+        },
+      });
+      expect(result.imagePath).toBeNull();
     });
   });
 

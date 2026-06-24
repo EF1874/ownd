@@ -7,6 +7,7 @@ type MockMinioClient = {
   bucketExists: jest.Mock;
   makeBucket: jest.Mock;
   putObject: jest.Mock;
+  removeObject: jest.Mock;
 };
 
 jest.mock('minio', () => {
@@ -15,6 +16,7 @@ jest.mock('minio', () => {
       bucketExists: jest.fn(),
       makeBucket: jest.fn(),
       putObject: jest.fn(),
+      removeObject: jest.fn(),
     })),
   };
 });
@@ -115,5 +117,13 @@ describe('MinioService', () => {
     expect(client.putObject).toHaveBeenCalled();
     expect(path).toContain('ownd-items');
     expect(path.endsWith('.png')).toBe(true);
+  });
+
+  it('删除已上传图片时应该只删除桶内文件', async () => {
+    client.removeObject.mockResolvedValue(undefined);
+
+    await service.deleteFile('/ownd-items/test.png');
+
+    expect(client.removeObject).toHaveBeenCalledWith('ownd-items', 'test.png');
   });
 });

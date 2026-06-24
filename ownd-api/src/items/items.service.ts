@@ -11,6 +11,9 @@ import { UpdateItemDto } from './dto/update-item.dto';
 import { CreateItemHistoryDto } from './dto/create-item-history.dto';
 import { UpdateItemHistoryDto } from './dto/update-item-history.dto';
 import {
+  AssetPurpose,
+  AssetRefType,
+  AssetStatus,
   ItemCycleCalculationMode,
   ItemCycleType,
   ItemRecordType,
@@ -99,20 +102,25 @@ export class ItemsService {
     }
 
     // 3. 事务性创建物品和历史记录
-    const created = await this.prisma.item.create({
-      data: {
-        ...data,
-        imagePath,
-        nextBillingDate,
-        user: { connect: { id: userId } },
-        category: categoryId ? { connect: { id: categoryId } } : undefined,
-        platform: platformId ? { connect: { id: platformId } } : undefined,
-        itemHistories:
-          itemHistoriesCreate.length > 0
-            ? { create: itemHistoriesCreate }
-            : undefined,
-      },
-      include: this.itemInclude,
+    const created = await this.prisma.$transaction(async (tx) => {
+      const item = await tx.item.create({
+        data: {
+          ...data,
+          imagePath,
+          nextBillingDate,
+          user: { connect: { id: userId } },
+          category: categoryId ? { connect: { id: categoryId } } : undefined,
+          platform: platformId ? { connect: { id: platformId } } : undefined,
+          itemHistories:
+            itemHistoriesCreate.length > 0
+              ? { create: itemHistoriesCreate }
+              : undefined,
+        },
+        include: this.itemInclude,
+      });
+
+      await this.attachItemImageAsset(tx, userId, item.id, imagePath);
+      return item;
     });
     await this.clearCache(userId);
     return created;
@@ -331,22 +339,35 @@ export class ItemsService {
 
   async update(userId: string, id: string, updateItemDto: UpdateItemDto) {
     // 先检查是否存在
-    await this.findOne(userId, id);
+    const existing = await this.findOne(userId, id);
 
     const { platformId, categoryId, imagePath, ...data } = updateItemDto;
 
     await this.ensureCategoryAccess(userId, categoryId);
     await this.ensurePlatformAccess(userId, platformId);
 
-    const updated = await this.prisma.item.update({
-      where: { id },
-      data: {
-        ...data,
-        imagePath,
-        category: categoryId ? { connect: { id: categoryId } } : undefined,
-        platform: platformId ? { connect: { id: platformId } } : undefined,
-      },
-      include: this.itemInclude,
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const item = await tx.item.update({
+        where: { id },
+        data: {
+          ...data,
+          imagePath,
+          category: categoryId ? { connect: { id: categoryId } } : undefined,
+          platform: platformId ? { connect: { id: platformId } } : undefined,
+        },
+        include: this.itemInclude,
+      });
+
+      if (imagePath !== undefined) {
+        await this.syncItemImageAsset(
+          tx,
+          userId,
+          id,
+          existing.imagePath,
+          imagePath,
+        );
+      }
+      return item;
     });
     await this.clearCache(userId);
     return updated;
@@ -382,14 +403,64 @@ export class ItemsService {
     }
   }
 
-  async updateImagePath(userId: string, id: string, imagePath: string) {
-    await this.findOne(userId, id);
-    const updated = await this.prisma.item.update({
-      where: { id },
-      data: { imagePath },
+  async updateImagePath(userId: string, id: string, imagePath: string | null) {
+    const existing = await this.findOne(userId, id);
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const item = await tx.item.update({
+        where: { id },
+        data: { imagePath },
+      });
+      await this.syncItemImageAsset(
+        tx,
+        userId,
+        id,
+        existing.imagePath,
+        imagePath,
+      );
+      return item;
     });
     await this.clearCache(userId);
     return updated;
+  }
+
+  private async syncItemImageAsset(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    itemId: string,
+    oldPath: string | null,
+    newPath: string | null | undefined,
+  ) {
+    if (oldPath && oldPath !== newPath) {
+      await tx.asset.updateMany({
+        where: { userId, path: oldPath },
+        data: {
+          status: AssetStatus.ORPHAN,
+          refType: null,
+          refId: null,
+        },
+      });
+    }
+
+    await this.attachItemImageAsset(tx, userId, itemId, newPath);
+  }
+
+  private async attachItemImageAsset(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    itemId: string,
+    imagePath: string | null | undefined,
+  ) {
+    if (!imagePath) return;
+
+    await tx.asset.updateMany({
+      where: { userId, path: imagePath },
+      data: {
+        purpose: AssetPurpose.ITEM_IMAGE,
+        status: AssetStatus.ACTIVE,
+        refType: AssetRefType.ITEM,
+        refId: itemId,
+      },
+    });
   }
 
   async remove(userId: string, id: string) {

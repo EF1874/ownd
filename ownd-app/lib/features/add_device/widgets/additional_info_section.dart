@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/app_image.dart';
 import '../../../shared/widgets/base_card.dart';
+import '../../../shared/widgets/image_preview_dialog.dart';
 
 class AdditionalInfoSection extends StatelessWidget {
   final TextEditingController notesController;
@@ -60,7 +61,9 @@ class AdditionalInfoSection extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           GestureDetector(
-            onTap: onPickImage,
+            onTap: imagePath == null
+                ? onPickImage
+                : () => ImagePreviewDialog.show(context, imagePath!),
             child: Container(
               height: 120,
               width: double.infinity,
@@ -83,14 +86,30 @@ class AdditionalInfoSection extends StatelessWidget {
                           child: AppImage(path: imagePath!),
                         ),
                         Positioned(
-                          right: 4,
-                          top: 4,
+                          right: 8,
+                          top: 8,
                           child: IconButton(
+                            tooltip: '删除图片',
                             icon: const Icon(Icons.close, color: Colors.white),
                             style: IconButton.styleFrom(
                               backgroundColor: Colors.black54,
                             ),
                             onPressed: onRemoveImage,
+                          ),
+                        ),
+                        Positioned(
+                          right: 8,
+                          bottom: 8,
+                          child: IconButton(
+                            tooltip: '更换图片',
+                            icon: const Icon(
+                              Icons.camera_alt_outlined,
+                              color: Colors.white,
+                            ),
+                            style: IconButton.styleFrom(
+                              backgroundColor: Colors.black54,
+                            ),
+                            onPressed: onPickImage,
                           ),
                         ),
                       ],

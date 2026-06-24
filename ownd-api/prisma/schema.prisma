@@ -27,6 +27,22 @@ model User {
 
   categories Category[]
   platforms  Platform[]
+  assets     Asset[]
+}
+
+enum AssetPurpose {
+  ITEM_IMAGE
+  USER_AVATAR
+}
+
+enum AssetStatus {
+  ACTIVE
+  ORPHAN
+}
+
+enum AssetRefType {
+  ITEM
+  USER
 }
 
 enum ItemRecordType {
@@ -116,8 +132,8 @@ model Item {
   currentCycleMode ItemCycleCalculationMode @default(CALENDAR)
   currentCycleDays Int?
   nextBillingDate  DateTime?
-  isAutoRenew      Boolean        @default(false)
-  hasReminder      Boolean        @default(false)
+  isAutoRenew      Boolean                  @default(false)
+  hasReminder      Boolean                  @default(false)
 
   isBackup   Boolean   @default(false)
   backupDate DateTime?
@@ -133,6 +149,27 @@ model Item {
   platform   Platform? @relation(fields: [platformId], references: [id], onDelete: SetNull)
 
   @@index([categoryId])
+}
+
+model Asset {
+  id       String        @id @default(uuid())
+  path     String        @unique
+  mimeType String?
+  size     Int?
+  purpose  AssetPurpose
+  status   AssetStatus   @default(ORPHAN)
+  refType  AssetRefType?
+  refId    String?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, purpose, status])
+  @@index([refType, refId])
+  @@index([status, updatedAt])
 }
 
 // 3. 分类模型

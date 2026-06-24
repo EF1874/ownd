@@ -10,7 +10,9 @@ final platformRepositoryProvider = Provider<PlatformRepository>((ref) {
   );
 });
 
-final platformsProvider = FutureProvider<List<PurchasePlatform>>((ref) async {
+final platformsProvider = FutureProvider.autoDispose<List<PurchasePlatform>>((
+  ref,
+) async {
   return ref.read(platformRepositoryProvider).getAllPlatforms();
 });
 
