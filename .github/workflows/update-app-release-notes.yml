@@ -1,0 +1,54 @@
+name: Update App Release Notes
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version in android/latest.json, for example 0.1.2'
+        required: true
+      release_notes_json:
+        description: 'JSON string array for the app update popup'
+        required: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.OWND_RELEASES_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.OWND_RELEASES_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_EC2_METADATA_DISABLED: true
+      S3_ENDPOINT: ${{ secrets.OWND_RELEASES_S3_ENDPOINT }}
+      S3_BUCKET: ${{ secrets.OWND_RELEASES_BUCKET || 'ownd-releases' }}
+    steps:
+      - name: Update manifest release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -z "$S3_ENDPOINT" ]; then
+            echo "OWND_RELEASES_S3_ENDPOINT is required." >&2
+            exit 1
+          fi
+
+          printf '%s' '${{ inputs.release_notes_json }}' \
+            | jq -e 'type == "array" and length > 0 and all(.[]; type == "string" and length > 0)' \
+            > /tmp/release-notes.json
+
+          aws s3 cp "s3://${S3_BUCKET}/android/latest.json" /tmp/latest.json \
+            --endpoint-url "$S3_ENDPOINT"
+
+          CURRENT_VERSION=$(jq -r '.version' /tmp/latest.json)
+          if [ "$CURRENT_VERSION" != '${{ inputs.version }}' ]; then
+            echo "latest.json version is ${CURRENT_VERSION}, expected ${{ inputs.version }}." >&2
+            exit 1
+          fi
+
+          jq --slurpfile notes /tmp/release-notes.json \
+            '.releaseNotes = $notes[0]' \
+            /tmp/latest.json > /tmp/latest.updated.json
+
+          aws s3 cp /tmp/latest.updated.json "s3://${S3_BUCKET}/android/latest.json" \
+            --endpoint-url "$S3_ENDPOINT" \
+            --content-type "application/json" \
+            --cache-control "no-cache"
