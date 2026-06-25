@@ -37,7 +37,7 @@ class PlatformConfig {
       color: const Color(0xFFE02E24), // 拼多多红
     ),
     PlatformModel(
-      name: '抖音电商',
+      name: '抖音',
       icon: MdiIcons.musicNote, // 标志性音符
       color: const Color(0xFF1C1C1C), // 抖音黑
     ),

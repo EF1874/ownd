@@ -9,6 +9,12 @@ import { CreatePlatformDto } from './dto/create-platform.dto';
 import { UpdatePlatformDto } from './dto/update-platform.dto';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import * as cacheManager from 'cache-manager';
+import { platforms as platformTemplates } from '../common/constants/templates';
+
+const platformOrder = new Map(
+  platformTemplates.map((platform, index) => [platform.name, index]),
+);
+platformOrder.set('抖音电商', platformOrder.get('抖音') ?? 0);
 
 @Injectable()
 export class PlatformService {
@@ -29,29 +35,37 @@ export class PlatformService {
   }
 
   async findAll(userId: string) {
+    const defaultsChanged = await this.ensureUserDefaultPlatforms(userId);
+    const normalized = await this.normalizeUserPlatforms(userId);
     const cacheKey = `user:platforms:${userId}`;
-    try {
-      const cached =
-        await this.cacheManager.get<import('@prisma/client').Platform[]>(
-          cacheKey,
-        );
-      if (cached) {
-        return cached;
+    const shouldBypassCache = defaultsChanged || normalized;
+
+    if (shouldBypassCache) {
+      await this.clearCache(userId);
+    } else {
+      try {
+        const cached =
+          await this.cacheManager.get<import('@prisma/client').Platform[]>(
+            cacheKey,
+          );
+        if (cached) {
+          return this.sortPlatforms(cached);
+        }
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
     }
 
-    await this.ensureUserDefaultPlatforms(userId);
-
-    const platforms = await this.prisma.platform.findMany({
-      where: {
-        userId,
-      },
-      orderBy: {
-        createdAt: 'asc',
-      },
-    });
+    const platforms = this.sortPlatforms(
+      await this.prisma.platform.findMany({
+        where: {
+          userId,
+        },
+        orderBy: {
+          createdAt: 'asc',
+        },
+      }),
+    );
 
     try {
       await this.cacheManager.set(cacheKey, platforms, 600000); // 缓存 10 分钟
@@ -141,12 +155,14 @@ export class PlatformService {
       throw new NotFoundException('用户不存在');
     }
 
+    let changed = false;
     const existingUserPlatforms = await this.prisma.platform.count({
       where: { userId },
     });
 
     if (existingUserPlatforms === 0) {
       await this.copySystemPlatformTemplates(userId);
+      changed = true;
     }
 
     if (!user.platformDefaultsInitialized) {
@@ -155,6 +171,8 @@ export class PlatformService {
         data: { platformDefaultsInitialized: true },
       });
     }
+
+    return changed;
   }
 
   private async copySystemPlatformTemplates(userId: string) {
@@ -173,5 +191,51 @@ export class PlatformService {
         },
       });
     }
+  }
+
+  private async normalizeUserPlatforms(userId: string) {
+    const platforms = await this.prisma.platform.findMany({
+      where: { userId, name: { in: ['抖音电商', '抖音'] } },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (platforms.length === 0) return false;
+
+    let changed = false;
+    const keep =
+      platforms.find((platform) => platform.name === '抖音') ?? platforms[0];
+    if (keep.name !== '抖音') {
+      await this.prisma.platform.update({
+        where: { id: keep.id },
+        data: { name: '抖音' },
+      });
+      changed = true;
+    }
+
+    for (const platform of platforms) {
+      if (platform.id === keep.id) continue;
+      await this.prisma.item.updateMany({
+        where: { userId, platformId: platform.id },
+        data: { platformId: keep.id },
+      });
+      await this.prisma.platform.delete({ where: { id: platform.id } });
+      changed = true;
+    }
+
+    return changed;
+  }
+
+  private sortPlatforms<T extends { name: string; createdAt: Date }>(
+    platforms: T[],
+  ) {
+    return [...platforms].sort((a, b) => {
+      if (a.name === '其它' && b.name !== '其它') return 1;
+      if (a.name !== '其它' && b.name === '其它') return -1;
+      const orderA = platformOrder.get(a.name);
+      const orderB = platformOrder.get(b.name);
+      if (orderA !== undefined && orderB !== undefined) return orderA - orderB;
+      if (orderA !== undefined) return -1;
+      if (orderB !== undefined) return 1;
+      return a.createdAt.getTime() - b.createdAt.getTime();
+    });
   }
 }

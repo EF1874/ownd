@@ -6,6 +6,11 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 
 describe('PlatformService', () => {
   let service: PlatformService;
+  let cacheManager: {
+    get: jest.Mock;
+    set: jest.Mock;
+    del: jest.Mock;
+  };
 
   const mockPrismaService = {
     platform: {
@@ -16,6 +21,9 @@ describe('PlatformService', () => {
       update: jest.fn(),
       delete: jest.fn(),
     },
+    item: {
+      updateMany: jest.fn(),
+    },
     user: {
       findUnique: jest.fn(),
       update: jest.fn(),
@@ -24,6 +32,11 @@ describe('PlatformService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    cacheManager = {
+      get: jest.fn(),
+      set: jest.fn(),
+      del: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -31,11 +44,7 @@ describe('PlatformService', () => {
         { provide: PrismaService, useValue: mockPrismaService },
         {
           provide: CACHE_MANAGER,
-          useValue: {
-            get: jest.fn(),
-            set: jest.fn(),
-            del: jest.fn(),
-          },
+          useValue: cacheManager,
         },
       ],
     }).compile();
@@ -63,6 +72,7 @@ describe('PlatformService', () => {
             userId: null,
           },
         ])
+        .mockResolvedValueOnce([])
         .mockResolvedValueOnce([
           {
             id: 'user-1-platform',
@@ -70,6 +80,7 @@ describe('PlatformService', () => {
             icon: 'MdiIcons.dog',
             color: '#E4393C',
             userId: 'user-1',
+            createdAt: new Date('2026-01-01T00:00:00.000Z'),
           },
         ]);
 
@@ -94,9 +105,17 @@ describe('PlatformService', () => {
       mockPrismaService.user.findUnique.mockResolvedValue({
         platformDefaultsInitialized: true,
       });
-      mockPrismaService.platform.findMany.mockResolvedValue([
-        { id: 'p1', userId: 'user-1' },
-      ]);
+      mockPrismaService.platform.count.mockResolvedValue(1);
+      mockPrismaService.platform.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          {
+            id: 'p1',
+            name: '京东',
+            userId: 'user-1',
+            createdAt: new Date('2026-01-01T00:00:00.000Z'),
+          },
+        ]);
 
       await service.findAll('user-1');
 
@@ -104,6 +123,142 @@ describe('PlatformService', () => {
         where: { userId: 'user-1' },
         orderBy: { createdAt: 'asc' },
       });
+    });
+
+    it('should merge legacy douyin platform and keep other last', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        platformDefaultsInitialized: true,
+      });
+      mockPrismaService.platform.count.mockResolvedValue(1);
+      mockPrismaService.platform.findMany
+        .mockResolvedValueOnce([
+          {
+            id: 'old',
+            name: '抖音电商',
+            userId: 'user-1',
+            createdAt: new Date('2026-01-01T00:00:00.000Z'),
+          },
+          {
+            id: 'douyin',
+            name: '抖音',
+            userId: 'user-1',
+            createdAt: new Date('2026-01-02T00:00:00.000Z'),
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'other',
+            name: '其它',
+            userId: 'user-1',
+            createdAt: new Date('2026-01-01T00:00:00.000Z'),
+          },
+          {
+            id: 'jd',
+            name: '京东',
+            userId: 'user-1',
+            createdAt: new Date('2026-01-02T00:00:00.000Z'),
+          },
+        ]);
+
+      const result = await service.findAll('user-1');
+
+      expect(mockPrismaService.item.updateMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1', platformId: 'old' },
+        data: { platformId: 'douyin' },
+      });
+      expect(mockPrismaService.platform.delete).toHaveBeenCalledWith({
+        where: { id: 'old' },
+      });
+      expect(result.map((platform) => platform.name)).toEqual(['京东', '其它']);
+    });
+
+    it('should sort legacy user platforms by current template order', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        platformDefaultsInitialized: true,
+      });
+      mockPrismaService.platform.count.mockResolvedValue(1);
+      mockPrismaService.platform.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          {
+            id: 'meituan',
+            name: '美团',
+            userId: 'user-1',
+            createdAt: new Date('2026-01-01T00:00:00.000Z'),
+          },
+          {
+            id: 'steam',
+            name: 'Steam',
+            userId: 'user-1',
+            createdAt: new Date('2026-01-02T00:00:00.000Z'),
+          },
+          {
+            id: 'jd',
+            name: '京东',
+            userId: 'user-1',
+            createdAt: new Date('2026-01-03T00:00:00.000Z'),
+          },
+          {
+            id: 'taobao',
+            name: '淘宝',
+            userId: 'user-1',
+            createdAt: new Date('2026-01-04T00:00:00.000Z'),
+          },
+          {
+            id: 'other',
+            name: '其它',
+            userId: 'user-1',
+            createdAt: new Date('2026-01-05T00:00:00.000Z'),
+          },
+        ]);
+
+      const result = await service.findAll('user-1');
+
+      expect(result.map((platform) => platform.name)).toEqual([
+        '淘宝',
+        '京东',
+        '美团',
+        'Steam',
+        '其它',
+      ]);
+    });
+
+    it('should skip stale cache when legacy platforms are normalized', async () => {
+      cacheManager.get.mockResolvedValue([
+        {
+          id: 'old-cache',
+          name: '抖音电商',
+          userId: 'user-1',
+          createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        },
+      ]);
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        platformDefaultsInitialized: true,
+      });
+      mockPrismaService.platform.count.mockResolvedValue(1);
+      mockPrismaService.platform.findMany
+        .mockResolvedValueOnce([
+          {
+            id: 'old',
+            name: '抖音电商',
+            userId: 'user-1',
+            createdAt: new Date('2026-01-01T00:00:00.000Z'),
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'old',
+            name: '抖音',
+            userId: 'user-1',
+            createdAt: new Date('2026-01-01T00:00:00.000Z'),
+          },
+        ]);
+
+      const result = await service.findAll('user-1');
+
+      expect(cacheManager.get).not.toHaveBeenCalled();
+      expect(cacheManager.del).toHaveBeenCalledWith('user:platforms:user-1');
+      expect(result.map((platform) => platform.name)).toEqual(['抖音']);
     });
   });
 

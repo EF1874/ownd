@@ -66,7 +66,7 @@ export class CreateItemDto {
     required: false,
   })
   @IsOptional()
-  file?: any; // 在 DTO 层面使用 any 或更宽泛的类型，避免全局命名空间冲突
+  file?: Express.Multer.File;
 
   @ApiProperty({ description: '所属平台ID', example: 'uuid', required: false })
   @IsUUID()

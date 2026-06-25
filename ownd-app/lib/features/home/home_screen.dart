@@ -32,21 +32,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _isGridView = false;
 
   // Sort state
-  String _sortField = 'date'; // date, price, expiry
+  String _sortField = 'default'; // default, date, price, expiry
   bool _isAscending = false;
 
   Set<String> _selectedCategories = {};
   String? _selectedPlatformFilter;
   final Set<String> _selectedTags = {};
 
-  bool _expiringSoonOnly = false;
+  String? _statusFilter;
 
   @override
   void initState() {
     super.initState();
     final prefs = ref.read(preferencesServiceProvider);
     _isGridView = prefs.isGridView;
-    _expiringSoonOnly = prefs.expiringSoonOnly;
+    _statusFilter = prefs.expiringSoonOnly ? 'expiring-soon' : null;
     _scrollController.addListener(_onScroll);
     _searchController.addListener(_onSearchChanged);
   }
@@ -109,7 +109,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   HomeSliverAppBar(
                     searchController: _searchController,
                     isGridView: _isGridView,
-                    expiringSoonOnly: _expiringSoonOnly,
+                    statusFilter: _statusFilter,
                     sortField: _sortField,
                     isAscending: _isAscending,
                     selectedPlatformFilter: _selectedPlatformFilter,
@@ -117,14 +117,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       setState(() => _isGridView = val);
                       ref.read(preferencesServiceProvider).setGridView(val);
                     },
-                    onExpiringSoonOnlyChanged: (val) {
-                      setState(() => _expiringSoonOnly = val);
+                    onStatusFilterChanged: (val) {
+                      setState(() => _statusFilter = val);
                       ref
                           .read(preferencesServiceProvider)
-                          .setExpiringSoonOnly(val);
+                          .setExpiringSoonOnly(val == 'expiring-soon');
                       ref
                           .read(homeDevicesNotifierProvider.notifier)
-                          .updateExpiringSoonOnly(val);
+                          .updateStatusFilter(val);
                     },
                     onSortFieldChanged: (val) {
                       setState(() => _sortField = val);
@@ -239,7 +239,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     HomeDeviceList(
                       processedDevices: homeDevicesState.devices,
                       isGridView: _isGridView,
-                      hasSearchQuery: homeDevicesState.search.isNotEmpty,
+                      emptyMessage: _emptyMessage(homeDevicesState),
                       onDeleteComplete: (success, error) {
                         debugPrint(
                           '[HomeScreen] onDeleteComplete: success=$success, error=$error',
@@ -271,5 +271,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ],
       ),
     );
+  }
+
+  String _emptyMessage(HomeDevicesState state) {
+    if (state.search.isNotEmpty) return '没有搜到相关物品';
+    final hasFilter =
+        state.selectedCategories.isNotEmpty ||
+        state.selectedPlatformFilter != null ||
+        state.selectedTags.isNotEmpty ||
+        state.statusFilter != null;
+    return hasFilter ? '当前过滤条件没有物品' : '还没有添加物品';
   }
 }

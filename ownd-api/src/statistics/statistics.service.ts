@@ -51,12 +51,13 @@ export class StatisticsService {
       totalTco += item.price + historySum;
 
       const dueDate = item.nextBillingDate ? dayjs(item.nextBillingDate) : null;
+      const scrappedItem = item.isScrapped && item.scrappedDate !== null;
       const expiredSubscription =
         item.isVirtual &&
         !item.isAutoRenew &&
         dueDate !== null &&
         dueDate.isBefore(today);
-      if (item.isScrapped || expiredSubscription) {
+      if (scrappedItem || expiredSubscription) {
         scrapOrExpiredCount++;
       }
       if (

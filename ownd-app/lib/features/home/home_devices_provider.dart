@@ -60,7 +60,7 @@ class HomeDevicesState {
   final Set<String> selectedCategories;
   final String? selectedPlatformFilter;
   final Set<String> selectedTags;
-  final bool expiringSoonOnly;
+  final String? statusFilter;
   final String sortField;
   final bool isAscending;
   final String? error;
@@ -75,7 +75,7 @@ class HomeDevicesState {
     required this.selectedCategories,
     this.selectedPlatformFilter,
     required this.selectedTags,
-    required this.expiringSoonOnly,
+    this.statusFilter,
     required this.sortField,
     required this.isAscending,
     this.error,
@@ -91,8 +91,8 @@ class HomeDevicesState {
       selectedCategories = const {},
       selectedPlatformFilter = null,
       selectedTags = const {},
-      expiringSoonOnly = false,
-      sortField = 'date',
+      statusFilter = null,
+      sortField = 'default',
       isAscending = false,
       error = null;
 
@@ -107,7 +107,8 @@ class HomeDevicesState {
     String? selectedPlatformFilter,
     bool nullPlatform = false,
     Set<String>? selectedTags,
-    bool? expiringSoonOnly,
+    String? statusFilter,
+    bool nullStatusFilter = false,
     String? sortField,
     bool? isAscending,
     String? error,
@@ -125,7 +126,9 @@ class HomeDevicesState {
           ? null
           : (selectedPlatformFilter ?? this.selectedPlatformFilter),
       selectedTags: selectedTags ?? this.selectedTags,
-      expiringSoonOnly: expiringSoonOnly ?? this.expiringSoonOnly,
+      statusFilter: nullStatusFilter
+          ? null
+          : (statusFilter ?? this.statusFilter),
       sortField: sortField ?? this.sortField,
       isAscending: isAscending ?? this.isAscending,
       error: clearError ? null : (error ?? this.error),
@@ -212,8 +215,11 @@ class HomeDevicesNotifier extends StateNotifier<HomeDevicesState> {
         : null;
 
     // 4. Map sorting parameters
-    final sortBy = state.sortField; // date, price, expiry
-    final sortOrder = state.isAscending ? 'asc' : 'desc';
+    final hasManualSort = state.sortField != 'default';
+    final sortBy = hasManualSort ? state.sortField : null;
+    final sortOrder = hasManualSort
+        ? (state.isAscending ? 'asc' : 'desc')
+        : null;
 
     return await _deviceRepository.getPaginatedDevices(
       page: page,
@@ -222,7 +228,7 @@ class HomeDevicesNotifier extends StateNotifier<HomeDevicesState> {
       categoryId: categoryIdParam,
       platformId: platformIdParam,
       tag: tagsParam,
-      expiringSoon: state.expiringSoonOnly,
+      status: state.statusFilter,
       sortBy: sortBy,
       sortOrder: sortOrder,
     );
@@ -317,9 +323,11 @@ class HomeDevicesNotifier extends StateNotifier<HomeDevicesState> {
     _loadFirstPage();
   }
 
-  void updateExpiringSoonOnly(bool value) {
-    if (state.expiringSoonOnly == value) return;
-    state = state.copyWith(expiringSoonOnly: value);
+  void updateStatusFilter(String? value) {
+    if (state.statusFilter == value) return;
+    state = value == null
+        ? state.copyWith(nullStatusFilter: true)
+        : state.copyWith(statusFilter: value);
     _loadFirstPage();
   }
 

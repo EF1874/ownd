@@ -43,7 +43,7 @@ describe('AssetsService', () => {
       file,
     });
 
-    expect(prisma.asset.create).toHaveBeenCalledWith({
+    expect(prisma.asset.create.mock.calls[0]?.[0]).toEqual({
       data: {
         userId: 'user-1',
         path: '/ownd-items/test.png',
@@ -58,7 +58,7 @@ describe('AssetsService', () => {
   it('释放资产时应该标记孤儿并删除文件和资产记录', async () => {
     await service.releasePath('/ownd-items/test.png');
 
-    expect(prisma.asset.updateMany).toHaveBeenCalledWith({
+    expect(prisma.asset.updateMany.mock.calls[0]?.[0]).toEqual({
       where: { path: '/ownd-items/test.png' },
       data: {
         status: AssetStatus.ORPHAN,
@@ -66,10 +66,10 @@ describe('AssetsService', () => {
         refId: null,
       },
     });
-    expect(minioService.deleteFile).toHaveBeenCalledWith(
+    expect(minioService.deleteFile.mock.calls[0]?.[0]).toBe(
       '/ownd-items/test.png',
     );
-    expect(prisma.asset.deleteMany).toHaveBeenCalledWith({
+    expect(prisma.asset.deleteMany.mock.calls[0]?.[0]).toEqual({
       where: { path: '/ownd-items/test.png' },
     });
   });
@@ -93,15 +93,16 @@ describe('AssetsService', () => {
 
     await service.cleanupOrphans();
 
-    expect(prisma.asset.findMany).toHaveBeenCalledWith({
+    const findManyArgs = prisma.asset.findMany.mock.calls[0]?.[0];
+    expect(findManyArgs).toMatchObject({
       where: {
         status: AssetStatus.ORPHAN,
-        updatedAt: { lt: expect.any(Date) },
       },
       take: 200,
       orderBy: { updatedAt: 'asc' },
     });
-    expect(minioService.deleteFile).toHaveBeenCalledWith(
+    expect(JSON.stringify(findManyArgs?.where?.updatedAt)).toContain('lt');
+    expect(minioService.deleteFile.mock.calls[0]?.[0]).toBe(
       '/ownd-items/orphan.png',
     );
   });

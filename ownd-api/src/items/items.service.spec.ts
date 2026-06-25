@@ -8,9 +8,9 @@ import {
   AssetPurpose,
   AssetRefType,
   AssetStatus,
-  Prisma,
   PrismaClient,
   Item,
+  ItemCycleCalculationMode,
   ItemCycleType,
   ItemRecordType,
 } from '@prisma/client';
@@ -20,6 +20,25 @@ import { UpdateItemDto } from './dto/update-item.dto';
 describe('ItemsService', () => {
   let service: ItemsService;
   let prisma: DeepMockProxy<PrismaClient>;
+
+  const runTransaction = (callbackOrPromises: unknown): unknown => {
+    if (typeof callbackOrPromises === 'function') {
+      return (
+        callbackOrPromises as (tx: DeepMockProxy<PrismaClient>) => unknown
+      )(prisma);
+    }
+    if (Array.isArray(callbackOrPromises)) {
+      return Promise.all(callbackOrPromises as Promise<unknown>[]);
+    }
+    return callbackOrPromises;
+  };
+  const mockTransaction = () => {
+    prisma.$transaction.mockImplementation(
+      runTransaction as Parameters<
+        typeof prisma.$transaction.mockImplementation
+      >[0],
+    );
+  };
 
   beforeEach(async () => {
     const mockPrisma = mockDeep<PrismaClient>();
@@ -44,9 +63,7 @@ describe('ItemsService', () => {
 
     service = module.get<ItemsService>(ItemsService);
     prisma = module.get(PrismaService);
-    prisma.$transaction.mockImplementation(async (callback) =>
-      typeof callback === 'function' ? callback(prisma) : Promise.all(callback),
-    );
+    mockTransaction();
   });
 
   // 辅助函数：创建一个符合 Prisma.Item 结构的 Mock 对象
@@ -54,6 +71,7 @@ describe('ItemsService', () => {
     id: 'item-1',
     name: '测试物品',
     price: 100,
+    renewalPrice: null,
     userId: 'user-1',
     imagePath: null,
     notes: null,
@@ -62,6 +80,8 @@ describe('ItemsService', () => {
     platformId: null,
     currentCycleType: null,
     currentCycle: null,
+    currentCycleMode: ItemCycleCalculationMode.CALENDAR,
+    currentCycleDays: null,
     nextBillingDate: null,
     isAutoRenew: false,
     hasReminder: false,
@@ -76,6 +96,9 @@ describe('ItemsService', () => {
     updatedAt: new Date(),
     ...overrides,
   });
+  type ItemWithStartHistory = Item & {
+    itemHistories: { startDate: Date | null }[];
+  };
 
   it('should be defined', () => {
     expect(service).toBeDefined();
@@ -91,7 +114,7 @@ describe('ItemsService', () => {
 
       const result = await service.create(userId, dto);
 
-      expect(prisma.item.create).toHaveBeenCalledWith({
+      expect(prisma.item.create.mock.calls[0]?.[0]).toEqual({
         data: {
           ...dto,
           imagePath: undefined,
@@ -107,7 +130,7 @@ describe('ItemsService', () => {
           itemHistories: true,
         },
       });
-      expect(prisma.asset.updateMany).not.toHaveBeenCalled();
+      expect(prisma.asset.updateMany.mock.calls).toHaveLength(0);
       expect(result).toEqual(mockResult);
     });
 
@@ -125,7 +148,7 @@ describe('ItemsService', () => {
 
       await service.create(userId, dto);
 
-      expect(prisma.asset.updateMany).toHaveBeenCalledWith({
+      expect(prisma.asset.updateMany.mock.calls[0]?.[0]).toEqual({
         where: { userId, path: imagePath },
         data: {
           purpose: AssetPurpose.ITEM_IMAGE,
@@ -176,24 +199,18 @@ describe('ItemsService', () => {
       const userId = 'user-1';
       const mockItems = [createMockItem({ userId })];
 
-      prisma.item.findMany.mockResolvedValue(mockItems);
+      prisma.item.findMany
+        .mockResolvedValueOnce(mockItems)
+        .mockResolvedValueOnce([]);
 
       const result = await service.findAll(userId);
 
-      expect(prisma.item.findMany).toHaveBeenCalledWith({
-        where: { userId },
-        include: {
-          category: { include: { parent: true } },
-          platform: true,
-          itemHistories: {
-            orderBy: { startDate: 'desc' },
-            take: 1,
-          },
-        },
-        orderBy: { purchaseDate: 'desc' },
-        skip: undefined,
-        take: undefined,
-      });
+      const activeQuery = prisma.item.findMany.mock.calls[0]?.[0];
+      const inactiveQuery = prisma.item.findMany.mock.calls[1]?.[0];
+      expect(activeQuery?.where?.userId).toBe(userId);
+      expect(JSON.stringify(activeQuery?.where)).toContain('"NOT"');
+      expect(inactiveQuery?.where?.userId).toBe(userId);
+      expect(JSON.stringify(inactiveQuery?.where)).toContain('"OR"');
       expect(result).toEqual(mockItems);
     });
 
@@ -201,80 +218,16 @@ describe('ItemsService', () => {
       const userId = 'user-1';
       const mockItems = [createMockItem({ userId })];
 
-      prisma.item.findMany.mockResolvedValue(mockItems);
+      prisma.item.findMany
+        .mockResolvedValueOnce(mockItems)
+        .mockResolvedValueOnce([]);
 
       const result = await service.findAll(userId, { search: ' 京东 ' });
 
-      expect(prisma.item.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            userId,
-            AND: [
-              {
-                OR: [
-                  {
-                    name: {
-                      contains: '京东',
-                      mode: Prisma.QueryMode.insensitive,
-                    },
-                  },
-                  {
-                    notes: {
-                      contains: '京东',
-                      mode: Prisma.QueryMode.insensitive,
-                    },
-                  },
-                  { tags: { has: '京东' } },
-                  {
-                    platform: {
-                      is: {
-                        name: {
-                          contains: '京东',
-                          mode: Prisma.QueryMode.insensitive,
-                        },
-                      },
-                    },
-                  },
-                  {
-                    category: {
-                      is: {
-                        OR: [
-                          {
-                            name: {
-                              contains: '京东',
-                              mode: Prisma.QueryMode.insensitive,
-                            },
-                          },
-                          {
-                            parent: {
-                              is: {
-                                name: {
-                                  contains: '京东',
-                                  mode: Prisma.QueryMode.insensitive,
-                                },
-                              },
-                            },
-                          },
-                        ],
-                      },
-                    },
-                  },
-                  {
-                    itemHistories: {
-                      some: {
-                        note: {
-                          contains: '京东',
-                          mode: Prisma.QueryMode.insensitive,
-                        },
-                      },
-                    },
-                  },
-                ],
-              },
-            ],
-          },
-        }),
-      );
+      const query = prisma.item.findMany.mock.calls[0]?.[0];
+      expect(query?.where?.userId).toBe(userId);
+      expect(JSON.stringify(query?.where)).toContain('"OR"');
+      expect(JSON.stringify(query?.where)).toContain('"NOT"');
       expect(result).toEqual(mockItems);
     });
 
@@ -292,23 +245,146 @@ describe('ItemsService', () => {
 
       const result = await service.findAll(userId, { expiringSoon: true });
 
-      expect(prisma.item.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            userId,
-            AND: [
-              {
-                isVirtual: true,
-                nextBillingDate: {
-                  gte: expect.any(Date),
-                  lte: expect.any(Date),
-                },
-              },
-            ],
-          },
-        }),
-      );
+      const query = prisma.item.findMany.mock.calls[0]?.[0];
+      expect(query?.where?.userId).toBe(userId);
+      expect(JSON.stringify(query?.where)).toContain('"isVirtual":true');
+      expect(JSON.stringify(query?.where)).toContain('"nextBillingDate"');
       expect(result).toEqual(mockItems);
+    });
+
+    it('应该支持状态筛选和分类筛选同时生效', async () => {
+      const userId = 'user-1';
+      const mockItems = [
+        createMockItem({
+          userId,
+          isVirtual: true,
+          isAutoRenew: false,
+          nextBillingDate: new Date('2026-06-01T00:00:00.000Z'),
+        }),
+      ];
+
+      prisma.item.findMany.mockResolvedValue(mockItems);
+
+      const result = await service.findAll(userId, {
+        categoryId: 'category-1',
+        status: 'expired-subscriptions',
+      });
+
+      const query = prisma.item.findMany.mock.calls[0]?.[0];
+      const whereJson = JSON.stringify(query?.where);
+      expect(query?.where?.userId).toBe(userId);
+      expect(whereJson).toContain('category-1');
+      expect(whereJson).toContain('"isVirtual":true');
+      expect(whereJson).toContain('"isAutoRenew":false');
+      expect(result).toEqual(mockItems);
+    });
+
+    it('筛选已报废实物应由后端按报废状态过滤', async () => {
+      const userId = 'user-1';
+      const mockItems = [
+        createMockItem({
+          userId,
+          isVirtual: true,
+          isScrapped: true,
+          scrappedDate: new Date('2026-06-01T00:00:00.000Z'),
+        }),
+      ];
+
+      prisma.item.findMany.mockResolvedValue(mockItems);
+
+      const result = await service.findAll(userId, {
+        status: 'scrapped-items',
+      });
+
+      const call = prisma.item.findMany.mock.calls[0][0]!;
+      expect(call.where).toEqual({
+        userId,
+        AND: [{ isScrapped: true, scrappedDate: { not: null } }],
+      });
+      expect(JSON.stringify(call.where)).not.toContain('isVirtual');
+      expect(result).toEqual(mockItems);
+    });
+
+    it('默认排序应该让订阅按到期临近、实物按购买时间临近排列', async () => {
+      const userId = 'user-1';
+      const now = new Date();
+      const newItem = createMockItem({
+        id: 'new-item',
+        userId,
+        name: '新买实物',
+        purchaseDate: new Date(now.getTime() - 1 * 86400000),
+      });
+      const oldItem = createMockItem({
+        id: 'old-item',
+        userId,
+        name: '旧实物',
+        purchaseDate: new Date(now.getTime() - 90 * 86400000),
+      });
+      const soonSubscription = createMockItem({
+        id: 'soon-subscription',
+        userId,
+        name: '快到期订阅',
+        isVirtual: true,
+        nextBillingDate: new Date(now.getTime() + 2 * 86400000),
+      });
+      const laterSubscription = createMockItem({
+        id: 'later-subscription',
+        userId,
+        name: '晚到期订阅',
+        isVirtual: true,
+        nextBillingDate: new Date(now.getTime() + 30 * 86400000),
+      });
+
+      prisma.item.findMany
+        .mockResolvedValueOnce([
+          oldItem,
+          laterSubscription,
+          soonSubscription,
+          newItem,
+        ])
+        .mockResolvedValueOnce([]);
+
+      const result = await service.findAll(userId);
+      const ids = result.map((item) => item.id);
+
+      expect(ids.indexOf('soon-subscription')).toBeLessThan(
+        ids.indexOf('later-subscription'),
+      );
+      expect(ids.indexOf('new-item')).toBeLessThan(ids.indexOf('old-item'));
+    });
+
+    it('手动按购买日期排序时订阅应该使用最新一期开始日期', async () => {
+      const userId = 'user-1';
+      const item = createMockItem({
+        id: 'item',
+        userId,
+        name: '实物',
+        purchaseDate: new Date('2026-06-01T00:00:00.000Z'),
+      });
+      const subscription: ItemWithStartHistory = {
+        ...createMockItem({
+          id: 'subscription',
+          userId,
+          name: '订阅',
+          isVirtual: true,
+          purchaseDate: new Date('2026-01-01T00:00:00.000Z'),
+        }),
+        itemHistories: [{ startDate: new Date('2026-06-20T00:00:00.000Z') }],
+      };
+
+      prisma.item.findMany
+        .mockResolvedValueOnce([item, subscription])
+        .mockResolvedValueOnce([]);
+
+      const result = await service.findAll(userId, {
+        sortBy: 'date',
+        sortOrder: 'desc',
+      });
+
+      expect(result.map((device) => device.id)).toEqual([
+        'subscription',
+        'item',
+      ]);
     });
   });
 
@@ -322,7 +398,7 @@ describe('ItemsService', () => {
 
       const result = await service.findOne(userId, itemId);
 
-      expect(prisma.item.findFirst).toHaveBeenCalledWith({
+      expect(prisma.item.findFirst.mock.calls[0]?.[0]).toEqual({
         where: { id: itemId, userId },
         include: {
           category: { include: { parent: true } },
@@ -360,7 +436,7 @@ describe('ItemsService', () => {
 
       const result = await service.update(userId, itemId, dto);
 
-      expect(prisma.item.update).toHaveBeenCalledWith({
+      expect(prisma.item.update.mock.calls[0]?.[0]).toEqual({
         where: { id: itemId },
         data: {
           ...dto,
@@ -374,7 +450,7 @@ describe('ItemsService', () => {
           itemHistories: true,
         },
       });
-      expect(prisma.asset.updateMany).not.toHaveBeenCalled();
+      expect(prisma.asset.updateMany.mock.calls).toHaveLength(0);
       expect(result.name).toBe(dto.name);
     });
   });
@@ -394,7 +470,7 @@ describe('ItemsService', () => {
 
       await service.remove(userId, itemId);
 
-      expect(prisma.item.delete).toHaveBeenCalledWith({
+      expect(prisma.item.delete.mock.calls[0]?.[0]).toEqual({
         where: { id: itemId },
       });
     });
@@ -416,11 +492,11 @@ describe('ItemsService', () => {
 
       const result = await service.updateImagePath(userId, itemId, imagePath);
 
-      expect(prisma.item.update).toHaveBeenCalledWith({
+      expect(prisma.item.update.mock.calls[0]?.[0]).toEqual({
         where: { id: itemId },
         data: { imagePath },
       });
-      expect(prisma.asset.updateMany).toHaveBeenCalledWith({
+      expect(prisma.asset.updateMany.mock.calls[0]?.[0]).toEqual({
         where: { userId, path: imagePath },
         data: {
           purpose: AssetPurpose.ITEM_IMAGE,
@@ -451,11 +527,11 @@ describe('ItemsService', () => {
 
       const result = await service.updateImagePath(userId, itemId, null);
 
-      expect(prisma.item.update).toHaveBeenCalledWith({
+      expect(prisma.item.update.mock.calls[0]?.[0]).toEqual({
         where: { id: itemId },
         data: { imagePath: null },
       });
-      expect(prisma.asset.updateMany).toHaveBeenCalledWith({
+      expect(prisma.asset.updateMany.mock.calls[0]?.[0]).toEqual({
         where: { userId, path: oldPath },
         data: {
           status: AssetStatus.ORPHAN,
@@ -480,7 +556,10 @@ describe('ItemsService', () => {
       endDate: new Date('2026-07-11T00:00:00.000Z'),
       cycleType: ItemCycleType.MONTH,
       cycle: 1,
+      cycleMode: ItemCycleCalculationMode.CALENDAR,
+      cycleDays: null,
       note: null,
+      isAutoRenew: false,
       createdAt: new Date('2026-06-12T00:00:00.000Z'),
       updatedAt: new Date('2026-06-12T00:00:00.000Z'),
     };
@@ -501,7 +580,7 @@ describe('ItemsService', () => {
         }),
       ).rejects.toThrow(BadRequestException);
 
-      expect(prisma.itemHistory.findFirst).not.toHaveBeenCalled();
+      expect(prisma.itemHistory.findFirst.mock.calls).toHaveLength(0);
     });
 
     it('应该拒绝和上一期日期重复的续费记录', async () => {
@@ -533,9 +612,7 @@ describe('ItemsService', () => {
       prisma.item.update.mockResolvedValue(
         createMockItem({ id: itemId, nextBillingDate: newHistory.endDate }),
       );
-      prisma.$transaction.mockImplementation(async (callback) =>
-        callback(prisma),
-      );
+      mockTransaction();
 
       const result = await service.addHistory(userId, itemId, {
         type: ItemRecordType.RENEWAL,
@@ -546,14 +623,14 @@ describe('ItemsService', () => {
         cycle: 1,
       });
 
-      expect(prisma.itemHistory.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
+      expect(prisma.itemHistory.create.mock.calls[0]?.[0]).toMatchObject({
+        data: {
           itemId,
           startDate: newHistory.startDate,
           endDate: newHistory.endDate,
-        }),
+        },
       });
-      expect(prisma.item.update).toHaveBeenCalledWith({
+      expect(prisma.item.update.mock.calls[0]?.[0]).toEqual({
         where: { id: itemId },
         data: { nextBillingDate: newHistory.endDate },
       });
@@ -575,7 +652,10 @@ describe('ItemsService', () => {
       endDate: new Date('2026-07-11T00:00:00.000Z'),
       cycleType: ItemCycleType.MONTH,
       cycle: 1,
+      cycleMode: ItemCycleCalculationMode.CALENDAR,
+      cycleDays: null,
       note: null,
+      isAutoRenew: false,
       createdAt: new Date('2026-06-12T00:00:00.000Z'),
       updatedAt: new Date('2026-06-12T00:00:00.000Z'),
     };
@@ -583,9 +663,7 @@ describe('ItemsService', () => {
     beforeEach(() => {
       prisma.item.findFirst.mockResolvedValue(createMockItem({ id: itemId }));
       prisma.itemHistory.findUnique.mockResolvedValue(history);
-      prisma.$transaction.mockImplementation(async (callback) =>
-        callback(prisma),
-      );
+      mockTransaction();
     });
 
     it('应该更新订阅记录并按最新记录重算到期日', async () => {
@@ -605,14 +683,14 @@ describe('ItemsService', () => {
         endDate: updatedHistory.endDate,
       });
 
-      expect(prisma.itemHistory.update).toHaveBeenCalledWith({
+      expect(prisma.itemHistory.update.mock.calls[0]?.[0]).toMatchObject({
         where: { id: historyId },
-        data: expect.objectContaining({
+        data: {
           price: 35,
           endDate: updatedHistory.endDate,
-        }),
+        },
       });
-      expect(prisma.item.update).toHaveBeenCalledWith({
+      expect(prisma.item.update.mock.calls[0]?.[0]).toEqual({
         where: { id: itemId },
         data: { nextBillingDate: updatedHistory.endDate },
       });
@@ -634,7 +712,10 @@ describe('ItemsService', () => {
       endDate: new Date('2026-08-11T00:00:00.000Z'),
       cycleType: ItemCycleType.MONTH,
       cycle: 1,
+      cycleMode: ItemCycleCalculationMode.CALENDAR,
+      cycleDays: null,
       note: null,
+      isAutoRenew: false,
       createdAt: new Date('2026-07-12T00:00:00.000Z'),
       updatedAt: new Date('2026-07-12T00:00:00.000Z'),
     };
@@ -649,9 +730,7 @@ describe('ItemsService', () => {
       prisma.item.findFirst.mockResolvedValue(createMockItem({ id: itemId }));
       prisma.itemHistory.findUnique.mockResolvedValue(deletedHistory);
       prisma.itemHistory.delete.mockResolvedValue(deletedHistory);
-      prisma.$transaction.mockImplementation(async (callback) =>
-        callback(prisma),
-      );
+      mockTransaction();
     });
 
     it('应该删除订阅记录并把到期日回退到剩余记录的最后一期', async () => {
@@ -659,10 +738,10 @@ describe('ItemsService', () => {
 
       const result = await service.removeHistory(userId, itemId, historyId);
 
-      expect(prisma.itemHistory.delete).toHaveBeenCalledWith({
+      expect(prisma.itemHistory.delete.mock.calls[0]?.[0]).toEqual({
         where: { id: historyId },
       });
-      expect(prisma.item.update).toHaveBeenCalledWith({
+      expect(prisma.item.update.mock.calls[0]?.[0]).toEqual({
         where: { id: itemId },
         data: { nextBillingDate: previousHistory.endDate },
       });

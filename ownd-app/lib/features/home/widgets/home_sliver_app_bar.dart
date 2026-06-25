@@ -3,19 +3,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/purchase_platform.dart';
 import '../../../data/repositories/platform_repository.dart';
 import '../../../core/network/error_messages.dart';
-import '../../../core/theme/theme_provider.dart';
 import '../../../shared/utils/icon_utils.dart';
 
 class HomeSliverAppBar extends ConsumerWidget {
   final TextEditingController searchController;
   final bool isGridView;
-  final bool expiringSoonOnly;
+  final String? statusFilter;
   final String sortField;
   final bool isAscending;
   final String? selectedPlatformFilter;
 
   final ValueChanged<bool> onGridViewChanged;
-  final ValueChanged<bool> onExpiringSoonOnlyChanged;
+  final ValueChanged<String?> onStatusFilterChanged;
   final ValueChanged<String> onSortFieldChanged;
   final ValueChanged<bool> onSortOrderChanged;
   final ValueChanged<String?> onPlatformFilterChanged;
@@ -26,12 +25,12 @@ class HomeSliverAppBar extends ConsumerWidget {
     super.key,
     required this.searchController,
     required this.isGridView,
-    required this.expiringSoonOnly,
+    required this.statusFilter,
     required this.sortField,
     required this.isAscending,
     required this.selectedPlatformFilter,
     required this.onGridViewChanged,
-    required this.onExpiringSoonOnlyChanged,
+    required this.onStatusFilterChanged,
     required this.onSortFieldChanged,
     required this.onSortOrderChanged,
     required this.onPlatformFilterChanged,
@@ -110,31 +109,6 @@ class HomeSliverAppBar extends ConsumerWidget {
               height: buttonSize,
             ),
             padding: EdgeInsets.zero,
-            icon: Icon(_getThemeIcon(ref.watch(themeProvider))),
-            tooltip: '切换主题',
-            onPressed: () {
-              final currentMode = ref.read(themeProvider);
-              ThemeMode nextMode;
-              switch (currentMode) {
-                case ThemeMode.system:
-                  nextMode = ThemeMode.light;
-                  break;
-                case ThemeMode.light:
-                  nextMode = ThemeMode.dark;
-                  break;
-                case ThemeMode.dark:
-                  nextMode = ThemeMode.system;
-                  break;
-              }
-              ref.read(themeProvider.notifier).setThemeMode(nextMode);
-            },
-          ),
-          IconButton(
-            constraints: const BoxConstraints.tightFor(
-              width: buttonSize,
-              height: buttonSize,
-            ),
-            padding: EdgeInsets.zero,
             icon: Icon(isGridView ? Icons.view_list : Icons.grid_view),
             tooltip: isGridView ? '列表视图' : '网格视图',
             onPressed: () => onGridViewChanged(!isGridView),
@@ -144,32 +118,36 @@ class HomeSliverAppBar extends ConsumerWidget {
             height: buttonSize,
             child: PopupMenuButton<String>(
               padding: EdgeInsets.zero,
-              icon: const Icon(Icons.tune_rounded),
+              icon: Icon(
+                statusFilter != null || selectedPlatformFilter != null
+                    ? Icons.filter_alt
+                    : Icons.filter_alt_outlined,
+              ),
+              tooltip: '筛选',
               itemBuilder: (context) {
                 const double itemHeight = 36.0;
                 final textStyle = Theme.of(context).textTheme.bodyMedium;
                 return [
-                  PopupMenuItem(
-                    value: 'filter_expiring',
-                    height: itemHeight,
-                    child: Row(
-                      children: [
-                        Icon(
-                          expiringSoonOnly
-                              ? Icons.notifications_active
-                              : Icons.notifications_active_outlined,
-                          size: 18,
-                          color: expiringSoonOnly
-                              ? Theme.of(context).colorScheme.primary
-                              : null,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          expiringSoonOnly ? '取消到期筛选' : '仅看即将到期',
-                          style: textStyle,
-                        ),
-                      ],
-                    ),
+                  _statusMenuItem(context, null, itemHeight, textStyle),
+                  _statusMenuItem(context, 'active', itemHeight, textStyle),
+                  _statusMenuItem(context, 'inactive', itemHeight, textStyle),
+                  _statusMenuItem(
+                    context,
+                    'expired-subscriptions',
+                    itemHeight,
+                    textStyle,
+                  ),
+                  _statusMenuItem(
+                    context,
+                    'scrapped-items',
+                    itemHeight,
+                    textStyle,
+                  ),
+                  _statusMenuItem(
+                    context,
+                    'expiring-soon',
+                    itemHeight,
+                    textStyle,
                   ),
                   const PopupMenuDivider(height: 1),
                   PopupMenuItem(
@@ -194,8 +172,47 @@ class HomeSliverAppBar extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  const PopupMenuDivider(height: 1),
-                  // Sort Fields
+                ];
+              },
+              onSelected: (v) {
+                if (v.startsWith('status_')) {
+                  final rawValue = v.substring(7);
+                  final value = rawValue == 'all' ? null : rawValue;
+                  onStatusFilterChanged(statusFilter == value ? null : value);
+                } else if (v == 'platform_filter') {
+                  _showPlatformFilterDialog(context);
+                }
+              },
+            ),
+          ),
+          SizedBox(
+            width: buttonSize,
+            height: buttonSize,
+            child: PopupMenuButton<String>(
+              padding: EdgeInsets.zero,
+              icon: const Icon(Icons.sort),
+              tooltip: '排序',
+              itemBuilder: (context) {
+                const double itemHeight = 36.0;
+                final textStyle = Theme.of(context).textTheme.bodyMedium;
+                return [
+                  PopupMenuItem(
+                    value: 'field_default',
+                    height: itemHeight,
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.auto_awesome_motion_outlined,
+                          size: 18,
+                          color: sortField == 'default'
+                              ? Theme.of(context).colorScheme.primary
+                              : null,
+                        ),
+                        const SizedBox(width: 8),
+                        Text('默认排序', style: textStyle),
+                      ],
+                    ),
+                  ),
                   PopupMenuItem(
                     value: 'field_date',
                     height: itemHeight,
@@ -248,7 +265,6 @@ class HomeSliverAppBar extends ConsumerWidget {
                     ),
                   ),
                   const PopupMenuDivider(height: 1),
-                  // Sort Order
                   PopupMenuItem(
                     value: 'order_desc',
                     height: itemHeight,
@@ -286,11 +302,7 @@ class HomeSliverAppBar extends ConsumerWidget {
                 ];
               },
               onSelected: (v) {
-                if (v == 'filter_expiring') {
-                  onExpiringSoonOnlyChanged(!expiringSoonOnly);
-                } else if (v == 'platform_filter') {
-                  _showPlatformFilterDialog(context);
-                } else if (v.startsWith('field_')) {
+                if (v.startsWith('field_')) {
                   onSortFieldChanged(v.substring(6));
                 } else if (v == 'order_asc') {
                   onSortOrderChanged(true);
@@ -305,15 +317,50 @@ class HomeSliverAppBar extends ConsumerWidget {
     );
   }
 
-  IconData _getThemeIcon(ThemeMode mode) {
-    switch (mode) {
-      case ThemeMode.system:
-        return Icons.brightness_auto_rounded;
-      case ThemeMode.light:
-        return Icons.light_mode_rounded;
-      case ThemeMode.dark:
-        return Icons.dark_mode_rounded;
-    }
+  PopupMenuItem<String> _statusMenuItem(
+    BuildContext context,
+    String? value,
+    double itemHeight,
+    TextStyle? textStyle,
+  ) {
+    final selected = statusFilter == value;
+    return PopupMenuItem(
+      value: 'status_${value ?? 'all'}',
+      height: itemHeight,
+      child: Row(
+        children: [
+          Icon(
+            selected ? Icons.check_circle : _statusIcon(value),
+            size: 18,
+            color: selected ? Theme.of(context).colorScheme.primary : null,
+          ),
+          const SizedBox(width: 8),
+          Text(_statusLabel(value), style: textStyle),
+        ],
+      ),
+    );
+  }
+
+  IconData _statusIcon(String? value) {
+    return switch (value) {
+      'active' => Icons.play_circle_outline,
+      'inactive' => Icons.archive_outlined,
+      'expired-subscriptions' => Icons.event_busy_outlined,
+      'scrapped-items' => Icons.delete_sweep_outlined,
+      'expiring-soon' => Icons.notifications_active_outlined,
+      _ => Icons.all_inbox_outlined,
+    };
+  }
+
+  String _statusLabel(String? value) {
+    return switch (value) {
+      'active' => '使用中',
+      'inactive' => '退役/到期',
+      'expired-subscriptions' => '已过期订阅',
+      'scrapped-items' => '已报废实物',
+      'expiring-soon' => '即将到期订阅',
+      _ => '全部物品',
+    };
   }
 
   void _showPlatformFilterDialog(BuildContext context) {
@@ -386,7 +433,9 @@ class HomeSliverAppBar extends ConsumerWidget {
                                       )
                                     : null,
                                 onTap: () {
-                                  onPlatformFilterChanged(p.name);
+                                  onPlatformFilterChanged(
+                                    isSelected ? null : p.name,
+                                  );
                                   Navigator.pop(context);
                                 },
                               );

@@ -5,12 +5,13 @@ import DailyRotateFile from 'winston-daily-rotate-file';
 // 敏感字段脱敏逻辑
 const maskFormat = winston.format((info) => {
   const sensitiveFields = ['password', 'token', 'secret', 'authorization'];
-  const message = info.message as Record<string, any>;
+  const message = info.message;
 
   if (message && typeof message === 'object') {
+    const messageRecord = message as Record<string, unknown>;
     sensitiveFields.forEach((field) => {
-      if (message[field]) {
-        message[field] = '***MASKED***';
+      if (messageRecord[field]) {
+        messageRecord[field] = '***MASKED***';
       }
     });
   }

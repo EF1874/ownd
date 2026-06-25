@@ -10,8 +10,6 @@ import { ConfigService } from '@nestjs/config';
 
 describe('AuthService', () => {
   let service: AuthService;
-  let usersService: UsersService;
-  let jwtService: JwtService;
 
   const mockUsersService = {
     findByEmail: jest.fn(),
@@ -52,8 +50,6 @@ describe('AuthService', () => {
     }).compile();
 
     service = module.get<AuthService>(AuthService);
-    usersService = module.get<UsersService>(UsersService);
-    jwtService = module.get<JwtService>(JwtService);
   });
 
   afterEach(() => {
@@ -113,7 +109,7 @@ describe('AuthService', () => {
 
       const result = await service.register(email, 'pass123', 'Name', '123456');
 
-      expect(usersService.create as jest.Mock).toHaveBeenCalledWith(
+      expect(mockUsersService.create).toHaveBeenCalledWith(
         email,
         'pass123',
         'Name',
@@ -142,7 +138,7 @@ describe('AuthService', () => {
 
       const result = await service.login(user);
 
-      expect(jwtService.sign as jest.Mock).toHaveBeenCalledWith(
+      expect(mockJwtService.sign).toHaveBeenCalledWith(
         { email: user.email, sub: user.id },
         { expiresIn: '30d' },
       );
@@ -180,10 +176,9 @@ describe('AuthService', () => {
 
       const result = await service.updateProfile('1', { name: 'New' });
 
-      expect(usersService.updateProfile as jest.Mock).toHaveBeenCalledWith(
-        '1',
-        { name: 'New' },
-      );
+      expect(mockUsersService.updateProfile).toHaveBeenCalledWith('1', {
+        name: 'New',
+      });
       expect(result.user.name).toBe('New');
     });
   });
@@ -212,7 +207,7 @@ describe('AuthService', () => {
         code: '123456',
       });
 
-      expect(usersService.updateEmail as jest.Mock).toHaveBeenCalledWith(
+      expect(mockUsersService.updateEmail).toHaveBeenCalledWith(
         '1',
         'new@test.com',
       );
@@ -237,7 +232,7 @@ describe('AuthService', () => {
           code: '123456',
         }),
       ).rejects.toThrow(UnauthorizedException);
-      expect(usersService.updateEmail as jest.Mock).not.toHaveBeenCalled();
+      expect(mockUsersService.updateEmail).not.toHaveBeenCalled();
     });
   });
 
@@ -253,7 +248,7 @@ describe('AuthService', () => {
 
       const result = await service.updateAvatar('1', '/ownd-items/avatar.png');
 
-      expect(usersService.updateAvatar as jest.Mock).toHaveBeenCalledWith(
+      expect(mockUsersService.updateAvatar).toHaveBeenCalledWith(
         '1',
         '/ownd-items/avatar.png',
       );
@@ -277,7 +272,7 @@ describe('AuthService', () => {
         newPassword: 'new-pass',
       });
 
-      expect(usersService.updatePassword as jest.Mock).toHaveBeenCalledWith(
+      expect(mockUsersService.updatePassword).toHaveBeenCalledWith(
         '1',
         'new-pass',
       );

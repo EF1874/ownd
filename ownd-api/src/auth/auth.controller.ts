@@ -46,11 +46,14 @@ import { MinioService } from '../minio/minio.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AssetPurpose } from '@prisma/client';
 import { AssetsService } from '../assets/assets.service';
+import type { Request } from 'express';
 
 // 定义一个包含 user 的 Request 类型，或者使用全局声明
 interface RequestWithUser extends Request {
   user: Omit<User, 'password'>;
 }
+
+type AuthRequest = Request;
 
 const imageMaxSize = 5 * 1024 * 1024;
 const imageFileType = /image\/(jpeg|jpg|png)/;
@@ -259,7 +262,7 @@ export class AuthController {
   @Audit('用户登出')
   @HttpCode(HttpStatus.OK)
   @ApiResponse({ status: 200, description: '登出成功' })
-  async logout(@NestRequest() req: any) {
+  async logout(@NestRequest() req: AuthRequest) {
     const token = ExtractJwt.fromAuthHeaderAsBearerToken()(req);
     if (token) {
       try {

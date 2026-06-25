@@ -74,7 +74,10 @@ export class AppUpdatesService {
       throw new ServiceUnavailableException('应用更新平台配置不匹配');
     }
 
-    const versionCode = this.requiredNumber(manifest.versionCode, 'versionCode');
+    const versionCode = this.requiredNumber(
+      manifest.versionCode,
+      'versionCode',
+    );
     const artifacts = this.artifacts(manifest, versionCode);
     const defaultArtifact =
       artifacts.find((artifact) => artifact.abi === 'universal') ??

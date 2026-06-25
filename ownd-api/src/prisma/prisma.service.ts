@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 
@@ -35,11 +35,14 @@ export class PrismaService
 
   private async autoSeedTemplates() {
     try {
-      const categoriesCount = await this.category.count({ where: { userId: null } });
+      const categoriesCount = await this.category.count({
+        where: { userId: null },
+      });
       if (categoriesCount === 0) {
         console.log('检测到系统分类模板为空，正在自动灌入分类模板...');
-        const { categories: templateCats } = await import('../common/constants/templates.js');
-        
+        const { categories: templateCats } =
+          await import('../common/constants/templates.js');
+
         for (const cat of templateCats) {
           const parent = await this.category.create({
             data: {
@@ -48,7 +51,7 @@ export class PrismaService
               userId: null,
             },
           });
-          
+
           for (const child of [
             ...cat.children,
             { name: '其它', icon: 'MdiIcons.dotsHorizontal' },
@@ -66,11 +69,14 @@ export class PrismaService
         console.log('系统分类模板灌包完成。');
       }
 
-      const platformsCount = await this.platform.count({ where: { userId: null } });
+      const platformsCount = await this.platform.count({
+        where: { userId: null },
+      });
       if (platformsCount === 0) {
         console.log('检测到系统平台模板为空，正在自动灌入平台模板...');
-        const { platforms: templatePlats } = await import('../common/constants/templates.js');
-        
+        const { platforms: templatePlats } =
+          await import('../common/constants/templates.js');
+
         for (const plat of templatePlats) {
           await this.platform.create({
             data: {
@@ -93,10 +99,7 @@ export class PrismaService
       // Find items pointing to template categories or platforms
       const items = await this.item.findMany({
         where: {
-          OR: [
-            { category: { userId: null } },
-            { platform: { userId: null } },
-          ],
+          OR: [{ category: { userId: null } }, { platform: { userId: null } }],
         },
         include: {
           category: true,
@@ -106,26 +109,32 @@ export class PrismaService
 
       if (items.length === 0) return;
 
-      console.log(`[Heal] Found ${items.length} items with template category/platform links. Healing...`);
+      console.log(
+        `[Heal] Found ${items.length} items with template category/platform links. Healing...`,
+      );
 
       // Group items by userId
-      const userIds = Array.from(new Set(items.map(item => item.userId)));
+      const userIds = Array.from(new Set(items.map((item) => item.userId)));
 
       for (const userId of userIds) {
         // Ensure user categories & platforms are initialized
         await this.ensureUserTemplates(userId);
 
         // Fetch user categories and platforms
-        const userCategories = await this.category.findMany({ where: { userId } });
-        const userPlatforms = await this.platform.findMany({ where: { userId } });
+        const userCategories = await this.category.findMany({
+          where: { userId },
+        });
+        const userPlatforms = await this.platform.findMany({
+          where: { userId },
+        });
 
-        const catMap = new Map(userCategories.map(c => [c.name, c.id]));
-        const platMap = new Map(userPlatforms.map(p => [p.name, p.id]));
+        const catMap = new Map(userCategories.map((c) => [c.name, c.id]));
+        const platMap = new Map(userPlatforms.map((p) => [p.name, p.id]));
 
-        const userItems = items.filter(item => item.userId === userId);
+        const userItems = items.filter((item) => item.userId === userId);
 
         for (const item of userItems) {
-          const updateData: any = {};
+          const updateData: Prisma.ItemUncheckedUpdateInput = {};
 
           if (item.category && item.category.userId === null) {
             const userCatId = catMap.get(item.category.name);
@@ -146,7 +155,9 @@ export class PrismaService
               where: { id: item.id },
               data: updateData,
             });
-            console.log(`[Heal] Updated item '${item.name}' with user-specific category/platform.`);
+            console.log(
+              `[Heal] Updated item '${item.name}' with user-specific category/platform.`,
+            );
           }
         }
       }
@@ -159,7 +170,10 @@ export class PrismaService
   private async ensureUserTemplates(userId: string) {
     const user = await this.user.findUnique({
       where: { id: userId },
-      select: { categoryDefaultsInitialized: true, platformDefaultsInitialized: true },
+      select: {
+        categoryDefaultsInitialized: true,
+        platformDefaultsInitialized: true,
+      },
     });
 
     if (!user) return;
@@ -167,7 +181,9 @@ export class PrismaService
     const categoriesCount = await this.category.count({ where: { userId } });
     if (categoriesCount === 0) {
       console.log(`[Heal] Initializing categories for user ${userId}...`);
-      const templates = await this.category.findMany({ where: { userId: null } });
+      const templates = await this.category.findMany({
+        where: { userId: null },
+      });
       const idMap = new Map<string, string>();
       for (const template of templates.filter((c) => !c.parentId)) {
         const created = await this.category.create({
@@ -206,7 +222,9 @@ export class PrismaService
     const platformsCount = await this.platform.count({ where: { userId } });
     if (platformsCount === 0) {
       console.log(`[Heal] Initializing platforms for user ${userId}...`);
-      const templates = await this.platform.findMany({ where: { userId: null } });
+      const templates = await this.platform.findMany({
+        where: { userId: null },
+      });
       for (const template of templates) {
         await this.platform.create({
           data: {

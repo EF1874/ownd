@@ -8,14 +8,14 @@ import 'device_grid_item.dart';
 class HomeDeviceList extends StatelessWidget {
   final List<Device> processedDevices;
   final bool isGridView;
-  final bool hasSearchQuery;
+  final String emptyMessage;
   final OnDeleteComplete? onDeleteComplete;
 
   const HomeDeviceList({
     super.key,
     required this.processedDevices,
     required this.isGridView,
-    required this.hasSearchQuery,
+    required this.emptyMessage,
     this.onDeleteComplete,
   });
 
@@ -93,7 +93,7 @@ class HomeDeviceList extends StatelessWidget {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              hasSearchQuery ? '没有搜到相关物品' : '当前分类下没有相关物品',
+                              emptyMessage,
                               style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
                                     color: Theme.of(

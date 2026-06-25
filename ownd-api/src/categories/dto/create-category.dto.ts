@@ -15,5 +15,5 @@ export class CreateCategoryDto {
   @ApiProperty({ description: '父级分类ID', example: '1' })
   @IsString()
   @IsOptional()
-  parentId: string;
+  parentId?: string;
 }

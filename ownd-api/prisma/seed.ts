@@ -298,7 +298,7 @@ const platforms: PlatformSeed[] = [
   { name: '天猫', icon: 'MdiIcons.cat', color: '#FF0036' },
   { name: '京东', icon: 'MdiIcons.dog', color: '#E4393C' },
   { name: '拼多多', icon: 'MdiIcons.accountGroup', color: '#E02E24' },
-  { name: '抖音电商', icon: 'MdiIcons.musicNote', color: '#1C1C1C' },
+  { name: '抖音', icon: 'MdiIcons.musicNote', color: '#1C1C1C' },
   { name: '快手电商', icon: 'MdiIcons.video', color: '#FF4800' },
   { name: '苏宁易购', icon: 'MdiIcons.store', color: '#FDBD00' },
   { name: '唯品会', icon: 'MdiIcons.tagHeart', color: '#F10180' },

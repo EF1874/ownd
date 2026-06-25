@@ -72,6 +72,7 @@ class RemoteDeviceDataSource implements DeviceDataSource {
     String? platformId,
     String? tag,
     bool expiringSoon = false,
+    String? status,
     String? sortBy,
     String? sortOrder,
   }) async {
@@ -83,6 +84,7 @@ class RemoteDeviceDataSource implements DeviceDataSource {
       if (platformId != null && platformId.isNotEmpty) 'platformId': platformId,
       if (tag != null && tag.isNotEmpty) 'tag': tag,
       if (expiringSoon) 'expiringSoon': 'true',
+      if (status != null && status.isNotEmpty) 'status': status,
       if (sortBy != null && sortBy.isNotEmpty) 'sortBy': sortBy,
       if (sortOrder != null && sortOrder.isNotEmpty) 'sortOrder': sortOrder,
     };

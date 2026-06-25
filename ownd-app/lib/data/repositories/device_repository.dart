@@ -39,6 +39,7 @@ class DeviceRepository {
     String? platformId,
     String? tag,
     bool expiringSoon = false,
+    String? status,
     String? sortBy,
     String? sortOrder,
   }) {
@@ -50,6 +51,7 @@ class DeviceRepository {
       platformId: platformId,
       tag: tag,
       expiringSoon: expiringSoon,
+      status: status,
       sortBy: sortBy,
       sortOrder: sortOrder,
     );

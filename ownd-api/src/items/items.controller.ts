@@ -37,6 +37,7 @@ import { ItemEntity } from './entities/item.entity';
 import type { Response } from 'express';
 import { AssetPurpose } from '@prisma/client';
 import { AssetsService } from '../assets/assets.service';
+import type { BackupData } from './item-backup-import';
 
 interface RequestWithUser extends Request {
   user: User;
@@ -60,7 +61,7 @@ export class ItemsController {
   @Audit('导入备份数据')
   @ApiOperation({ summary: '批量导入/恢复备份数据' })
   @ApiResponse({ status: 201, description: '导入成功' })
-  importBackup(@Body() body: any, @Request() req: RequestWithUser) {
+  importBackup(@Body() body: BackupData, @Request() req: RequestWithUser) {
     return this.itemsService.importBackup(req.user.id, body);
   }
 
@@ -111,6 +112,7 @@ export class ItemsController {
     @Query('platformId') platformId?: string,
     @Query('tag') tag?: string,
     @Query('expiringSoon') expiringSoon?: string,
+    @Query('status') status?: string,
     @Query('sortBy') sortBy?: string,
     @Query('sortOrder') sortOrder?: 'asc' | 'desc',
   ) {
@@ -122,6 +124,7 @@ export class ItemsController {
       platformId,
       tag,
       expiringSoon: expiringSoon === 'true',
+      status,
       sortBy,
       sortOrder,
     });

@@ -22,6 +22,7 @@ abstract class DeviceDataSource {
     String? platformId,
     String? tag,
     bool expiringSoon = false,
+    String? status,
     String? sortBy,
     String? sortOrder,
   });

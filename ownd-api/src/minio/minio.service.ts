@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as Minio from 'minio';
 import path from 'path';
+import { Readable } from 'stream';
 
 @Injectable()
 export class MinioService {
@@ -70,17 +71,21 @@ export class MinioService {
     return `/${this.bucketName}/${fileName}`;
   }
 
-  async getFile(fileName: string) {
+  async getFile(
+    fileName: string,
+  ): Promise<{ stream: Readable; contentType: string }> {
     if (fileName.includes('/') || fileName.includes('\\')) {
       throw new BadRequestException('图片不存在或已被删除');
     }
 
     const stat = await this.client.statObject(this.bucketName, fileName);
     const stream = await this.client.getObject(this.bucketName, fileName);
+    const metaData = stat.metaData as
+      | Record<string, string | undefined>
+      | undefined;
     return {
       stream,
-      contentType:
-        stat.metaData?.['content-type'] ?? 'application/octet-stream',
+      contentType: metaData?.['content-type'] ?? 'application/octet-stream',
     };
   }
 

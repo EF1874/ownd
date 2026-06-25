@@ -5,9 +5,16 @@ import * as bcrypt from 'bcrypt';
 import { AssetPurpose, AssetRefType, AssetStatus, User } from '@prisma/client';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 
+type UserCreateArgs = {
+  data: {
+    email: string;
+    name?: string;
+    password: string;
+  };
+};
+
 describe('UsersService', () => {
   let service: UsersService;
-  let prisma: PrismaService;
 
   const mockPrismaService = {
     $transaction: jest.fn(),
@@ -40,7 +47,6 @@ describe('UsersService', () => {
     }).compile();
 
     service = module.get<UsersService>(UsersService);
-    prisma = module.get<PrismaService>(PrismaService);
   });
 
   afterEach(() => {
@@ -48,8 +54,9 @@ describe('UsersService', () => {
   });
 
   beforeEach(() => {
-    mockPrismaService.$transaction.mockImplementation(async (callback) =>
-      callback(mockPrismaService),
+    mockPrismaService.$transaction.mockImplementation(
+      (callback: (tx: typeof mockPrismaService) => unknown) =>
+        callback(mockPrismaService),
     );
   });
 
@@ -68,18 +75,13 @@ describe('UsersService', () => {
 
       const result = await service.create(email, password, name);
 
-      expect(prisma.user.create as jest.Mock).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          email,
-          name,
-          password: expect.any(String) as string,
-        }),
-      });
-
-      const callArgs = (prisma.user.create as jest.Mock).mock.calls[0] as [
-        { data: { password: string } },
+      const callArgs = mockPrismaService.user.create.mock.calls[0] as [
+        UserCreateArgs,
       ];
+      expect(callArgs[0].data.email).toBe(email);
+      expect(callArgs[0].data.name).toBe(name);
       const passwordSentToPrisma = callArgs[0].data.password;
+      expect(typeof passwordSentToPrisma).toBe('string');
       expect(passwordSentToPrisma).not.toBe(password);
 
       const isMatch = await bcrypt.compare(password, passwordSentToPrisma);
@@ -96,7 +98,7 @@ describe('UsersService', () => {
 
       const result = await service.findByEmail(email);
 
-      expect(prisma.user.findUnique as jest.Mock).toHaveBeenCalledWith({
+      expect(mockPrismaService.user.findUnique).toHaveBeenCalledWith({
         where: { email },
       });
       expect(result).toEqual(mockUser);
@@ -127,7 +129,7 @@ describe('UsersService', () => {
         avatarPath: '/ownd-items/avatar.png',
       });
 
-      expect(prisma.user.update as jest.Mock).toHaveBeenCalledWith({
+      expect(mockPrismaService.user.update).toHaveBeenCalledWith({
         where: { id: '1' },
         data: {
           name: 'New Name',
@@ -148,7 +150,7 @@ describe('UsersService', () => {
 
       await service.updateEmail('1', 'new@example.com');
 
-      expect(prisma.user.update as jest.Mock).toHaveBeenCalledWith({
+      expect(mockPrismaService.user.update).toHaveBeenCalledWith({
         where: { id: '1' },
         data: { email: 'new@example.com' },
       });
@@ -170,11 +172,11 @@ describe('UsersService', () => {
 
       const result = await service.updateAvatar('1', '/ownd-items/new.png');
 
-      expect(prisma.user.update as jest.Mock).toHaveBeenCalledWith({
+      expect(mockPrismaService.user.update).toHaveBeenCalledWith({
         where: { id: '1' },
         data: { avatarPath: '/ownd-items/new.png' },
       });
-      expect(prisma.asset.updateMany as jest.Mock).toHaveBeenCalledWith({
+      expect(mockPrismaService.asset.updateMany).toHaveBeenCalledWith({
         where: {
           userId: '1',
           path: '/ownd-items/old.png',
@@ -186,7 +188,7 @@ describe('UsersService', () => {
           refId: null,
         },
       });
-      expect(prisma.asset.updateMany as jest.Mock).toHaveBeenCalledWith({
+      expect(mockPrismaService.asset.updateMany).toHaveBeenCalledWith({
         where: { userId: '1', path: '/ownd-items/new.png' },
         data: {
           purpose: AssetPurpose.USER_AVATAR,

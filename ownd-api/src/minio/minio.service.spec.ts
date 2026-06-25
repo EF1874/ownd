@@ -9,15 +9,19 @@ type MockMinioClient = {
   putObject: jest.Mock;
   removeObject: jest.Mock;
 };
+let mockMinioClient: MockMinioClient;
 
 jest.mock('minio', () => {
   return {
-    Client: jest.fn().mockImplementation(() => ({
-      bucketExists: jest.fn(),
-      makeBucket: jest.fn(),
-      putObject: jest.fn(),
-      removeObject: jest.fn(),
-    })),
+    Client: jest.fn().mockImplementation(() => {
+      mockMinioClient = {
+        bucketExists: jest.fn(),
+        makeBucket: jest.fn(),
+        putObject: jest.fn(),
+        removeObject: jest.fn(),
+      };
+      return mockMinioClient;
+    }),
   };
 });
 
@@ -55,7 +59,7 @@ describe('MinioService', () => {
     }).compile();
 
     service = module.get<MinioService>(MinioService);
-    client = (service as any).client as MockMinioClient;
+    client = mockMinioClient;
   });
 
   it('缺失关键配置时应 fail-fast 抛错', async () => {

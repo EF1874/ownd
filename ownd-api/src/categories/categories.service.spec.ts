@@ -1,13 +1,28 @@
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
 import { Test, TestingModule } from '@nestjs/testing';
 import { CategoriesService } from './categories.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotFoundException } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { CreateCategoryDto } from './dto/create-category.dto';
+
+type MockPrismaService = {
+  category: {
+    count: jest.Mock;
+    findFirst: jest.Mock;
+    findMany: jest.Mock;
+    create: jest.Mock;
+    update: jest.Mock;
+    delete: jest.Mock;
+  };
+  user: {
+    findUnique: jest.Mock;
+    update: jest.Mock;
+  };
+};
 
 describe('CategoriesService', () => {
   let service: CategoriesService;
-  let prisma: any;
+  let prisma: MockPrismaService;
 
   beforeEach(async () => {
     prisma = {
@@ -28,7 +43,10 @@ describe('CategoriesService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CategoriesService,
-        { provide: PrismaService, useValue: prisma },
+        {
+          provide: PrismaService,
+          useValue: prisma as unknown as PrismaService,
+        },
         {
           provide: CACHE_MANAGER,
           useValue: {
@@ -49,28 +67,31 @@ describe('CategoriesService', () => {
 
   describe('create', () => {
     it('应该成功创建一个顶级分类', async () => {
-      const dto = { name: '电子产品' };
+      const dto: CreateCategoryDto = { name: '电子产品' };
       const userId = 'u1';
       prisma.category.create.mockResolvedValue({ id: '1', ...dto, userId });
 
-      const result = await service.create(userId, dto as any);
+      const result = await service.create(userId, dto);
       expect(result.name).toBe('电子产品');
       expect(prisma.category.create).toHaveBeenCalled();
     });
 
     it('创建带父级的分类时，若父级不可访问应报错', async () => {
-      const dto = { name: '手机', parentId: 'parent-id' };
+      const dto: CreateCategoryDto = { name: '手机', parentId: 'parent-id' };
       const userId = 'u1';
       // 模拟 findFirst 没找到（说明 id 不存在或 userId 不匹配）
       prisma.category.findFirst.mockResolvedValue(null);
 
-      await expect(service.create(userId, dto as any)).rejects.toThrow(
+      await expect(service.create(userId, dto)).rejects.toThrow(
         NotFoundException,
       );
     });
 
     it('应该允许用户分类挂到自己的父级下', async () => {
-      const dto = { name: '自定义订阅', parentId: 'parent-id' };
+      const dto: CreateCategoryDto = {
+        name: '自定义订阅',
+        parentId: 'parent-id',
+      };
       const userId = 'u1';
       prisma.category.findFirst.mockResolvedValue({
         id: 'parent-id',
@@ -78,7 +99,7 @@ describe('CategoriesService', () => {
       });
       prisma.category.create.mockResolvedValue({ id: '2', ...dto, userId });
 
-      await service.create(userId, dto as any);
+      await service.create(userId, dto);
 
       expect(prisma.category.create).toHaveBeenCalledWith({
         data: { ...dto, userId },
