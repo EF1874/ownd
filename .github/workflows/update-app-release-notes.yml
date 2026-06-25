@@ -31,9 +31,9 @@ jobs:
             exit 1
           fi
 
-          printf '%s' '${{ inputs.release_notes_json }}' \
-            | jq -e 'type == "array" and length > 0 and all(.[]; type == "string" and length > 0)' \
-            > /tmp/release-notes.json
+          printf '%s' '${{ inputs.release_notes_json }}' > /tmp/release-notes.json
+          jq -e 'type == "array" and length > 0 and all(.[]; type == "string" and length > 0)' \
+            /tmp/release-notes.json > /dev/null
 
           aws s3 cp "s3://${S3_BUCKET}/android/latest.json" /tmp/latest.json \
             --endpoint-url "$S3_ENDPOINT"
