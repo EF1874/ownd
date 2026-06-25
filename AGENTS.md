@@ -4,8 +4,11 @@
 
 - All git commit messages must follow Conventional Commits.
 - Use `feat:` for new user-facing features, `fix:` for bug fixes, `chore:` for maintenance, `docs:` for documentation, `refactor:` for behavior-preserving code changes, `test:` for tests, `ci:` for CI/CD changes, and `build:` for build-system changes.
-- Every version change must produce release notes automatically in the release pipeline.
-- GitHub Releases should show a concise user-facing summary first, followed by the automatically generated changelog.
+- Every app version change should include committed release notes before the version bump is pushed.
+- Use `docs/releases/vX.Y.Z.md` for the GitHub Release body and `docs/releases/vX.Y.Z.app.txt` for the in-app update popup text.
+- The release pipeline must prefer committed release notes when present, then fall back to automatic commit-message release notes.
+- Keep the manual App release-notes update workflow available for post-release text fixes.
+- GitHub Releases should show a concise user-facing summary first, followed by the detailed changelog.
 
 ## User-Facing Messages
 
