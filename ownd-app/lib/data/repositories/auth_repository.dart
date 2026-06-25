@@ -1,4 +1,8 @@
+import 'dart:io';
+
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
 
 import '../../core/network/api_client.dart';
 import '../../core/network/token_storage.dart';
@@ -95,6 +99,64 @@ class AuthRepository {
     return _persistLoginResult(data);
   }
 
+  Future<AuthSession> updateProfile({String? name, String? avatarPath}) async {
+    final data = await _apiClient.patch<Map<String, dynamic>>(
+      '/auth/profile',
+      data: {
+        if (name != null) 'name': name,
+        if (avatarPath != null) 'avatarPath': avatarPath,
+      },
+    );
+
+    return _persistLoginResult(data);
+  }
+
+  Future<AuthSession> changeEmail({
+    required String email,
+    required String password,
+    required String code,
+  }) async {
+    final data = await _apiClient.patch<Map<String, dynamic>>(
+      '/auth/profile/email',
+      data: {'email': email, 'password': password, 'code': code},
+    );
+
+    return _persistLoginResult(data);
+  }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await _apiClient.patch<dynamic>(
+      '/auth/profile/password',
+      data: {'currentPassword': currentPassword, 'newPassword': newPassword},
+    );
+  }
+
+  Future<AuthSession> uploadAvatar(String imagePath) async {
+    final data = await _apiClient.post<Map<String, dynamic>>(
+      '/auth/profile/avatar',
+      data: FormData.fromMap({
+        'file': await MultipartFile.fromFile(
+          imagePath,
+          filename: p.basename(imagePath),
+          contentType: await _imageContentType(imagePath),
+        ),
+      }),
+    );
+
+    return _persistLoginResult(data);
+  }
+
+  Future<AuthSession> deleteAvatar() async {
+    final data = await _apiClient.delete<Map<String, dynamic>>(
+      '/auth/profile/avatar',
+    );
+
+    return _persistLoginResult(data);
+  }
+
   Future<void> sendVerificationCode(String email, {String? type}) async {
     await _apiClient.post<dynamic>(
       '/auth/send-code',
@@ -118,5 +180,17 @@ class AuthRepository {
     final user = AuthUser.fromJson(data['user'] as Map<String, dynamic>);
     await _tokenStorage.saveToken(token);
     return AuthSession(token: token, user: user);
+  }
+
+  Future<DioMediaType> _imageContentType(String imagePath) async {
+    final bytes = await File(imagePath).openRead(0, 12).first;
+    if (bytes.length >= 8 &&
+        bytes[0] == 0x89 &&
+        bytes[1] == 0x50 &&
+        bytes[2] == 0x4E &&
+        bytes[3] == 0x47) {
+      return DioMediaType.parse('image/png');
+    }
+    return DioMediaType.parse('image/jpeg');
   }
 }

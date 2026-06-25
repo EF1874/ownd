@@ -17,6 +17,7 @@ model User {
   email                       String   @unique
   password                    String
   name                        String   @unique
+  avatarPath                  String?
   items                       Item[] // 一个用户可以拥有多个物品
   categoryDefaultsInitialized Boolean  @default(false)
   platformDefaultsInitialized Boolean  @default(false)

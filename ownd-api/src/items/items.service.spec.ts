@@ -8,6 +8,7 @@ import {
   AssetPurpose,
   AssetRefType,
   AssetStatus,
+  Prisma,
   PrismaClient,
   Item,
   ItemCycleType,
@@ -193,6 +194,87 @@ describe('ItemsService', () => {
         skip: undefined,
         take: undefined,
       });
+      expect(result).toEqual(mockItems);
+    });
+
+    it('应该支持按物品名称、平台、分类、标签和备注搜索', async () => {
+      const userId = 'user-1';
+      const mockItems = [createMockItem({ userId })];
+
+      prisma.item.findMany.mockResolvedValue(mockItems);
+
+      const result = await service.findAll(userId, { search: ' 京东 ' });
+
+      expect(prisma.item.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            userId,
+            AND: [
+              {
+                OR: [
+                  {
+                    name: {
+                      contains: '京东',
+                      mode: Prisma.QueryMode.insensitive,
+                    },
+                  },
+                  {
+                    notes: {
+                      contains: '京东',
+                      mode: Prisma.QueryMode.insensitive,
+                    },
+                  },
+                  { tags: { has: '京东' } },
+                  {
+                    platform: {
+                      is: {
+                        name: {
+                          contains: '京东',
+                          mode: Prisma.QueryMode.insensitive,
+                        },
+                      },
+                    },
+                  },
+                  {
+                    category: {
+                      is: {
+                        OR: [
+                          {
+                            name: {
+                              contains: '京东',
+                              mode: Prisma.QueryMode.insensitive,
+                            },
+                          },
+                          {
+                            parent: {
+                              is: {
+                                name: {
+                                  contains: '京东',
+                                  mode: Prisma.QueryMode.insensitive,
+                                },
+                              },
+                            },
+                          },
+                        ],
+                      },
+                    },
+                  },
+                  {
+                    itemHistories: {
+                      some: {
+                        note: {
+                          contains: '京东',
+                          mode: Prisma.QueryMode.insensitive,
+                        },
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        }),
+      );
       expect(result).toEqual(mockItems);
     });
 

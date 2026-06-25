@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import * as cacheManager from 'cache-manager';
+import { AssetPurpose, AssetRefType, AssetStatus } from '@prisma/client';
 
 @Injectable()
 export class UsersService {
@@ -46,6 +47,12 @@ export class UsersService {
     });
   }
 
+  async findByName(name: string) {
+    return this.prisma.user.findUnique({
+      where: { name },
+    });
+  }
+
   /**
    * @param userId 用户ID
    * @returns 用户对象
@@ -79,10 +86,83 @@ export class UsersService {
 
   async updatePassword(userId: string, pass: string) {
     const hashedPassword = await bcrypt.hash(pass, 10);
-    return this.prisma.user.update({
+    const user = await this.prisma.user.update({
       where: { id: userId },
       data: { password: hashedPassword },
     });
+    await this.clearProfileCache(userId);
+    return user;
+  }
+
+  async updateEmail(userId: string, email: string) {
+    const { password: _, ...user } = await this.prisma.user.update({
+      where: { id: userId },
+      data: { email },
+    });
+    await this.clearProfileCache(userId);
+    return user;
+  }
+
+  async updateProfile(
+    userId: string,
+    data: {
+      name?: string;
+      avatarPath?: string | null;
+      notificationLeadDays?: number;
+      notificationTime?: string;
+    },
+  ) {
+    const { password: _, ...user } = await this.prisma.user.update({
+      where: { id: userId },
+      data,
+    });
+    await this.clearProfileCache(userId);
+    return user;
+  }
+
+  async updateAvatar(userId: string, avatarPath: string | null) {
+    const user = await this.prisma.$transaction(async (tx) => {
+      const current = await tx.user.findUnique({
+        where: { id: userId },
+        select: { avatarPath: true },
+      });
+
+      const { password: _, ...updated } = await tx.user.update({
+        where: { id: userId },
+        data: { avatarPath },
+      });
+
+      if (current?.avatarPath && current.avatarPath !== avatarPath) {
+        await tx.asset.updateMany({
+          where: {
+            userId,
+            path: current.avatarPath,
+            purpose: AssetPurpose.USER_AVATAR,
+          },
+          data: {
+            status: AssetStatus.ORPHAN,
+            refType: null,
+            refId: null,
+          },
+        });
+      }
+
+      if (avatarPath) {
+        await tx.asset.updateMany({
+          where: { userId, path: avatarPath },
+          data: {
+            purpose: AssetPurpose.USER_AVATAR,
+            status: AssetStatus.ACTIVE,
+            refType: AssetRefType.USER,
+            refId: userId,
+          },
+        });
+      }
+
+      return updated;
+    });
+    await this.clearProfileCache(userId);
+    return user;
   }
 
   async updatePreferences(
@@ -92,15 +172,14 @@ export class UsersService {
       notificationTime?: string;
     },
   ) {
-    const { password: _, ...user } = await this.prisma.user.update({
-      where: { id: userId },
-      data,
-    });
+    return this.updateProfile(userId, data);
+  }
+
+  private async clearProfileCache(userId: string) {
     try {
       await this.cacheManager.del(`user:profile:${userId}`);
     } catch {
       // ignore
     }
-    return user;
   }
 }

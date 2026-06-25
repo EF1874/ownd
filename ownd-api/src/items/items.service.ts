@@ -223,11 +223,61 @@ export class ItemsService {
     const where: Prisma.ItemWhereInput = { userId };
     const andConditions: Prisma.ItemWhereInput[] = [];
 
-    if (query?.search) {
+    const search = query?.search?.trim();
+    if (search) {
       andConditions.push({
         OR: [
-          { name: { contains: query.search, mode: 'insensitive' } },
-          { notes: { contains: query.search, mode: 'insensitive' } },
+          {
+            name: { contains: search, mode: Prisma.QueryMode.insensitive },
+          },
+          {
+            notes: { contains: search, mode: Prisma.QueryMode.insensitive },
+          },
+          { tags: { has: search } },
+          {
+            platform: {
+              is: {
+                name: {
+                  contains: search,
+                  mode: Prisma.QueryMode.insensitive,
+                },
+              },
+            },
+          },
+          {
+            category: {
+              is: {
+                OR: [
+                  {
+                    name: {
+                      contains: search,
+                      mode: Prisma.QueryMode.insensitive,
+                    },
+                  },
+                  {
+                    parent: {
+                      is: {
+                        name: {
+                          contains: search,
+                          mode: Prisma.QueryMode.insensitive,
+                        },
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+          {
+            itemHistories: {
+              some: {
+                note: {
+                  contains: search,
+                  mode: Prisma.QueryMode.insensitive,
+                },
+              },
+            },
+          },
         ],
       });
     }

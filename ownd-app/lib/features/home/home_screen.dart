@@ -239,6 +239,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     HomeDeviceList(
                       processedDevices: homeDevicesState.devices,
                       isGridView: _isGridView,
+                      hasSearchQuery: homeDevicesState.search.isNotEmpty,
                       onDeleteComplete: (success, error) {
                         debugPrint(
                           '[HomeScreen] onDeleteComplete: success=$success, error=$error',

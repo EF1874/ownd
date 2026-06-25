@@ -5,6 +5,7 @@ import 'scaffold_with_navbar.dart';
 import '../../features/home/home_screen.dart';
 import '../../features/add_device/add_device_screen.dart';
 import '../../features/profile/profile_screen.dart';
+import '../../features/profile/account_profile_screen.dart';
 import '../../features/dashboard/insights_screen.dart';
 import '../../features/device_detail/device_detail_screen.dart';
 import '../../features/auth/auth_controller.dart';
@@ -14,13 +15,14 @@ final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorKey = GlobalKey<NavigatorState>();
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authControllerProvider);
-  final session = authState.asData?.value;
+  late final GoRouter router;
 
-  return GoRouter(
+  router = GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/',
     redirect: (context, state) {
+      final authState = ref.read(authControllerProvider);
+      final session = authState.asData?.value;
       final isLoginRoute = state.matchedLocation == '/login';
 
       if (authState.isLoading) {
@@ -55,6 +57,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/profile',
             builder: (context, state) => const ProfileScreen(),
           ),
+          GoRoute(
+            path: '/profile/account',
+            builder: (context, state) => const AccountProfileScreen(),
+          ),
         ],
       ),
       GoRoute(
@@ -73,4 +79,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
     ],
   );
+
+  ref.listen(authControllerProvider, (_, __) => router.refresh());
+  ref.onDispose(router.dispose);
+
+  return router;
 });

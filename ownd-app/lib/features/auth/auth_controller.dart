@@ -78,6 +78,46 @@ class AuthController extends StateNotifier<AsyncValue<AuthSession?>> {
     state = AsyncValue.data(session);
   }
 
+  Future<void> updateProfile({required String name}) async {
+    final session = await _repository.updateProfile(name: name);
+    await _syncPreferences(session);
+    state = AsyncValue.data(session);
+  }
+
+  Future<void> changeEmail({
+    required String email,
+    required String password,
+    required String code,
+  }) async {
+    final session = await _repository.changeEmail(
+      email: email,
+      password: password,
+      code: code,
+    );
+    await _syncPreferences(session);
+    state = AsyncValue.data(session);
+  }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) {
+    return _repository.changePassword(
+      currentPassword: currentPassword,
+      newPassword: newPassword,
+    );
+  }
+
+  Future<void> uploadAvatar(String imagePath) async {
+    final session = await _repository.uploadAvatar(imagePath);
+    state = AsyncValue.data(session);
+  }
+
+  Future<void> deleteAvatar() async {
+    final session = await _repository.deleteAvatar();
+    state = AsyncValue.data(session);
+  }
+
   Future<void> logout() async {
     await _repository.logout();
     _invalidateUserData();

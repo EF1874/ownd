@@ -1,4 +1,11 @@
-import { Injectable, ConflictException, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+  BadRequestException,
+  Inject,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
@@ -7,7 +14,11 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import * as cacheManager from 'cache-manager';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
-import { UpdateUserPreferencesDto } from './dto/auth.dto';
+import {
+  ChangeEmailDto,
+  ChangePasswordDto,
+  UpdateProfileDto,
+} from './dto/auth.dto';
 
 @Injectable()
 export class AuthService {
@@ -38,15 +49,74 @@ export class AuthService {
         id: user.id,
         email: user.email,
         name: user.name,
+        avatarPath: user.avatarPath ?? null,
         notificationLeadDays: user.notificationLeadDays ?? 3,
         notificationTime: user.notificationTime ?? '08:00',
       },
     });
   }
 
-  async updatePreferences(userId: string, dto: UpdateUserPreferencesDto) {
+  async updateProfile(userId: string, dto: UpdateProfileDto) {
+    const data: UpdateProfileDto = { ...dto };
+    if (data.name !== undefined) {
+      data.name = data.name.trim();
+      if (!data.name) {
+        throw new BadRequestException('请输入用户名');
+      }
+
+      const existing = await this.usersService.findByName(data.name);
+      if (existing && existing.id !== userId) {
+        throw new ConflictException('该用户名已被占用');
+      }
+    }
+
+    const user = await this.usersService.updateProfile(userId, data);
+    return this.login(user);
+  }
+
+  async updateAvatar(userId: string, avatarPath: string | null) {
+    const user = await this.usersService.updateAvatar(userId, avatarPath);
+    return this.login(user);
+  }
+
+  async updatePreferences(userId: string, dto: UpdateProfileDto) {
     const user = await this.usersService.updatePreferences(userId, dto);
     return this.login(user);
+  }
+
+  async changeEmail(userId: string, dto: ChangeEmailDto) {
+    const user = await this.requirePassword(userId, dto.password);
+    if (user.email === dto.email) {
+      throw new BadRequestException('请输入新的邮箱');
+    }
+
+    await this.verifyCode(dto.email, dto.code);
+    const existing = await this.usersService.findByEmail(dto.email);
+    if (existing && existing.id !== userId) {
+      throw new ConflictException('该邮箱已被注册');
+    }
+
+    const updated = await this.usersService.updateEmail(userId, dto.email);
+    return this.login(updated);
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    await this.requirePassword(userId, dto.currentPassword);
+    await this.usersService.updatePassword(userId, dto.newPassword);
+    return { success: true, message: '密码已更新' };
+  }
+
+  private async requirePassword(userId: string, password: string) {
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('登录状态已失效，请重新登录');
+    }
+
+    if (!(await bcrypt.compare(password, user.password))) {
+      throw new UnauthorizedException('当前密码不正确');
+    }
+
+    return user;
   }
 
   private getTransporter() {
@@ -82,6 +152,11 @@ export class AuthService {
       if (!user) {
         throw new NotFoundException('该邮箱未注册');
       }
+    } else if (type === 'change-email') {
+      const user = await this.usersService.findByEmail(email);
+      if (user) {
+        throw new ConflictException('该邮箱已被注册');
+      }
     }
 
     const code = Math.floor(100000 + Math.random() * 900000).toString();
@@ -89,7 +164,10 @@ export class AuthService {
     await this.cacheManager.set(key, code, 300000); // 5 minutes TTL in milliseconds
 
     const transporter = this.getTransporter();
-    const smtpFrom = this.configService.get<string>('SMTP_FROM', '"物记" <sender@example.com>');
+    const smtpFrom = this.configService.get<string>(
+      'SMTP_FROM',
+      '"物记" <sender@example.com>',
+    );
 
     let subject = '【物记】验证码';
     let textBody = `您的验证码是：${code}。该验证码有效期为 5 分钟，请勿泄露给他人。`;
@@ -103,9 +181,16 @@ export class AuthService {
       subject = '【物记】重置密码验证码';
       textBody = `您好！您正在申请重置密码。您的找回密码验证码是：${code}。该验证码有效期为 5 分钟，如果是您本人操作，请在页面中输入；如果非您本人操作，请忽略此邮件。`;
       htmlBody = `<p>您好！您正在申请重置密码。</p><p>您的找回密码验证码是：<strong>${code}</strong>。</p><p>该验证码有效期为 5 分钟，如果是您本人操作，请在页面中输入；如果非您本人操作，请忽略此邮件。</p>`;
+    } else if (type === 'change-email') {
+      subject = '【物记】更换邮箱验证码';
+      textBody = `您好！您正在更换物记账号邮箱。验证码是：${code}。该验证码有效期为 5 分钟，请勿泄露给他人。`;
+      htmlBody = `<p>您好！您正在更换物记账号邮箱。</p><p>验证码是：<strong>${code}</strong>。</p><p>该验证码有效期为 5 分钟，请勿泄露给他人。</p>`;
     }
 
-    if (transporter && !this.configService.get<string>('SMTP_HOST', '').includes('example.com')) {
+    if (
+      transporter &&
+      !this.configService.get<string>('SMTP_HOST', '').includes('example.com')
+    ) {
       try {
         await transporter.sendMail({
           from: smtpFrom,
@@ -114,19 +199,28 @@ export class AuthService {
           text: textBody,
           html: htmlBody,
         });
-        console.log(`[VERIFICATION CODE] Sent real email to ${email} successfully (${type || 'default'}).`);
+        console.log(
+          `[VERIFICATION CODE] Sent real email to ${email} successfully (${type || 'default'}).`,
+        );
       } catch (error) {
-        console.error(`[VERIFICATION CODE] Failed to send real email to ${email}:`, error);
+        console.error(
+          `[VERIFICATION CODE] Failed to send real email to ${email}:`,
+          error,
+        );
         // Fallback to console log in case of SMTP failure
         console.log(`\n========================================`);
-        console.log(`[VERIFICATION CODE] (SMTP FAILED FALLBACK) Sent to: ${email}`);
+        console.log(
+          `[VERIFICATION CODE] (SMTP FAILED FALLBACK) Sent to: ${email}`,
+        );
         console.log(`[CODE]: ${code}`);
         console.log(`========================================\n`);
       }
     } else {
       // Fallback/Dev mode
       console.log(`\n========================================`);
-      console.log(`[VERIFICATION CODE] (DEV CONSOLE FALLBACK) Sent to: ${email}`);
+      console.log(
+        `[VERIFICATION CODE] (DEV CONSOLE FALLBACK) Sent to: ${email}`,
+      );
       console.log(`[CODE]: ${code}`);
       console.log(`========================================\n`);
     }

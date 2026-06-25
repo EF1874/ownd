@@ -10,6 +10,7 @@ import '../../shared/widgets/app_update_prompt.dart';
 import '../../shared/widgets/draggable_add_button.dart';
 import '../../shared/widgets/app_toast.dart';
 import '../../core/theme/app_colors.dart';
+import 'navigation_provider.dart';
 
 class ScaffoldWithNavBar extends ConsumerStatefulWidget {
   final Widget child;
@@ -49,7 +50,17 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
 
         // 1. If not on Home, go to Home
         if (index != 0) {
-          _onItemTapped(0, context);
+          final guard = ref.read(routeLeaveGuardProvider);
+          if (guard != null && !await guard()) return;
+          if (!context.mounted) return;
+
+          final path = GoRouterState.of(context).uri.path;
+          if (path.startsWith('/profile/')) {
+            GoRouter.of(context).go('/profile');
+            return;
+          }
+
+          GoRouter.of(context).go('/');
           return;
         }
 
@@ -78,8 +89,9 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
                   ? _BottomNavigationBarSurface(
                       isDark: isDark,
                       selectedIndex: index,
-                      onDestinationSelected: (idx) =>
-                          _onItemTapped(idx, context),
+                      onDestinationSelected: (idx) {
+                        _onItemTapped(idx, context);
+                      },
                     )
                   : const SizedBox.shrink(),
             ),
@@ -100,7 +112,11 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
     return 0;
   }
 
-  void _onItemTapped(int index, BuildContext context) {
+  Future<void> _onItemTapped(int index, BuildContext context) async {
+    final guard = ref.read(routeLeaveGuardProvider);
+    if (guard != null && !await guard()) return;
+    if (!context.mounted) return;
+
     switch (index) {
       case 0:
         GoRouter.of(context).go('/');

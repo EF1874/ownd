@@ -92,7 +92,27 @@ export class ResetPasswordDto {
   code: string;
 }
 
-export class UpdateUserPreferencesDto {
+export class UpdateProfileDto {
+  @ApiProperty({
+    description: '用户名',
+    example: '张三',
+    required: false,
+  })
+  @IsString()
+  @IsNotEmpty({ message: '请输入用户名' })
+  @IsOptional()
+  name?: string;
+
+  @ApiProperty({
+    description: '头像路径',
+    example: '/ownd-items/avatar.png',
+    required: false,
+  })
+  @IsString()
+  @IsNotEmpty({ message: '头像信息不完整，请重新选择' })
+  @IsOptional()
+  avatarPath?: string | null;
+
   @ApiProperty({
     description: '提前提醒天数',
     example: 3,
@@ -112,4 +132,53 @@ export class UpdateUserPreferencesDto {
   })
   @IsOptional()
   notificationTime?: string;
+}
+
+export class ChangeEmailDto {
+  @ApiProperty({
+    description: '新邮箱',
+    example: 'new@example.com',
+    required: true,
+  })
+  @IsEmail({}, { message: '邮箱格式不正确' })
+  email: string;
+
+  @ApiProperty({
+    description: '当前密码',
+    example: '123456',
+    required: true,
+  })
+  @IsString()
+  @IsNotEmpty({ message: '请输入当前密码' })
+  password: string;
+
+  @ApiProperty({
+    description: '新邮箱验证码',
+    example: '123456',
+    required: true,
+  })
+  @IsString()
+  @IsNotEmpty({ message: '请输入验证码' })
+  code: string;
+}
+
+export class ChangePasswordDto {
+  @ApiProperty({
+    description: '当前密码',
+    example: '123456',
+    required: true,
+  })
+  @IsString()
+  @IsNotEmpty({ message: '请输入当前密码' })
+  currentPassword: string;
+
+  @ApiProperty({
+    description: '新密码',
+    example: '123456',
+    required: true,
+    minimum: 6,
+  })
+  @IsString()
+  @MinLength(6, { message: '密码至少需要 6 位' })
+  newPassword: string;
 }

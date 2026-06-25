@@ -6,10 +6,14 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { AssetsModule } from '../assets/assets.module';
+import { MinioModule } from '../minio/minio.module';
 
 @Module({
   imports: [
     UsersModule,
+    AssetsModule,
+    MinioModule,
     PassportModule,
     // 异步配置 Jwt，确保能从 ConfigService 读取密钥
     JwtModule.registerAsync({

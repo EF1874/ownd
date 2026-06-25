@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../data/services/data_transfer_service.dart';
@@ -22,6 +23,7 @@ import '../home/home_screen.dart';
 import '../home/home_devices_provider.dart';
 
 import '../../shared/widgets/base_card.dart';
+import '../../shared/widgets/app_image.dart';
 import '../../shared/widgets/app_toast.dart';
 import '../../shared/widgets/app_update_prompt.dart';
 
@@ -50,16 +52,46 @@ class ProfileScreen extends ConsumerWidget {
           children: [
             if (user != null) ...[
               BaseCard(
-                child: ListTile(
-                  leading: const Icon(Icons.account_circle_outlined),
-                  title: Text(user.name ?? user.email),
-                  subtitle: Text(user.email),
-                  trailing: TextButton(
-                    onPressed: () async {
-                      await ref.read(authControllerProvider.notifier).logout();
-                    },
-                    child: const Text('退出登录'),
-                  ),
+                onTap: () => context.push('/profile/account'),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        _buildAvatar(context, user.avatarPath),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Text(
+                            user.name ?? user.email,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () async {
+                            await ref
+                                .read(authControllerProvider.notifier)
+                                .logout();
+                          },
+                          child: const Text('退出登录'),
+                        ),
+                        const Icon(Icons.chevron_right),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 56),
+                      child: Text(
+                        user.email,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 24),
@@ -282,6 +314,29 @@ class ProfileScreen extends ConsumerWidget {
       context,
       message,
       isError: message.contains('失败') || message.contains('错误'),
+    );
+  }
+
+  Widget _buildAvatar(BuildContext context, String? avatarPath) {
+    const size = 40.0;
+    final fallback = ColoredBox(
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      child: Center(
+        child: Icon(
+          Icons.account_circle_outlined,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+
+    return ClipOval(
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: avatarPath == null
+            ? fallback
+            : AppImage(path: avatarPath, width: size, height: size),
+      ),
     );
   }
 

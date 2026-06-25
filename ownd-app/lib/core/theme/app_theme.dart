@@ -19,6 +19,7 @@ class AppTheme {
         onSurface: AppColors.silver,
       ),
       scaffoldBackgroundColor: AppColors.deepSpace,
+      hintColor: AppColors.silver,
       textTheme: const TextTheme(
         titleLarge: TextStyle(
           fontWeight: FontWeight.w800,
@@ -119,11 +120,11 @@ class AppTheme {
         filled: true,
         fillColor: AppColors.graphite,
         labelStyle: const TextStyle(
-          color: AppColors.ash,
+          color: AppColors.silver,
           fontWeight: FontWeight.w400,
         ),
         floatingLabelStyle: const TextStyle(
-          color: Color(0xFF4F46E5),
+          color: AppColors.electricViolet,
           fontWeight: FontWeight.w400,
         ),
         border: OutlineInputBorder(

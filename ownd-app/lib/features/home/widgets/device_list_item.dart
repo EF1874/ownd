@@ -146,6 +146,7 @@ class _DeviceListItemState extends ConsumerState<DeviceListItem>
       child: Slidable(
         key: ValueKey(widget.device.id),
         endActionPane: ActionPane(
+          extentRatio: isSubscription ? 0.18 : 0.36,
           motion: const ScrollMotion(),
           children: [
             if (!isSubscription)
