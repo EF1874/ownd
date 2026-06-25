@@ -15,6 +15,8 @@ class AppImage extends ConsumerWidget {
   final BoxFit fit;
   final double? width;
   final double? height;
+  final int? cacheWidth;
+  final int? cacheHeight;
 
   const AppImage({
     super.key,
@@ -22,16 +24,51 @@ class AppImage extends ConsumerWidget {
     this.fit = BoxFit.cover,
     this.width,
     this.height,
+    this.cacheWidth,
+    this.cacheHeight,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
+        final shouldResize = fit == BoxFit.cover;
+        final resolvedCacheWidth =
+            cacheWidth ??
+            (shouldResize
+                ? _cacheExtent(width, constraints.maxWidth, devicePixelRatio)
+                : null);
+        final resolvedCacheHeight =
+            cacheHeight ??
+            (shouldResize
+                ? _cacheExtent(height, constraints.maxHeight, devicePixelRatio)
+                : null);
+
+        return _buildImage(
+          context,
+          ref,
+          cacheWidth: resolvedCacheWidth,
+          cacheHeight: resolvedCacheHeight,
+        );
+      },
+    );
+  }
+
+  Widget _buildImage(
+    BuildContext context,
+    WidgetRef ref, {
+    required int? cacheWidth,
+    required int? cacheHeight,
+  }) {
     if (!isRemoteImagePath(path)) {
       return Image.file(
         File(path),
         fit: fit,
         width: width,
         height: height,
+        cacheWidth: cacheWidth,
+        cacheHeight: cacheHeight,
         errorBuilder: (_, __, ___) => _fallback(context),
       );
     }
@@ -43,6 +80,8 @@ class AppImage extends ConsumerWidget {
         fit: fit,
         width: width,
         height: height,
+        cacheWidth: cacheWidth,
+        cacheHeight: cacheHeight,
         headers: value == null || value.isEmpty
             ? null
             : {'Authorization': 'Bearer $value'},
@@ -63,5 +102,11 @@ class AppImage extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  int? _cacheExtent(double? explicitExtent, double constraint, double ratio) {
+    final extent = explicitExtent ?? constraint;
+    if (!extent.isFinite || extent <= 0) return null;
+    return (extent * ratio).round();
   }
 }

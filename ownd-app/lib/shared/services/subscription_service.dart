@@ -20,9 +20,15 @@ class SubscriptionService {
 
   SubscriptionService(this._deviceRepo, this._notificationService, this._prefs);
 
-  /// Checks all auto-renew subscriptions and updates them if they are due.
-  Future<void> checkAndRenewSubscriptions() async {
+  Future<void> checkStartupSubscriptions() async {
     final devices = await _deviceRepo.getAllDevices();
+    await checkAndRenewSubscriptions(devices);
+    await checkMissedNotifications(devices);
+  }
+
+  /// Checks all auto-renew subscriptions and updates them if they are due.
+  Future<void> checkAndRenewSubscriptions([List<Device>? loadedDevices]) async {
+    final devices = loadedDevices ?? await _deviceRepo.getAllDevices();
     final now = DateTime.now();
     for (final device in devices) {
       bool needUpdate = false;
@@ -141,8 +147,8 @@ class SubscriptionService {
   }
 
   /// Check for missed notifications on app start
-  Future<void> checkMissedNotifications() async {
-    final devices = await _deviceRepo.getAllDevices();
+  Future<void> checkMissedNotifications([List<Device>? loadedDevices]) async {
+    final devices = loadedDevices ?? await _deviceRepo.getAllDevices();
     final now = DateTime.now();
 
     // Parse user preference time

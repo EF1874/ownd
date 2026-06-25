@@ -1,10 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_provider.dart';
 import 'features/navigation/app_router.dart';
-import 'data/services/database_service.dart';
 import 'data/services/preferences_service.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'shared/services/notification_service.dart';
@@ -14,50 +15,42 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 1. Initialize DatabaseService manually
-  final dbService = DatabaseService();
-  await dbService.init();
-
-  // 2. Initialize PreferencesService
   final prefs = await SharedPreferences.getInstance();
   final preferencesService = PreferencesService(prefs);
 
-  // 3. Create ProviderContainer with the initialized services
   final container = ProviderContainer(
     overrides: [
-      databaseServiceProvider.overrideWithValue(dbService),
       preferencesServiceProvider.overrideWithValue(preferencesService),
     ],
   );
 
-  // 4a. Initialize Notification Service
-  try {
-    await container.read(notificationServiceProvider).init();
-  } catch (e) {
-    debugPrint('Notification Init Error: $e');
-  }
+  runApp(UncontrolledProviderScope(container: container, child: const MyApp()));
 
-  // 4b. Check and renew subscriptions
-  try {
-    await container
-        .read(subscriptionServiceProvider)
-        .checkAndRenewSubscriptions();
-    // 4c. Check for missed notifications
-    await container
-        .read(subscriptionServiceProvider)
-        .checkMissedNotifications();
-  } catch (e) {
-    debugPrint('Subscription Renewal Error: $e');
-  }
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    unawaited(_runStartupTasks(container));
+  });
+}
 
-  // 5. Set high refresh rate
+Future<void> _runStartupTasks(ProviderContainer container) async {
   try {
     await FlutterDisplayMode.setHighRefreshRate();
   } catch (e) {
     debugPrint('Error setting high refresh rate: $e');
   }
 
-  runApp(UncontrolledProviderScope(container: container, child: const MyApp()));
+  try {
+    await container.read(notificationServiceProvider).init();
+  } catch (e) {
+    debugPrint('Notification Init Error: $e');
+  }
+
+  try {
+    await container
+        .read(subscriptionServiceProvider)
+        .checkStartupSubscriptions();
+  } catch (e) {
+    debugPrint('Subscription Renewal Error: $e');
+  }
 }
 
 class MyApp extends ConsumerWidget {

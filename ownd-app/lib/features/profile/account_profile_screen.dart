@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -9,7 +8,6 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/network/error_messages.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../features/auth/auth_controller.dart';
-import '../../features/navigation/navigation_provider.dart';
 import '../../shared/services/image_service.dart';
 import '../../shared/widgets/app_image.dart';
 import '../../shared/widgets/app_toast.dart';
@@ -37,13 +35,8 @@ class _AccountProfileScreenState extends ConsumerState<AccountProfileScreen>
   final _currentPasswordFocusNode = FocusNode();
   final _newPasswordFocusNode = FocusNode();
   final _confirmPasswordFocusNode = FocusNode();
-  final _passwordSaveButtonKey = GlobalKey();
 
   String? _loadedUserId;
-  bool _keyboardWasVisible = false;
-  bool _leaveGuardActive = false;
-  late final RouteLeaveGuard _leaveGuard;
-  late final StateController<RouteLeaveGuard?> _leaveGuardNotifier;
   bool _isSavingName = false;
   bool _isUploadingAvatar = false;
   bool _isSendingEmailCode = false;
@@ -71,26 +64,11 @@ class _AccountProfileScreenState extends ConsumerState<AccountProfileScreen>
   @override
   void initState() {
     super.initState();
-    _leaveGuard = _confirmLeave;
-    _leaveGuardNotifier = ref.read(routeLeaveGuardProvider.notifier);
     WidgetsBinding.instance.addObserver(this);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _leaveGuardActive = true;
-      if (!_leaveGuardNotifier.mounted) return;
-      _leaveGuardNotifier.state = _leaveGuard;
-    });
   }
 
   @override
   void dispose() {
-    _leaveGuardActive = false;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_leaveGuardNotifier.mounted &&
-          _leaveGuardNotifier.state == _leaveGuard) {
-        _leaveGuardNotifier.state = null;
-      }
-    });
     WidgetsBinding.instance.removeObserver(this);
     _scrollController.dispose();
     _emailPasswordFocusNode.dispose();
@@ -116,18 +94,6 @@ class _AccountProfileScreenState extends ConsumerState<AccountProfileScreen>
   }
 
   @override
-  void didChangeMetrics() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
-      if (_keyboardWasVisible && !keyboardVisible && _hasPasswordInput) {
-        _keepPasswordActionsVisible();
-      }
-      _keyboardWasVisible = keyboardVisible;
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
     final user = authState.asData?.value?.user;
@@ -137,45 +103,40 @@ class _AccountProfileScreenState extends ConsumerState<AccountProfileScreen>
       _nameController.text = user.name ?? user.email;
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: BackButton(onPressed: _leaveAccountPage),
-        title: const Text('账号资料'),
-      ),
-      body: NotificationListener<UserScrollNotification>(
-        onNotification: (notification) {
-          if (notification.direction == ScrollDirection.reverse) {
-            ref.read(bottomNavBarVisibleProvider.notifier).state = false;
-          } else if (notification.direction == ScrollDirection.forward) {
-            ref.read(bottomNavBarVisibleProvider.notifier).state = true;
-          }
-          return true;
-        },
-        child: user == null
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        await _leaveAccountPage();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: BackButton(onPressed: _leaveAccountPage),
+          title: const Text('账号资料'),
+        ),
+        body: user == null
             ? const Center(child: Text('请先登录'))
-            : ListView(
-                controller: _scrollController,
-                padding: EdgeInsets.fromLTRB(
-                  16,
-                  16,
-                  16,
-                  120 + MediaQuery.viewInsetsOf(context).bottom,
+            : SafeArea(
+                top: false,
+                child: ListView(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                  children: [
+                    _buildAvatarCard(user.avatarPath),
+                    const SizedBox(height: 24),
+                    _buildSectionHeader(context, '用户名'),
+                    const SizedBox(height: 8),
+                    _buildNameCard(),
+                    const SizedBox(height: 24),
+                    _buildSectionHeader(context, '邮箱'),
+                    const SizedBox(height: 8),
+                    _buildEmailCard(user.email),
+                    const SizedBox(height: 24),
+                    _buildSectionHeader(context, '密码'),
+                    const SizedBox(height: 8),
+                    _buildPasswordCard(),
+                  ],
                 ),
-                children: [
-                  _buildAvatarCard(user.avatarPath),
-                  const SizedBox(height: 24),
-                  _buildSectionHeader(context, '用户名'),
-                  const SizedBox(height: 8),
-                  _buildNameCard(),
-                  const SizedBox(height: 24),
-                  _buildSectionHeader(context, '邮箱'),
-                  const SizedBox(height: 8),
-                  _buildEmailCard(user.email),
-                  const SizedBox(height: 24),
-                  _buildSectionHeader(context, '密码'),
-                  const SizedBox(height: 8),
-                  _buildPasswordCard(),
-                ],
               ),
       ),
     );
@@ -329,7 +290,6 @@ class _AccountProfileScreenState extends ConsumerState<AccountProfileScreen>
             label: '当前密码',
             visible: _showEmailPassword,
             errorText: _emailPasswordError,
-            onTap: () => _focusPasswordField(_emailPasswordFocusNode),
             onChanged: (_) {
               if (_emailPasswordError != null) {
                 setState(() => _emailPasswordError = null);
@@ -368,7 +328,6 @@ class _AccountProfileScreenState extends ConsumerState<AccountProfileScreen>
             errorText: _currentPasswordError,
             textInputAction: TextInputAction.next,
             onSubmitted: () => _focusPasswordField(_newPasswordFocusNode),
-            onTap: () => _focusPasswordField(_currentPasswordFocusNode),
             onChanged: (_) {
               if (_currentPasswordError != null) {
                 setState(() => _currentPasswordError = null);
@@ -386,7 +345,6 @@ class _AccountProfileScreenState extends ConsumerState<AccountProfileScreen>
             errorText: _newPasswordError,
             textInputAction: TextInputAction.next,
             onSubmitted: () => _focusPasswordField(_confirmPasswordFocusNode),
-            onTap: () => _focusPasswordField(_newPasswordFocusNode),
             onChanged: (_) {
               if (_newPasswordError != null) {
                 setState(() => _newPasswordError = null);
@@ -403,7 +361,6 @@ class _AccountProfileScreenState extends ConsumerState<AccountProfileScreen>
             visible: _showConfirmPassword,
             errorText: _confirmPasswordError,
             onSubmitted: _savePassword,
-            onTap: () => _focusPasswordField(_confirmPasswordFocusNode),
             onChanged: (_) {
               if (_confirmPasswordError != null) {
                 setState(() => _confirmPasswordError = null);
@@ -415,7 +372,6 @@ class _AccountProfileScreenState extends ConsumerState<AccountProfileScreen>
           _feedbackText(_passwordFeedback, isError: _passwordFeedbackIsError),
           const SizedBox(height: 16),
           FilledButton(
-            key: _passwordSaveButtonKey,
             onPressed: _isSavingPassword ? null : _savePassword,
             child: _isSavingPassword
                 ? const SizedBox(
@@ -439,7 +395,6 @@ class _AccountProfileScreenState extends ConsumerState<AccountProfileScreen>
     String? errorText,
     TextInputAction textInputAction = TextInputAction.done,
     VoidCallback? onSubmitted,
-    VoidCallback? onTap,
     ValueChanged<String>? onChanged,
   }) {
     return TextField(
@@ -450,7 +405,6 @@ class _AccountProfileScreenState extends ConsumerState<AccountProfileScreen>
       textInputAction: textInputAction,
       autocorrect: false,
       enableSuggestions: false,
-      onTap: onTap,
       onChanged: onChanged,
       onSubmitted: (_) => onSubmitted?.call(),
       decoration: InputDecoration(
@@ -529,7 +483,7 @@ class _AccountProfileScreenState extends ConsumerState<AccountProfileScreen>
   }
 
   bool get _hasUnsavedChanges {
-    if (!mounted || !_leaveGuardActive) return false;
+    if (!mounted) return false;
 
     final user = ref.read(authControllerProvider).asData?.value?.user;
     if (user == null) return false;
@@ -541,7 +495,7 @@ class _AccountProfileScreenState extends ConsumerState<AccountProfileScreen>
   }
 
   Future<bool> _confirmLeave() async {
-    if (!mounted || !_leaveGuardActive) return true;
+    if (!mounted) return true;
 
     if (_isSavingName || _isSavingEmail || _isSavingPassword) {
       AppToast.show(context, '正在保存，请稍候');
@@ -581,22 +535,6 @@ class _AccountProfileScreenState extends ConsumerState<AccountProfileScreen>
 
   void _focusPasswordField(FocusNode focusNode) {
     FocusScope.of(context).requestFocus(focusNode);
-  }
-
-  Future<void> _keepPasswordActionsVisible() async {
-    await Future<void>.delayed(const Duration(milliseconds: 80));
-    if (!mounted) return;
-
-    final buttonContext = _passwordSaveButtonKey.currentContext;
-    if (buttonContext == null) return;
-    if (!buttonContext.mounted) return;
-
-    await Scrollable.ensureVisible(
-      buttonContext,
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOutCubic,
-      alignment: 0.85,
-    );
   }
 
   String? _emailValidationError(String email) {

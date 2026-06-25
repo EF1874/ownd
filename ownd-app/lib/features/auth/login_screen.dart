@@ -608,6 +608,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       key: const ValueKey('auth_password_field'),
                       controller: _passwordController,
                       obscureText: _obscurePassword,
+                      keyboardType: TextInputType.visiblePassword,
+                      autocorrect: false,
+                      enableSuggestions: false,
                       decoration: InputDecoration(
                         labelText: _isResetPassword
                             ? '新密码'
@@ -643,6 +646,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                         ),
                         controller: _confirmPasswordController,
                         obscureText: _obscureConfirmPassword,
+                        keyboardType: TextInputType.visiblePassword,
+                        autocorrect: false,
+                        enableSuggestions: false,
                         decoration: InputDecoration(
                           labelText: _isResetPassword ? '确认新密码' : '确认密码',
                           suffixIcon: IconButton(

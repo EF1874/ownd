@@ -59,19 +59,23 @@ class _DeviceGridItemState extends ConsumerState<DeviceGridItem>
     _opacityAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
       CurvedAnimation(parent: _deleteController, curve: Curves.easeOut),
     );
+    final shouldAnimateEntry = shouldPlayDeviceEntryAnimation(widget.device.id);
     _entryController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
+      value: shouldAnimateEntry ? 0 : 1,
     );
-    final delay = Duration(
-      milliseconds: (widget.index > 5 ? 5 : widget.index) * 50,
-    );
-    if (delay == Duration.zero) {
-      _entryController.forward();
-    } else {
-      Future.delayed(delay, () {
-        if (mounted) _entryController.forward();
-      });
+    if (shouldAnimateEntry) {
+      final delay = Duration(
+        milliseconds: (widget.index > 5 ? 5 : widget.index) * 50,
+      );
+      if (delay == Duration.zero) {
+        _entryController.forward();
+      } else {
+        Future.delayed(delay, () {
+          if (mounted) _entryController.forward();
+        });
+      }
     }
   }
 

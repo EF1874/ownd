@@ -57,11 +57,12 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/profile',
             builder: (context, state) => const ProfileScreen(),
           ),
-          GoRoute(
-            path: '/profile/account',
-            builder: (context, state) => const AccountProfileScreen(),
-          ),
         ],
+      ),
+      GoRoute(
+        path: '/profile/account',
+        parentNavigatorKey: _rootNavigatorKey,
+        builder: (context, state) => const AccountProfileScreen(),
       ),
       GoRoute(
         path: '/add',

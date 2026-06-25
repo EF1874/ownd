@@ -21,23 +21,40 @@ class ScaffoldWithNavBar extends ConsumerStatefulWidget {
   ConsumerState<ScaffoldWithNavBar> createState() => _ScaffoldWithNavBarState();
 }
 
-class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
+class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar>
+    with WidgetsBindingObserver {
   DateTime? _lastPressedAt;
   bool _autoUpdateCheckStarted = false;
+  bool _keyboardVisible = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _keyboardVisible = _readKeyboardVisible();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkForUpdateOncePerDay();
     });
   }
 
   @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
+    final keyboardVisible = _readKeyboardVisible();
+    if (!mounted || keyboardVisible == _keyboardVisible) return;
+    setState(() => _keyboardVisible = keyboardVisible);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final index = _calculateSelectedIndex(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final keyboardVisible = _keyboardVisible;
     final showBottomNavBar = !keyboardVisible;
 
     // Only show FAB on Home (0) and Insights (1)
@@ -99,6 +116,12 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar> {
           if (showFab) const DraggableAddButton(),
         ],
       ),
+    );
+  }
+
+  bool _readKeyboardVisible() {
+    return WidgetsBinding.instance.platformDispatcher.views.any(
+      (view) => view.viewInsets.bottom > 0,
     );
   }
 

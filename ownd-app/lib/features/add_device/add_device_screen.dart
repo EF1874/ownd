@@ -284,29 +284,61 @@ class _AddDeviceScreenState extends ConsumerState<AddDeviceScreen> {
                       onPickImage: _pickPhoto,
                       onRemoveImage: _removePhoto,
                     ),
-                    const SizedBox(
-                      height: 48,
-                    ), // Padding at the bottom for scroll
+                    const _KeyboardBottomSpacer(baseHeight: 48),
                   ],
                 ),
               ),
             ),
           ),
-          SafeArea(
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              child: AppButton(
-                text: '保存',
-                onPressed: _saveDevice,
-                isLoading: _isLoading,
-                backgroundColor: Theme.of(context).colorScheme.primary,
-                foregroundColor: Theme.of(context).colorScheme.onPrimary,
-              ),
-            ),
-          ),
+          _KeyboardAwareSaveBar(isLoading: _isLoading, onPressed: _saveDevice),
         ],
       ),
+    );
+  }
+}
+
+class _KeyboardAwareSaveBar extends StatelessWidget {
+  final bool isLoading;
+  final VoidCallback onPressed;
+
+  const _KeyboardAwareSaveBar({
+    required this.isLoading,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: SafeArea(
+        top: false,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          child: AppButton(
+            text: '保存',
+            onPressed: onPressed,
+            isLoading: isLoading,
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            foregroundColor: Theme.of(context).colorScheme.onPrimary,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _KeyboardBottomSpacer extends StatelessWidget {
+  final double baseHeight;
+
+  const _KeyboardBottomSpacer({required this.baseHeight});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: baseHeight + MediaQuery.viewInsetsOf(context).bottom,
     );
   }
 }
