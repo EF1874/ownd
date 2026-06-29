@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/device.dart';
 import '../../../data/repositories/device_repository.dart';
 import '../../../core/network/error_messages.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../shared/utils/icon_utils.dart';
 import '../../../shared/utils/category_utils.dart';
 import '../../../shared/config/category_config.dart';
@@ -141,11 +142,28 @@ class _DeviceGridItemState extends ConsumerState<DeviceGridItem>
         : daysUntilDue == null
         ? '-'
         : (daysUntilDue < 0 ? 0 : daysUntilDue).toString();
-    final metricColor = hasBg
-        ? Colors.white
-        : showUsageMetric
-        ? theme.colorScheme.primary
+    final cardAccentColor = theme.colorScheme.primary;
+    final needsLightText = hasBg || theme.brightness == Brightness.dark;
+    final titleColor = needsLightText ? AppColors.snow : AppColors.deepSpace;
+    final subtleColor = needsLightText ? AppColors.cloud : AppColors.graphite;
+    final accentColor = hasBg ? AppColors.electricViolet : cardAccentColor;
+    final dueTextColor = daysUntilDue == null || daysUntilDue > 8
+        ? accentColor
         : dueColor;
+    final metricColor = showUsageMetric ? accentColor : dueTextColor;
+    final detailColor = isSubscription
+        ? dueTextColor
+        : costColor ?? accentColor;
+    final tagColor = accentColor;
+    final tagTextColor = needsLightText ? AppColors.snow : tagColor;
+    final tagFillColor = hasBg
+        ? tagColor.withAlpha(55)
+        : tagColor.withAlpha(needsLightText ? 45 : 30);
+    final tagBorderColor = tagColor.withAlpha(needsLightText ? 160 : 110);
+    const imageTextShadow = [
+      Shadow(color: Color(0x800F172A), offset: Offset(0, 1), blurRadius: 1),
+    ];
+    final textShadow = hasBg ? imageTextShadow : null;
 
     final childWidget = BaseCard(
       variant: CardVariant.glass,
@@ -240,7 +258,8 @@ class _DeviceGridItemState extends ConsumerState<DeviceGridItem>
             textAlign: TextAlign.center,
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
-              color: hasBg ? Colors.white : theme.colorScheme.onSurface,
+              color: titleColor,
+              shadows: textShadow,
             ),
           ),
           const SizedBox(height: 6),
@@ -258,11 +277,10 @@ class _DeviceGridItemState extends ConsumerState<DeviceGridItem>
                   TextSpan(
                     text: metricLabel,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: hasBg
-                          ? Colors.white
-                          : theme.colorScheme.onSurfaceVariant,
+                      color: subtleColor,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
+                      shadows: textShadow,
                     ),
                   ),
                   TextSpan(
@@ -272,16 +290,16 @@ class _DeviceGridItemState extends ConsumerState<DeviceGridItem>
                       fontWeight: FontWeight.bold,
                       color: metricColor,
                       fontSize: 20,
+                      shadows: textShadow,
                     ),
                   ),
                   TextSpan(
                     text: '天',
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: hasBg
-                          ? Colors.white
-                          : theme.colorScheme.onSurfaceVariant,
+                      color: subtleColor,
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
+                      shadows: textShadow,
                     ),
                   ),
                 ],
@@ -295,9 +313,10 @@ class _DeviceGridItemState extends ConsumerState<DeviceGridItem>
                 '¥${FormatUtils.formatCurrency(widget.device.price)}',
                 style: TextStyle(
                   fontFamily: 'monospace',
-                  color: hasBg ? Colors.white : theme.colorScheme.onSurface,
+                  color: titleColor,
                   fontWeight: FontWeight.bold,
                   fontSize: 15,
+                  shadows: textShadow,
                 ),
               ),
               const SizedBox(height: 2),
@@ -307,13 +326,10 @@ class _DeviceGridItemState extends ConsumerState<DeviceGridItem>
                     : '¥${FormatUtils.formatCurrency(dailyCost)}/天',
                 style: TextStyle(
                   fontFamily: 'monospace',
-                  color: hasBg
-                      ? Colors.white
-                      : isSubscription
-                      ? dueColor
-                      : (costColor ?? theme.colorScheme.onSurfaceVariant),
+                  color: detailColor,
                   fontWeight: FontWeight.bold,
                   fontSize: 11,
+                  shadows: textShadow,
                 ),
               ),
             ],
@@ -335,23 +351,19 @@ class _DeviceGridItemState extends ConsumerState<DeviceGridItem>
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: theme.colorScheme.primaryContainer
-                                  .withAlpha(hasBg ? 100 : 50),
+                              color: tagFillColor,
                               borderRadius: BorderRadius.circular(4),
                               border: Border.all(
-                                color: theme.colorScheme.primary.withAlpha(
-                                  hasBg ? 200 : 100,
-                                ),
+                                color: tagBorderColor,
                                 width: 0.5,
                               ),
                             ),
                             child: Text(
                               '#$tag',
                               style: theme.textTheme.labelSmall?.copyWith(
-                                color: hasBg
-                                    ? Colors.white
-                                    : theme.colorScheme.primary,
+                                color: tagTextColor,
                                 fontSize: 9,
+                                shadows: textShadow,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,

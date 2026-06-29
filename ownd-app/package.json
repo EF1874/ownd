@@ -1,7 +1,7 @@
 {
   "name": "ownd-app",
   "private": true,
-  "version": "2.0.0",
+  "version": "0.1.5",
   "scripts": {
     "android:dev": "node scripts/build.mjs android dev debug",
     "android:dev:install": "node scripts/build.mjs android dev debug && adb install -r build/app/outputs/flutter-apk/app-debug.apk && adb shell monkey -p com.antigravity.ownd.debug -c android.intent.category.LAUNCHER 1",

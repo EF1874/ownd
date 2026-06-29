@@ -5,6 +5,7 @@ import 'package:flutter_slidable/flutter_slidable.dart';
 import '../../../data/models/device.dart';
 import '../../../data/repositories/device_repository.dart';
 import '../../../core/network/error_messages.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../shared/utils/icon_utils.dart';
 import '../../../shared/utils/category_utils.dart';
 import '../../../shared/config/category_config.dart';
@@ -145,11 +146,28 @@ class _DeviceListItemState extends ConsumerState<DeviceListItem>
         : daysUntilDue == null
         ? '-'
         : (daysUntilDue < 0 ? 0 : daysUntilDue).toString();
-    final metricColor = hasBg
-        ? Colors.white
-        : showUsageMetric
-        ? theme.colorScheme.primary
+    final cardAccentColor = theme.colorScheme.primary;
+    final needsLightText = hasBg || theme.brightness == Brightness.dark;
+    final titleColor = needsLightText ? AppColors.snow : AppColors.deepSpace;
+    final subtleColor = needsLightText ? AppColors.cloud : AppColors.graphite;
+    final accentColor = hasBg ? AppColors.electricViolet : cardAccentColor;
+    final dueTextColor = daysUntilDue == null || daysUntilDue > 8
+        ? accentColor
         : dueColor;
+    final metricColor = showUsageMetric ? accentColor : dueTextColor;
+    final detailColor = isSubscription
+        ? dueTextColor
+        : costColor ?? accentColor;
+    final tagColor = accentColor;
+    final tagTextColor = needsLightText ? AppColors.snow : tagColor;
+    final tagFillColor = hasBg
+        ? tagColor.withAlpha(55)
+        : tagColor.withAlpha(needsLightText ? 45 : 30);
+    final tagBorderColor = tagColor.withAlpha(needsLightText ? 160 : 110);
+    const imageTextShadow = [
+      Shadow(color: Color(0x800F172A), offset: Offset(0, 1), blurRadius: 1),
+    ];
+    final textShadow = hasBg ? imageTextShadow : null;
 
     final childWidget = Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -234,9 +252,8 @@ class _DeviceListItemState extends ConsumerState<DeviceListItem>
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.bold,
                         fontSize: 15,
-                        color: hasBg
-                            ? Colors.white
-                            : theme.colorScheme.onSurface,
+                        color: titleColor,
+                        shadows: textShadow,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -251,9 +268,8 @@ class _DeviceListItemState extends ConsumerState<DeviceListItem>
                             fontFamily: 'monospace',
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
-                            color: hasBg
-                                ? Colors.white
-                                : theme.colorScheme.onSurface,
+                            color: titleColor,
+                            shadows: textShadow,
                           ),
                         ),
                         Text(
@@ -262,14 +278,9 @@ class _DeviceListItemState extends ConsumerState<DeviceListItem>
                               : '¥${FormatUtils.formatCurrency(widget.device.dailyCost)}/天',
                           style: TextStyle(
                             fontFamily: 'monospace',
-                            color: hasBg
-                                ? Colors.white70
-                                : isSubscription
-                                ? dueColor
-                                : (costColor ??
-                                          theme.colorScheme.onSurfaceVariant)
-                                      .withValues(alpha: 0.8),
+                            color: detailColor,
                             fontSize: 12,
+                            shadows: textShadow,
                           ),
                         ),
                       ],
@@ -289,14 +300,10 @@ class _DeviceListItemState extends ConsumerState<DeviceListItem>
                                         vertical: 2,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: theme
-                                            .colorScheme
-                                            .primaryContainer
-                                            .withAlpha(hasBg ? 100 : 50),
+                                        color: tagFillColor,
                                         borderRadius: BorderRadius.circular(4),
                                         border: Border.all(
-                                          color: theme.colorScheme.primary
-                                              .withAlpha(hasBg ? 200 : 100),
+                                          color: tagBorderColor,
                                           width: 0.5,
                                         ),
                                       ),
@@ -304,10 +311,9 @@ class _DeviceListItemState extends ConsumerState<DeviceListItem>
                                         '#$tag',
                                         style: theme.textTheme.labelSmall
                                             ?.copyWith(
-                                              color: hasBg
-                                                  ? Colors.white
-                                                  : theme.colorScheme.primary,
+                                              color: tagTextColor,
                                               fontSize: 10,
+                                              shadows: textShadow,
                                             ),
                                       ),
                                     ),
@@ -336,10 +342,9 @@ class _DeviceListItemState extends ConsumerState<DeviceListItem>
                           TextSpan(
                             text: metricLabel,
                             style: theme.textTheme.labelSmall?.copyWith(
-                              color: hasBg
-                                  ? Colors.white
-                                  : theme.colorScheme.onSurfaceVariant,
+                              color: subtleColor,
                               fontWeight: FontWeight.w600,
+                              shadows: textShadow,
                             ),
                           ),
                           TextSpan(
@@ -348,15 +353,15 @@ class _DeviceListItemState extends ConsumerState<DeviceListItem>
                               fontWeight: FontWeight.w600,
                               color: metricColor,
                               fontSize: 18,
+                              shadows: textShadow,
                             ),
                           ),
                           TextSpan(
                             text: ' 天',
                             style: theme.textTheme.labelSmall?.copyWith(
-                              color: hasBg
-                                  ? Colors.white
-                                  : theme.colorScheme.onSurfaceVariant,
+                              color: subtleColor,
                               fontWeight: FontWeight.w600,
+                              shadows: textShadow,
                             ),
                           ),
                         ],
