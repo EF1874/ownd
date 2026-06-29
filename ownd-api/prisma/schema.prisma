@@ -150,6 +150,8 @@ model Item {
   platform   Platform? @relation(fields: [platformId], references: [id], onDelete: SetNull)
 
   @@index([categoryId])
+  @@index([userId, isVirtual, nextBillingDate])
+  @@index([userId, isScrapped, purchaseDate])
 }
 
 model Asset {

@@ -96,10 +96,6 @@ describe('ItemsService', () => {
     updatedAt: new Date(),
     ...overrides,
   });
-  type ItemWithStartHistory = Item & {
-    itemHistories: { startDate: Date | null }[];
-  };
-
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
@@ -195,22 +191,40 @@ describe('ItemsService', () => {
   });
 
   describe('findAll', () => {
+    const mockOrderedItems = (
+      orderedItems: Item[],
+      fetchedItems: Item[] = [...orderedItems].reverse(),
+    ) => {
+      prisma.$queryRaw.mockResolvedValueOnce(
+        orderedItems.map((item) => ({ id: item.id })),
+      );
+      prisma.item.findMany.mockResolvedValueOnce(fetchedItems);
+    };
+
+    const latestSqlQuery = () => {
+      const calls = prisma.$queryRaw.mock.calls;
+      const query = calls[calls.length - 1]?.[0] as
+        | { strings?: readonly string[]; values?: readonly unknown[] }
+        | undefined;
+      return {
+        text: query?.strings?.join('') ?? '',
+        values: [...(query?.values ?? [])],
+      };
+    };
+
     it('应该返回用户的所有物品', async () => {
       const userId = 'user-1';
       const mockItems = [createMockItem({ userId })];
 
-      prisma.item.findMany
-        .mockResolvedValueOnce(mockItems)
-        .mockResolvedValueOnce([]);
+      mockOrderedItems(mockItems);
 
       const result = await service.findAll(userId);
 
-      const activeQuery = prisma.item.findMany.mock.calls[0]?.[0];
-      const inactiveQuery = prisma.item.findMany.mock.calls[1]?.[0];
-      expect(activeQuery?.where?.userId).toBe(userId);
-      expect(JSON.stringify(activeQuery?.where)).toContain('"NOT"');
-      expect(inactiveQuery?.where?.userId).toBe(userId);
-      expect(JSON.stringify(inactiveQuery?.where)).toContain('"OR"');
+      expect(prisma.$queryRaw.mock.calls).toHaveLength(1);
+      expect(latestSqlQuery().text).toContain('FROM "Item" i');
+      expect(prisma.item.findMany.mock.calls[0]?.[0]).toMatchObject({
+        where: { id: { in: ['item-1'] } },
+      });
       expect(result).toEqual(mockItems);
     });
 
@@ -218,16 +232,15 @@ describe('ItemsService', () => {
       const userId = 'user-1';
       const mockItems = [createMockItem({ userId })];
 
-      prisma.item.findMany
-        .mockResolvedValueOnce(mockItems)
-        .mockResolvedValueOnce([]);
+      mockOrderedItems(mockItems);
 
       const result = await service.findAll(userId, { search: ' 京东 ' });
 
-      const query = prisma.item.findMany.mock.calls[0]?.[0];
-      expect(query?.where?.userId).toBe(userId);
-      expect(JSON.stringify(query?.where)).toContain('"OR"');
-      expect(JSON.stringify(query?.where)).toContain('"NOT"');
+      const query = latestSqlQuery();
+      expect(query.text).toContain('ILIKE');
+      expect(query.text).toContain('i."tags" @> ARRAY[');
+      expect(query.values).toContain('京东');
+      expect(query.values).toContain('%京东%');
       expect(result).toEqual(mockItems);
     });
 
@@ -241,14 +254,14 @@ describe('ItemsService', () => {
         }),
       ];
 
-      prisma.item.findMany.mockResolvedValue(mockItems);
+      mockOrderedItems(mockItems);
 
       const result = await service.findAll(userId, { expiringSoon: true });
 
-      const query = prisma.item.findMany.mock.calls[0]?.[0];
-      expect(query?.where?.userId).toBe(userId);
-      expect(JSON.stringify(query?.where)).toContain('"isVirtual":true');
-      expect(JSON.stringify(query?.where)).toContain('"nextBillingDate"');
+      const query = latestSqlQuery();
+      expect(query.text).toContain('i."isVirtual" = true');
+      expect(query.text).toContain('i."nextBillingDate" >=');
+      expect(query.text).toContain('i."nextBillingDate" <=');
       expect(result).toEqual(mockItems);
     });
 
@@ -263,19 +276,18 @@ describe('ItemsService', () => {
         }),
       ];
 
-      prisma.item.findMany.mockResolvedValue(mockItems);
+      mockOrderedItems(mockItems);
 
       const result = await service.findAll(userId, {
         categoryId: 'category-1',
         status: 'expired-subscriptions',
       });
 
-      const query = prisma.item.findMany.mock.calls[0]?.[0];
-      const whereJson = JSON.stringify(query?.where);
-      expect(query?.where?.userId).toBe(userId);
-      expect(whereJson).toContain('category-1');
-      expect(whereJson).toContain('"isVirtual":true');
-      expect(whereJson).toContain('"isAutoRenew":false');
+      const query = latestSqlQuery();
+      expect(query.values).toContain('category-1');
+      expect(query.text).toContain('c."parentId" IN');
+      expect(query.text).toContain('i."isVirtual" = true');
+      expect(query.text).toContain('i."isAutoRenew" = false');
       expect(result).toEqual(mockItems);
     });
 
@@ -290,22 +302,19 @@ describe('ItemsService', () => {
         }),
       ];
 
-      prisma.item.findMany.mockResolvedValue(mockItems);
+      mockOrderedItems(mockItems);
 
       const result = await service.findAll(userId, {
         status: 'scrapped-items',
       });
 
-      const call = prisma.item.findMany.mock.calls[0][0]!;
-      expect(call.where).toEqual({
-        userId,
-        AND: [{ isScrapped: true, scrappedDate: { not: null } }],
-      });
-      expect(JSON.stringify(call.where)).not.toContain('isVirtual');
+      const query = latestSqlQuery();
+      expect(query.text).toContain('i."isScrapped" = true');
+      expect(query.text).toContain('i."scrappedDate" IS NOT NULL');
       expect(result).toEqual(mockItems);
     });
 
-    it('默认排序应该让订阅按到期临近、实物按购买时间临近排列', async () => {
+    it('默认排序应该让订阅优先按到期临近排列，实物再按购买时间从晚到早排列，失效物品置底', async () => {
       const userId = 'user-1';
       const now = new Date();
       const newItem = createMockItem({
@@ -319,6 +328,14 @@ describe('ItemsService', () => {
         userId,
         name: '旧实物',
         purchaseDate: new Date(now.getTime() - 90 * 86400000),
+      });
+      const virtualDeviceWithoutDueDate = createMockItem({
+        id: 'virtual-device-without-due-date',
+        userId,
+        name: '没有到期日的实体物品',
+        isVirtual: true,
+        nextBillingDate: null,
+        purchaseDate: new Date(now.getTime() - 365 * 86400000),
       });
       const soonSubscription = createMockItem({
         id: 'soon-subscription',
@@ -334,23 +351,74 @@ describe('ItemsService', () => {
         isVirtual: true,
         nextBillingDate: new Date(now.getTime() + 30 * 86400000),
       });
+      const recentlyExpiredSubscription = createMockItem({
+        id: 'recently-expired-subscription',
+        userId,
+        name: '刚到期订阅',
+        isVirtual: true,
+        isAutoRenew: false,
+        nextBillingDate: new Date(now.getTime() - 1 * 86400000),
+      });
+      const longExpiredSubscription = createMockItem({
+        id: 'long-expired-subscription',
+        userId,
+        name: '很早到期订阅',
+        isVirtual: true,
+        isAutoRenew: false,
+        nextBillingDate: new Date(now.getTime() - 30 * 86400000),
+      });
+      const scrappedItem = createMockItem({
+        id: 'scrapped-item',
+        userId,
+        name: '报废实物',
+        isScrapped: true,
+        scrappedDate: new Date(now.getTime() - 1 * 86400000),
+        purchaseDate: new Date(now.getTime() - 365 * 86400000),
+      });
 
-      prisma.item.findMany
-        .mockResolvedValueOnce([
+      mockOrderedItems(
+        [
+          soonSubscription,
+          laterSubscription,
+          newItem,
+          oldItem,
+          virtualDeviceWithoutDueDate,
+          recentlyExpiredSubscription,
+          longExpiredSubscription,
+          scrappedItem,
+        ],
+        [
+          newItem,
+          scrappedItem,
+          virtualDeviceWithoutDueDate,
           oldItem,
           laterSubscription,
+          longExpiredSubscription,
           soonSubscription,
-          newItem,
-        ])
-        .mockResolvedValueOnce([]);
-
-      const result = await service.findAll(userId);
-      const ids = result.map((item) => item.id);
-
-      expect(ids.indexOf('soon-subscription')).toBeLessThan(
-        ids.indexOf('later-subscription'),
+          recentlyExpiredSubscription,
+        ],
       );
-      expect(ids.indexOf('new-item')).toBeLessThan(ids.indexOf('old-item'));
+
+      const result = await service.findAll(userId, { page: 1, limit: 20 });
+
+      const query = latestSqlQuery();
+      expect(query.text).toContain('ORDER BY');
+      expect(query.text).toContain('LIMIT');
+      expect(query.text).toContain('OFFSET');
+      expect(query.text).toContain('i."nextBillingDate" IS NOT NULL');
+      expect(query.text).toContain('DATE_PART');
+      expect(query.text).toContain('i."purchaseDate"');
+      expect(query.text).toContain('DESC NULLS LAST');
+      expect(result.map((item) => item.id)).toEqual([
+        'soon-subscription',
+        'later-subscription',
+        'new-item',
+        'old-item',
+        'virtual-device-without-due-date',
+        'recently-expired-subscription',
+        'long-expired-subscription',
+        'scrapped-item',
+      ]);
     });
 
     it('手动按购买日期排序时订阅应该使用最新一期开始日期', async () => {
@@ -361,26 +429,24 @@ describe('ItemsService', () => {
         name: '实物',
         purchaseDate: new Date('2026-06-01T00:00:00.000Z'),
       });
-      const subscription: ItemWithStartHistory = {
-        ...createMockItem({
-          id: 'subscription',
-          userId,
-          name: '订阅',
-          isVirtual: true,
-          purchaseDate: new Date('2026-01-01T00:00:00.000Z'),
-        }),
-        itemHistories: [{ startDate: new Date('2026-06-20T00:00:00.000Z') }],
-      };
+      const subscription = createMockItem({
+        id: 'subscription',
+        userId,
+        name: '订阅',
+        isVirtual: true,
+        purchaseDate: new Date('2026-01-01T00:00:00.000Z'),
+      });
 
-      prisma.item.findMany
-        .mockResolvedValueOnce([item, subscription])
-        .mockResolvedValueOnce([]);
+      mockOrderedItems([subscription, item], [item, subscription]);
 
       const result = await service.findAll(userId, {
         sortBy: 'date',
         sortOrder: 'desc',
       });
 
+      expect(latestSqlQuery().text).toContain(
+        'COALESCE(latest_start."startDate", i."purchaseDate")',
+      );
       expect(result.map((device) => device.id)).toEqual([
         'subscription',
         'item',

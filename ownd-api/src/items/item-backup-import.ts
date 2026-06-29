@@ -52,10 +52,24 @@ type BackupDevice = {
   history?: BackupHistory[];
 };
 
+export type BackupDeviceVirtualFields = Pick<
+  BackupDevice,
+  'isVirtual' | 'cycleType' | 'nextBillingDate' | 'categoryName'
+>;
+
 export type BackupData = {
   categories?: BackupCategory[];
   devices?: BackupDevice[];
 };
+
+export function isVirtualBackupDevice(dev: BackupDeviceVirtualFields) {
+  return (
+    dev.isVirtual === true ||
+    dev.cycleType != null ||
+    dev.nextBillingDate != null ||
+    dev.categoryName === '虚拟订阅'
+  );
+}
 
 export async function importItemsBackup(
   prisma: PrismaService,
@@ -441,10 +455,7 @@ export async function importItemsBackup(
         }
       }
 
-      const isVirtual =
-        dev.isVirtual ||
-        dev.cycleType !== undefined ||
-        dev.categoryName === '虚拟订阅';
+      const isVirtual = isVirtualBackupDevice(dev);
 
       let nextBillingDate: Date | null = null;
       if (dev.nextBillingDate) nextBillingDate = new Date(dev.nextBillingDate);
