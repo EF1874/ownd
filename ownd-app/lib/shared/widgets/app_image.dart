@@ -30,28 +30,11 @@ class AppImage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
-        final shouldResize = fit == BoxFit.cover;
-        final resolvedCacheWidth =
-            cacheWidth ??
-            (shouldResize
-                ? _cacheExtent(width, constraints.maxWidth, devicePixelRatio)
-                : null);
-        final resolvedCacheHeight =
-            cacheHeight ??
-            (shouldResize
-                ? _cacheExtent(height, constraints.maxHeight, devicePixelRatio)
-                : null);
-
-        return _buildImage(
-          context,
-          ref,
-          cacheWidth: resolvedCacheWidth,
-          cacheHeight: resolvedCacheHeight,
-        );
-      },
+    return _buildImage(
+      context,
+      ref,
+      cacheWidth: cacheWidth,
+      cacheHeight: cacheHeight,
     );
   }
 
@@ -102,11 +85,5 @@ class AppImage extends ConsumerWidget {
         ),
       ),
     );
-  }
-
-  int? _cacheExtent(double? explicitExtent, double constraint, double ratio) {
-    final extent = explicitExtent ?? constraint;
-    if (!extent.isFinite || extent <= 0) return null;
-    return (extent * ratio).round();
   }
 }
