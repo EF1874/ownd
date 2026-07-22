@@ -118,7 +118,7 @@ export class UpdateProfileDto {
     example: 3,
     required: false,
   })
-  @IsIn([1, 3, 7, 14, 30], { message: '请选择可用的提前提醒天数' })
+  @IsIn([0, 1, 3, 7, 14, 30], { message: '请选择可用的提前提醒天数' })
   @IsOptional()
   notificationLeadDays?: number;
 
