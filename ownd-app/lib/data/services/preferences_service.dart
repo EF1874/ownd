@@ -43,7 +43,7 @@ class PreferencesService {
   static const _keyNotificationTime = 'notification_time';
   static const _keyNotificationLeadDays = 'notification_lead_days';
   static const _keyLastAppUpdateAutoCheck = 'last_app_update_auto_check';
-  static const notificationLeadDayOptions = [1, 3, 7, 14, 30];
+  static const notificationLeadDayOptions = [0, 1, 3, 7, 14, 30];
 
   /// Format: "HH:mm" 24-hour format
   String get notificationTime =>

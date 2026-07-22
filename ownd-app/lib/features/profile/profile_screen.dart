@@ -182,19 +182,24 @@ class ProfileScreen extends ConsumerWidget {
                 child: ListTile(
                   leading: const Icon(Icons.notifications_active),
                   title: const Text('测试通知功能'),
-                  subtitle: const Text('立即发送一条测试通知'),
+                  subtitle: const Text('点击后 1 分钟发送模拟订阅提醒'),
                   onTap: () async {
                     final notificationId =
                         900000 +
                         DateTime.now().millisecondsSinceEpoch.remainder(100000);
                     await ref
                         .read(notificationServiceProvider)
-                        .showNotification(
+                        .scheduleNotification(
                           id: notificationId,
-                          title: '测试通知',
-                          body: '这是一条主动触发的测试通知！',
+                          title: '订阅提醒',
+                          body: '您的订阅 测试物品 即将到期',
+                          scheduledDate: DateTime.now().add(
+                            const Duration(minutes: 1),
+                          ),
                         );
-                    if (context.mounted) _showSnackBar(context, '通知已发送');
+                    if (context.mounted) {
+                      _showSnackBar(context, '已设置，1 分钟后发送提醒');
+                    }
                   },
                 ),
               ),
@@ -232,7 +237,9 @@ class ProfileScreen extends ConsumerWidget {
                             leading: const Icon(Icons.access_time),
                             title: const Text('提醒设置'),
                             subtitle: Text(
-                              '提前 ${prefs.notificationLeadDays} 天 · 每天 ${prefs.notificationTime}',
+                              prefs.notificationLeadDays == 0
+                                  ? '到期当天 · 每天 ${prefs.notificationTime}'
+                                  : '提前 ${prefs.notificationLeadDays} 天 · 每天 ${prefs.notificationTime}',
                             ),
                             trailing: const Icon(Icons.chevron_right),
                             onTap: () async {

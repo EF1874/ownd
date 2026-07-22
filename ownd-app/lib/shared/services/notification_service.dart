@@ -4,6 +4,7 @@ import 'package:app_badge_plus/app_badge_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -27,6 +28,8 @@ class NotificationService {
     if (_isized) return;
 
     tz.initializeTimeZones();
+    final localTimezone = await FlutterTimezone.getLocalTimezone();
+    tz.setLocalLocation(tz.getLocation(localTimezone.identifier));
 
     // Android Settings
     // Ensure you have a drawable/mipmap icon named 'ic_launcher' or 'app_icon'

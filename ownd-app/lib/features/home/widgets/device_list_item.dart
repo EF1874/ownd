@@ -12,10 +12,10 @@ import '../../../shared/config/category_config.dart';
 import '../../../shared/utils/category_tree_utils.dart';
 import '../../../shared/config/cost_config.dart';
 import '../../../shared/widgets/base_card.dart';
+import '../../../shared/widgets/app_image.dart';
 import '../../../shared/widgets/status_badge.dart';
 import '../../../shared/utils/format_utils.dart';
 import '../../../shared/utils/subscription_utils.dart';
-import 'dart:io';
 import '../../../shared/widgets/image_preview_dialog.dart';
 import '../../add_device/add_device_screen.dart';
 import '../home_devices_provider.dart';
@@ -229,8 +229,8 @@ class _DeviceListItemState extends ConsumerState<DeviceListItem>
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(11),
-                            child: Image.file(
-                              File(widget.device.customIconPath!),
+                            child: AppImage(
+                              path: widget.device.customIconPath!,
                               width: 48,
                               height: 48,
                               fit: BoxFit.cover,

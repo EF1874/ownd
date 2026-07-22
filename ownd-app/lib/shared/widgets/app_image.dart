@@ -30,11 +30,20 @@ class AppImage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final pixelRatio = MediaQuery.devicePixelRatioOf(context);
     return _buildImage(
       context,
       ref,
-      cacheWidth: cacheWidth,
-      cacheHeight: cacheHeight,
+      cacheWidth:
+          cacheWidth ??
+          (width != null && width!.isFinite
+              ? (width! * pixelRatio).ceil()
+              : null),
+      cacheHeight:
+          cacheHeight ??
+          (height != null && height!.isFinite
+              ? (height! * pixelRatio).ceil()
+              : null),
     );
   }
 

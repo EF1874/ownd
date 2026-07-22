@@ -90,7 +90,10 @@ extension _ProfileActions on ProfileScreen {
                       .map(
                         (days) => DropdownMenuItem(
                           value: days,
-                          child: Text('$days 天', style: leadDaysTextStyle),
+                          child: Text(
+                            days == 0 ? '到期当天' : '$days 天',
+                            style: leadDaysTextStyle,
+                          ),
                         ),
                       )
                       .toList(),

@@ -99,7 +99,15 @@ class _BaseCardState extends State<BaseCard> {
           Positioned.fill(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(16),
-              child: AppImage(path: widget.backgroundImagePath!),
+              child: LayoutBuilder(
+                builder: (context, constraints) => AppImage(
+                  path: widget.backgroundImagePath!,
+                  cacheWidth:
+                      (constraints.maxWidth *
+                              MediaQuery.devicePixelRatioOf(context))
+                          .ceil(),
+                ),
+              ),
             ),
           ),
           cardVariant,

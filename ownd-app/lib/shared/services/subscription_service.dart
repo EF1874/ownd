@@ -24,6 +24,10 @@ class SubscriptionService {
     final devices = await _deviceRepo.getAllDevices();
     await checkAndRenewSubscriptions(devices);
     await checkMissedNotifications(devices);
+    for (final device in devices) {
+      await scheduleSubscriptionNotification(device);
+      await scheduleWarrantyNotification(device);
+    }
   }
 
   /// Checks all auto-renew subscriptions and updates them if they are due.
@@ -212,6 +216,7 @@ class SubscriptionService {
     final devices = await _deviceRepo.getAllDevices();
     for (final device in devices) {
       await scheduleSubscriptionNotification(device);
+      await scheduleWarrantyNotification(device);
     }
   }
 

@@ -20,6 +20,9 @@ extension _DeviceDetailSubscriptionInfo on DeviceDetailScreen {
     final dueColor = daysUntilDue == null
         ? theme.colorScheme.primary
         : SubscriptionUtils.dueColor(context, daysUntilDue);
+    final notificationLeadDays = ref
+        .watch(preferencesServiceProvider)
+        .notificationLeadDays;
     return BaseCard(
       variant: CardVariant.standard,
       child: Column(
@@ -141,7 +144,9 @@ extension _DeviceDetailSubscriptionInfo on DeviceDetailScreen {
           _SwitchInfoRow(
             label: '到期提醒',
             subtitle: device.hasReminder
-                ? '到期前 ${ref.watch(preferencesServiceProvider).notificationLeadDays} 天提醒'
+                ? notificationLeadDays == 0
+                      ? '到期当天提醒'
+                      : '到期前 $notificationLeadDays 天提醒'
                 : '不提醒',
             value: device.hasReminder,
             onChanged: (enabled) =>
